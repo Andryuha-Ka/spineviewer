@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+
+# TypeScript generated
+src/auto-imports.d.ts
+src/components.d.ts
