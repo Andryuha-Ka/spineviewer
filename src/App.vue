@@ -1,5 +1,5 @@
 <template>
-  <n-config-provider :theme="darkTheme">
+  <n-config-provider :theme="naiveTheme">
     <n-global-style />
     <VersionPickerPage v-if="page === 'picker'" @open="page = 'viewer'" />
     <ViewerPage v-else @back="page = 'picker'" />
@@ -10,8 +10,20 @@
 import { darkTheme } from 'naive-ui'
 import VersionPickerPage from '@/components/pages/VersionPickerPage.vue'
 import ViewerPage from '@/components/pages/ViewerPage.vue'
+import { useSettingsStore } from '@/core/stores/useSettingsStore'
 
+const settingsStore = useSettingsStore()
 const page = ref<'picker' | 'viewer'>('picker')
+
+const naiveTheme = computed(() => settingsStore.theme === 'dark' ? darkTheme : null)
+
+watchEffect(() => {
+  const html = document.documentElement
+  // Remove previous theme/font classes
+  const toRemove = [...html.classList].filter(c => c.startsWith('theme-') || c.startsWith('font-'))
+  toRemove.forEach(c => html.classList.remove(c))
+  html.classList.add(`theme-${settingsStore.theme}`, `font-${settingsStore.fontSize}`)
+})
 </script>
 
 <style>
@@ -27,8 +39,8 @@ html,
 body,
 #app {
   height: 100%;
-  background: #0d0d0f;
-  color: #e0e0e0;
+  background: var(--c-bg);
+  color: var(--c-text);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 </style>

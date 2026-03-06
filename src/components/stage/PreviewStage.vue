@@ -374,6 +374,6 @@ defineExpose({
 
 .loading-text {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--c-text-muted);
 }
 </style>

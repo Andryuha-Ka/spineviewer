@@ -115,7 +115,7 @@ function fmt(n: number): string {
   height: 100%;
   overflow: hidden;
   font-size: 0.75rem;
-  color: #ccc;
+  color: var(--c-text);
 }
 
 .section {
@@ -135,7 +135,7 @@ function fmt(n: number): string {
 .label {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #777;
+  color: var(--c-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   flex-shrink: 0;
@@ -143,7 +143,7 @@ function fmt(n: number): string {
 
 .count {
   font-weight: 400;
-  color: #555;
+  color: var(--c-text-faint);
 }
 
 .search-input {
@@ -152,7 +152,7 @@ function fmt(n: number): string {
 
 .divider {
   height: 1px;
-  background: #1e1e24;
+  background: var(--c-border-dim);
   flex-shrink: 0;
 }
 
@@ -164,13 +164,13 @@ function fmt(n: number): string {
   max-height: 260px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #2a2a2e transparent;
+  scrollbar-color: var(--c-scroll) transparent;
 }
 
 .bone-list::-webkit-scrollbar { width: 4px; }
 .bone-list::-webkit-scrollbar-track { background: transparent; }
-.bone-list::-webkit-scrollbar-thumb { background: #2a2a2e; border-radius: 2px; }
-.bone-list::-webkit-scrollbar-thumb:hover { background: #3a3a3e; }
+.bone-list::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
+.bone-list::-webkit-scrollbar-thumb:hover { background: var(--c-scroll-hov); }
 
 .bone-row {
   display: flex;
@@ -185,11 +185,11 @@ function fmt(n: number): string {
 }
 
 .bone-row:hover {
-  background: #1a1a1f;
+  background: var(--c-raised);
 }
 
 .bone-name {
-  color: #bbb;
+  color: var(--c-text-dim);
   flex-shrink: 0;
   max-width: 110px;
   overflow: hidden;
@@ -198,7 +198,7 @@ function fmt(n: number): string {
 }
 
 .bone-vals {
-  color: #555;
+  color: var(--c-text-faint);
   font-variant-numeric: tabular-nums;
   font-size: 0.68rem;
   flex-shrink: 0;
@@ -212,28 +212,28 @@ function fmt(n: number): string {
   max-height: 160px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #2a2a2e transparent;
+  scrollbar-color: var(--c-scroll) transparent;
 }
 
 .attach-list::-webkit-scrollbar { width: 4px; }
 .attach-list::-webkit-scrollbar-track { background: transparent; }
-.attach-list::-webkit-scrollbar-thumb { background: #2a2a2e; border-radius: 2px; }
-.attach-list::-webkit-scrollbar-thumb:hover { background: #3a3a3e; }
+.attach-list::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
+.attach-list::-webkit-scrollbar-thumb:hover { background: var(--c-scroll-hov); }
 
 .attach-row {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 8px 2px 8px;
+  padding: 2px 8px;
   border-radius: 4px;
 }
 
 .attach-row:hover {
-  background: #1a1a1f;
+  background: var(--c-raised);
 }
 
 .attach-slot {
-  color: #888;
+  color: var(--c-text-muted);
   flex-shrink: 0;
   max-width: 80px;
   overflow: hidden;
@@ -242,7 +242,7 @@ function fmt(n: number): string {
 }
 
 .attach-name {
-  color: #bbb;
+  color: var(--c-text-dim);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -254,8 +254,8 @@ function fmt(n: number): string {
   font-size: 0.62rem;
   padding: 1px 4px;
   border-radius: 3px;
-  background: #1e1e24;
-  color: #666;
+  background: var(--c-border-dim);
+  color: var(--c-text-muted);
   flex-shrink: 0;
 }
 
@@ -267,7 +267,7 @@ function fmt(n: number): string {
 .empty-hint {
   padding: 16px;
   text-align: center;
-  color: #444;
+  color: var(--c-text-ghost);
   font-size: 0.75rem;
 }
 

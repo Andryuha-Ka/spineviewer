@@ -5,6 +5,8 @@
       <span class="version-tag">
         Pixi {{ versionStore.pixiVersion }} · Spine {{ versionStore.spineVersion }}
       </span>
+      <div class="toolbar-spacer" />
+      <SettingsPopover />
     </header>
 
     <div class="content">
@@ -49,6 +51,7 @@ import PreviewStage from '@/components/stage/PreviewStage.vue'
 import LoaderPanel from '@/components/panels/LoaderPanel.vue'
 import AnimationPanel from '@/components/panels/AnimationPanel.vue'
 import SkeletonPanel from '@/components/panels/SkeletonPanel.vue'
+import SettingsPopover from '@/components/ui/SettingsPopover.vue'
 import { useVersionStore } from '@/core/stores/useVersionStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import type { FileSet } from '@/core/types/FileSet'
@@ -107,7 +110,7 @@ function onSetSkins(names: string[]) {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #0d0d0f;
+  background: var(--c-bg);
 }
 
 .toolbar {
@@ -115,14 +118,16 @@ function onSetSkins(names: string[]) {
   align-items: center;
   gap: 16px;
   padding: 8px 16px;
-  border-bottom: 1px solid #1e1e24;
+  border-bottom: 1px solid var(--c-border-dim);
   flex-shrink: 0;
 }
 
+.toolbar-spacer { flex: 1; }
+
 .back-btn {
   background: none;
-  border: 1px solid #2a2a2e;
-  color: #888;
+  border: 1px solid var(--c-border);
+  color: var(--c-text-muted);
   border-radius: 6px;
   padding: 4px 12px;
   font-size: 0.8rem;
@@ -131,13 +136,13 @@ function onSetSkins(names: string[]) {
 }
 
 .back-btn:hover {
-  color: #ccc;
-  border-color: #444;
+  color: var(--c-text-dim);
+  border-color: var(--c-text-ghost);
 }
 
 .version-tag {
   font-size: 0.75rem;
-  color: #555;
+  color: var(--c-text-faint);
 }
 
 .content {
@@ -149,7 +154,7 @@ function onSetSkins(names: string[]) {
 .side-panel {
   width: 280px;
   flex-shrink: 0;
-  border-right: 1px solid #1e1e24;
+  border-right: 1px solid var(--c-border-dim);
   overflow: hidden;
   display: flex;
   flex-direction: column;

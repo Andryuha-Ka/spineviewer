@@ -4,10 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="step 6">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="step 7">
+      <change beforePath="$PROJECT_DIR$/src/App.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/App.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/pages/VersionPickerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/VersionPickerPage.vue" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/panels/AnimationPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/AnimationPanel.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/panels/LoaderPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/LoaderPanel.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/panels/SkeletonPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/SkeletonPanel.vue" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -110,7 +115,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1772542772095</updated>
-      <workItem from="1772542773282" duration="40671000" />
+      <workItem from="1772542773282" duration="41543000" />
     </task>
     <task id="LOCAL-00001" summary="перший коміт">
       <option name="closed" value="true" />
@@ -168,7 +173,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772784636236</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="step 7">
+      <option name="closed" value="true" />
+      <created>1772785661160</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1772785661160</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -190,6 +203,7 @@
     <MESSAGE value="Другий коміт" />
     <MESSAGE value="step 5" />
     <MESSAGE value="step 6" />
-    <option name="LAST_COMMIT_MESSAGE" value="step 6" />
+    <MESSAGE value="step 7" />
+    <option name="LAST_COMMIT_MESSAGE" value="step 7" />
   </component>
 </project>

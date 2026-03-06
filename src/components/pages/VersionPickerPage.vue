@@ -1,5 +1,9 @@
 <template>
   <div class="picker">
+    <div class="picker-top-bar">
+      <SettingsPopover />
+    </div>
+
     <header class="picker-header">
       <h1 class="title">
         <span class="t-spine">Spine</span>
@@ -67,6 +71,7 @@
 
 <script setup lang="ts">
 import { useVersionStore, type PixiVersion, type SpineVersion } from '@/core/stores/useVersionStore'
+import SettingsPopover from '@/components/ui/SettingsPopover.vue'
 
 const emit = defineEmits<{ open: [] }>()
 const store = useVersionStore()
@@ -81,7 +86,13 @@ const store = useVersionStore()
   min-height: 100vh;
   gap: 40px;
   padding: 40px 20px;
-  background: #0d0d0f;
+  background: var(--c-bg);
+}
+
+.picker-top-bar {
+  position: absolute;
+  top: 16px;
+  right: 20px;
 }
 
 /* ── Header ─────────────────────────────────────────── */
@@ -98,11 +109,11 @@ const store = useVersionStore()
 }
 
 .t-spine  { color: #7c6af5; }
-.t-viewer { color: #e0e0e0; }
+.t-viewer { color: var(--c-text); }
 .t-pro    { color: #4e9af1; }
 
 .hint {
-  color: #555;
+  color: var(--c-text-faint);
   font-size: 0.875rem;
   letter-spacing: 0.04em;
 }
@@ -119,22 +130,22 @@ const store = useVersionStore()
   width: 240px;
   padding: 28px 24px;
   border-radius: 16px;
-  border: 1.5px solid #2a2a2e;
-  background: #16161a;
+  border: 1.5px solid var(--c-border);
+  background: var(--c-surface);
   cursor: pointer;
   transition: border-color 0.18s, background 0.18s, transform 0.12s;
   user-select: none;
 }
 
 .card:hover {
-  border-color: #3a3a4e;
-  background: #1a1a20;
+  border-color: var(--c-text-ghost);
+  background: var(--c-raised);
   transform: translateY(-2px);
 }
 
 .card--selected {
   border-color: #7c6af5;
-  background: #1a1728;
+  background: var(--c-card-sel-bg);
 }
 
 .card--selected:hover {
@@ -157,14 +168,14 @@ const store = useVersionStore()
 
 .card-engine {
   font-size: 1rem;
-  color: #aaa;
+  color: var(--c-text-muted);
   font-weight: 500;
 }
 
 .card-ver {
   font-size: 2rem;
   font-weight: 800;
-  color: #e0e0e0;
+  color: var(--c-text);
   line-height: 1;
 }
 
@@ -186,7 +197,7 @@ const store = useVersionStore()
 
 .card-desc {
   font-size: 0.78rem;
-  color: #555;
+  color: var(--c-text-faint);
   margin-bottom: 4px;
 }
 
@@ -200,13 +211,13 @@ const store = useVersionStore()
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #444;
+  color: var(--c-text-ghost);
   margin-bottom: 12px;
 }
 
 .spine-ver {
   font-size: 0.9rem;
-  color: #c0c0c0;
+  color: var(--c-text-dim);
 }
 
 /* ── Open button ─────────────────────────────────────── */

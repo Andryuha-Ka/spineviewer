@@ -341,7 +341,7 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
 
 .label {
   font-size: 0.72rem;
-  color: #666;
+  color: var(--c-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -354,9 +354,9 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
 }
 
 .track-btn {
-  background: #1a1a1e;
-  border: 1px solid #2a2a2e;
-  color: #666;
+  background: var(--c-raised);
+  border: 1px solid var(--c-border);
+  color: var(--c-text-muted);
   border-radius: 4px;
   padding: 3px 0;
   font-size: 0.75rem;
@@ -365,7 +365,7 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
 }
 
 .track-btn:disabled { opacity: 0.35; cursor: default; }
-.track-btn:not(:disabled):hover { border-color: #444; color: #aaa; }
+.track-btn:not(:disabled):hover { border-color: var(--c-text-ghost); color: var(--c-text-dim); }
 
 .track-btn--active {
   border-color: #4ade80 !important;
@@ -410,7 +410,7 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
 .speed-value {
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
-  color: #ccc;
+  color: var(--c-text-dim);
   font-weight: 600;
   min-width: 38px;
   text-align: right;
@@ -430,7 +430,7 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
   max-height: 160px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #2a2a2e transparent;
+  scrollbar-color: var(--c-scroll) transparent;
 }
 
 .skin-list::-webkit-scrollbar {
@@ -442,12 +442,12 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
 }
 
 .skin-list::-webkit-scrollbar-thumb {
-  background: #2a2a2e;
+  background: var(--c-scroll);
   border-radius: 2px;
 }
 
 .skin-list::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3e;
+  background: var(--c-scroll-hov);
 }
 
 .skin-row {
@@ -460,12 +460,12 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
   user-select: none;
 }
 
-.skin-row:hover { background: #1a1a1e; }
+.skin-row:hover { background: var(--c-raised); }
 
 .skin-name {
   flex: 1;
   font-size: 0.75rem;
-  color: #bbb;
+  color: var(--c-text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -488,7 +488,7 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
 
 .empty-hint {
   font-size: 0.75rem;
-  color: #444;
+  color: var(--c-text-ghost);
   text-align: center;
   padding: 6px 0;
 }
@@ -497,7 +497,7 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
 .track-block {
   display: flex;
   flex-direction: column;
-  border: 1px solid #2a2a2e;
+  border: 1px solid var(--c-border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -511,13 +511,13 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
   align-items: center;
   gap: 6px;
   padding: 5px 8px;
-  background: #1a1a1e;
-  border-bottom: 1px solid #222226;
+  background: var(--c-raised);
+  border-bottom: 1px solid var(--c-border-dim);
   font-size: 0.75rem;
 }
 
 .track-index {
-  color: #555;
+  color: var(--c-text-faint);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
@@ -534,7 +534,7 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
 
 .track-loop-text {
   font-size: 0.7rem;
-  color: #555;
+  color: var(--c-text-faint);
 }
 
 /* ── Track entries ───────────────────────── */
@@ -547,16 +547,16 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
 }
 
 .track-entry--current {
-  background: #141416;
+  background: var(--c-surface);
 }
 
 .track-entry--queued {
-  background: #111113;
+  background: var(--c-sunken);
 }
 
 .entry-icon {
   font-size: 0.6rem;
-  color: #444;
+  color: var(--c-text-ghost);
   flex-shrink: 0;
   width: 12px;
   text-align: center;
@@ -569,6 +569,6 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
   white-space: nowrap;
 }
 
-.track-entry--current .entry-name { color: #ccc; }
-.track-entry--queued  .entry-name { color: #555; }
+.track-entry--current .entry-name { color: var(--c-text-dim); }
+.track-entry--queued  .entry-name { color: var(--c-text-faint); }
 </style>

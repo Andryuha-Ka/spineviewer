@@ -200,7 +200,7 @@ function formatSize(bytes: number): string {
 
 /* ── Drop zone ──────────────────────────────────────── */
 .drop-zone {
-  border: 1.5px dashed #2e2e38;
+  border: 1.5px dashed var(--c-border);
   border-radius: 10px;
   padding: 20px 12px;
   display: flex;
@@ -226,12 +226,12 @@ function formatSize(bytes: number): string {
 .drop-icon {
   font-size: 1.6rem;
   line-height: 1;
-  color: #444;
+  color: var(--c-text-ghost);
 }
 
 .drop-text {
   font-size: 0.85rem;
-  color: #888;
+  color: var(--c-text-muted);
   font-weight: 500;
 }
 
@@ -243,7 +243,7 @@ function formatSize(bytes: number): string {
 
 .drop-hint {
   font-size: 0.72rem;
-  color: #444;
+  color: var(--c-text-ghost);
 }
 
 /* ── File pickers ───────────────────────────────────── */
@@ -288,12 +288,12 @@ function formatSize(bytes: number): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #ccc;
+  color: var(--c-text-dim);
 }
 
 .file-size {
   flex-shrink: 0;
-  color: #555;
+  color: var(--c-text-faint);
   font-variant-numeric: tabular-nums;
 }
 
