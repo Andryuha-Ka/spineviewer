@@ -292,7 +292,7 @@ function formatAgo(timestamp: number): string {
   align-items: center;
   gap: 2px;
   padding: 6px 4px;
-  background: var(--c-bg-panel);
+  background: var(--c-raised);
 }
 
 .stat-label {
@@ -368,7 +368,7 @@ function formatAgo(timestamp: number): string {
   gap: 8px;
   padding: 3px 6px;
   border-radius: 4px;
-  background: var(--c-bg-panel);
+  background: var(--c-raised);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
