@@ -225,8 +225,8 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
       x: b.worldX ?? 0,
       y: b.worldY ?? 0,
       rotation: b.worldRotation ?? 0,
-      scaleX: b.worldScaleX ?? 1,
-      scaleY: b.worldScaleY ?? 1,
+      scaleX: b.scaleX ?? b.worldScaleX ?? 1,
+      scaleY: b.scaleY ?? b.worldScaleY ?? 1,
     }))
   }
 

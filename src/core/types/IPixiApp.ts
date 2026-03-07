@@ -1,3 +1,8 @@
+export interface RendererStats {
+  /** Number of WebGL draw calls in the last frame; null = not available for this Pixi version */
+  drawCalls: number | null
+}
+
 export interface PixiTicker {
   readonly FPS: number
   add(fn: (dt: number) => void): this
@@ -22,4 +27,5 @@ export interface IPixiApp {
   destroy(): void
   setBackground(color: number): void
   createTrackOverlay(): ITrackOverlay
+  getStats(): RendererStats
 }

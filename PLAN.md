@@ -515,29 +515,25 @@ export function buildImageResolver(images: SpineFile[]) {
 
 ---
 
-## Step 10 — Performance Profiler
+## Step 10 — Performance Profiler ✅
 
-**Видимий результат:** панель з FPS графіком, лічильниками draw calls, трикутників; список "важких кадрів".
+**Видимий результат:** вкладка "Perf" — FPS-графік (canvas, 120 барів), stats grid, список slow frames.
 
-### Задачі
+### Реалізовано
 
-- [ ] `src/core/stores/useProfilerStore.ts`:
-  ```typescript
-  const fpsHistory = ref<number[]>([]);    // ringbuffer 120 значень
-  const drawCalls = ref(0);
-  const triangles = ref(0);
-  const vertices = ref(0);
-  const clippingCount = ref(0);
-  const meshCount = ref(0);
-  const slowFrames = ref<FrameSnapshot[]>([]);
-  ```
-- [ ] `ProfilerPanel.vue`:
-  - **FPS Graph** — mini line chart (uPlot або canvas), 120 точок, мітки < 30 / < 60 fps
-  - **Per-frame stats** — draw calls, triangles, vertices, active clipping, active mesh
-  - **VRAM estimate** — `Σ(width × height × 4 bytes)` для всіх завантажених текстур
-  - **Slow Frame Log** — список кадрів > 16ms: timestamp + активні треки + стан
-- [ ] Tick loop → збирає дані з `renderer` (Pixi 7: `renderer.batch.currentPath`, Pixi 8: `renderer.renderPipes`)
-- [ ] `IPixiApp` — метод `getStats(): RendererStats` в обох адаптерах
+- [x] `src/core/types/IPixiApp.ts` — інтерфейс `RendererStats { drawCalls: number | null }` + метод `getStats()` в `IPixiApp`
+- [x] `Pixi7App.ts` / `Pixi8App.ts` — реалізація `getStats()` (повертає `{ drawCalls: null }` — Pixi 7/8 не мають публічного лічильника draw calls)
+- [x] `src/core/stores/useProfilerStore.ts`:
+  - `fpsHistory: ref<number[]>` — ringbuffer 120 значень; `recordFrame(fps, ms)` — кожен кадр
+  - `drawCalls`, `clippingCount`, `meshCount` — `updateStats()` кожні 6 кадрів (разом з inspector throttle)
+  - `slowFrames: ref<FrameSnapshot[]>` — кадри де fps < 30, max 50; `clearSlowFrames()`
+  - `clear()` при destroy адаптера та unmount
+- [x] `src/components/panels/ProfilerPanel.vue`:
+  - **FPS Graph** — canvas 2D, 64px, 120 барів; рефреш через rAF loop; горизонтальні мітки 30/60 fps; кольори: зелений ≥55, жовтий ≥30, червоний <30
+  - **Stats grid** (3×2): FPS (кольоровий), Frame ms, Draw calls (або —), Clipping (жовтий/червоний при ≥1/≥3), Meshes, VRAM (з `atlasStore.pages`)
+  - **Slow Frames log** — newest-first, max 50; показує fps, ms, clipping, mesh; кнопка Clear
+- [x] `PreviewStage.vue` — `profilerStore.recordFrame()` кожен кадр; `profilerStore.updateStats()` кожні 6 кадрів; `profilerStore.clear()` при destroy і unmount
+- [x] `ViewerPage.vue` — 6-та вкладка "Perf" → `<ProfilerPanel />`
 
 ---
 
@@ -675,3 +671,4 @@ export function buildImageResolver(images: SpineFile[]) {
 | `FileSet` — єдина структура файлів | Всі адаптери приймають `FileSet`, не `File[]` |
 | `useVersionStore` — єдине джерело вибраної версії | Не передавати версію через props по дереву |
 | Адаптери — динамічний import (`await import(...)`) | Не завантажувати всі версії Pixi/Spine одночасно |
+.

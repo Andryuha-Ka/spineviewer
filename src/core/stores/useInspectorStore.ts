@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import type { BoneTransform, AttachmentInfo } from '@/core/types/ISpineAdapter'
 
 export const useInspectorStore = defineStore('inspector', () => {
-  const boneTransforms    = shallowRef<BoneTransform[]>([])
-  const activeAttachments = shallowRef<AttachmentInfo[]>([])
+  const boneTransforms    = ref<BoneTransform[]>([])
+  const activeAttachments = ref<AttachmentInfo[]>([])
 
   function update(bones: BoneTransform[], attachments: AttachmentInfo[]) {
     boneTransforms.value    = bones

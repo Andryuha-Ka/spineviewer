@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi8'
-import type { IPixiApp, ITrackOverlay, PixiTicker } from '@/core/types/IPixiApp'
+import type { IPixiApp, ITrackOverlay, PixiTicker, RendererStats } from '@/core/types/IPixiApp'
 
 export class Pixi8App implements IPixiApp {
   private constructor(private readonly _app: PIXI.Application) {}
@@ -50,6 +50,11 @@ export class Pixi8App implements IPixiApp {
       resize: (_w: number, h: number) => { text.y = h - 8 },
       destroy: () => { this._app.stage.removeChild(text); text.destroy() },
     }
+  }
+
+  getStats(): RendererStats {
+    // Pixi 8 does not expose a public draw-call counter — return null
+    return { drawCalls: null }
   }
 
   destroy(): void {

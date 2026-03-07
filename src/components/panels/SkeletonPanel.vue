@@ -11,6 +11,7 @@
           <label class="label">
             Bones
             <span class="count">({{ filteredBones.length }})</span>
+            <span class="tick">· {{ updateTick }}</span>
           </label>
           <n-input
             v-model:value="boneSearch"
@@ -31,6 +32,7 @@
             <span class="bone-name">{{ item.name }}</span>
             <span v-if="item.transform" class="bone-vals">
               {{ fmt(item.transform.x) }}, {{ fmt(item.transform.y) }}, {{ fmt(item.transform.rotation) }}°
+              <span class="bone-scale">· {{ fmtS(item.transform.scaleX) }}×{{ fmtS(item.transform.scaleY) }}</span>
             </span>
           </div>
         </div>
@@ -74,6 +76,11 @@ const inspectorStore = useInspectorStore()
 
 const boneSearch = ref('')
 
+// Tick counter — increments every inspector update so the user can see data IS live
+// even when bone positions don't change (e.g. attachment-only animations)
+const updateTick = ref(0)
+watch(() => inspectorStore.boneTransforms, () => { updateTick.value = (updateTick.value + 1) % 100 })
+
 // Compute depth for each bone (Spine guarantees parent-before-child order)
 const boneDepthMap = computed(() => {
   const map = new Map<string, number>()
@@ -84,27 +91,28 @@ const boneDepthMap = computed(() => {
   return map
 })
 
-const boneTransformMap = computed(() => {
-  const map = new Map<string, BoneTransform>()
-  for (const bt of inspectorStore.boneTransforms) {
-    map.set(bt.name, bt)
-  }
-  return map
-})
-
 const filteredBones = computed(() => {
   const search = boneSearch.value.toLowerCase()
+  // Build transform lookup inline — directly tracks inspectorStore.boneTransforms
+  const transformMap = new Map<string, BoneTransform>()
+  for (const bt of inspectorStore.boneTransforms) {
+    transformMap.set(bt.name, bt)
+  }
   return skeletonStore.bones
     .filter(b => !search || b.name.toLowerCase().includes(search))
     .map(b => ({
       name: b.name,
       depth: boneDepthMap.value.get(b.name) ?? 0,
-      transform: boneTransformMap.value.get(b.name) ?? null,
+      transform: transformMap.get(b.name) ?? null,
     }))
 })
 
 function fmt(n: number): string {
   return n.toFixed(1)
+}
+
+function fmtS(n: number): string {
+  return n.toFixed(2)
 }
 </script>
 
@@ -144,6 +152,12 @@ function fmt(n: number): string {
 .count {
   font-weight: 400;
   color: var(--c-text-faint);
+}
+
+.tick {
+  font-weight: 400;
+  color: var(--c-text-ghost);
+  font-variant-numeric: tabular-nums;
 }
 
 .search-input {
@@ -202,6 +216,13 @@ function fmt(n: number): string {
   font-variant-numeric: tabular-nums;
   font-size: 0.68rem;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.bone-scale {
+  color: var(--c-text-ghost);
 }
 
 /* ── Attachments ── */

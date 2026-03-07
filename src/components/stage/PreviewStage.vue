@@ -26,7 +26,8 @@ import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useInspectorStore } from '@/core/stores/useInspectorStore'
 import { useEventsStore } from '@/core/stores/useEventsStore'
-import { useAtlasStore } from '@/core/stores/useAtlasStore'
+import { useAtlasStore }    from '@/core/stores/useAtlasStore'
+import { useProfilerStore } from '@/core/stores/useProfilerStore'
 import type { IPixiApp, ITrackOverlay } from '@/core/types/IPixiApp'
 import type { ISpineAdapter, TrackState } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
@@ -38,6 +39,7 @@ const animationStore = useAnimationStore()
 const inspectorStore = useInspectorStore()
 const eventsStore    = useEventsStore()
 const atlasStore     = useAtlasStore()
+const profilerStore  = useProfilerStore()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 const canvasRef    = ref<HTMLCanvasElement | null>(null)
@@ -57,7 +59,8 @@ let pixiApp: IPixiApp | null = null
 let spineAdapter: ISpineAdapter | null = null
 let trackOverlay: ITrackOverlay | null = null
 let tickerFn: ((dt: number) => void) | null = null
-let inspectorFrame = 0
+let lastFrameTs    = 0
+let lastInspectorTs = 0  // time-based throttle — avoids aliasing with short animation loops
 
 onMounted(async () => {
   const canvas    = canvasRef.value!
@@ -75,8 +78,14 @@ onMounted(async () => {
     trackOverlay = pixiApp.createTrackOverlay()
     trackOverlay.resize(width, height)
 
+    lastFrameTs = lastInspectorTs = performance.now()
     tickerFn = () => {
+      const now = performance.now()
+      const ms  = now - lastFrameTs
+      lastFrameTs = now
+
       fps.value = Math.round(pixiApp!.ticker.FPS)
+      profilerStore.recordFrame(fps.value, ms)
       if (spineAdapter) {
         const states = spineAdapter.getTrackStates()
         animationStore.setTracks(states)
@@ -99,9 +108,11 @@ onMounted(async () => {
           }
         }
 
-        // Inspector + Atlas: throttle to ~10 fps (every 6 frames at 60fps)
-        if (++inspectorFrame >= 6) {
-          inspectorFrame = 0
+        // Inspector + Atlas + Profiler: time-based throttle ~10 fps (100 ms).
+        // Time-based avoids aliasing with short animation loops whose length
+        // happens to be a multiple of a fixed frame count.
+        if (now - lastInspectorTs >= 100) {
+          lastInspectorTs = now
           const attachments = spineAdapter.getActiveAttachments()
           inspectorStore.update(spineAdapter.getBoneTransforms(), attachments)
           atlasStore.markSeen(
@@ -109,6 +120,7 @@ onMounted(async () => {
               .filter(a => a.type === 'region' || a.type === 'mesh')
               .map(a => a.attachmentName),
           )
+          profilerStore.updateStats(pixiApp!.getStats(), attachments)
         }
       }
     }
@@ -189,6 +201,7 @@ onUnmounted(() => {
   inspectorStore.clear()
   eventsStore.clear()
   atlasStore.clear()
+  profilerStore.clear()
 })
 
 useResizeObserver(containerRef, ([entry]) => {
@@ -233,6 +246,7 @@ async function loadSpine(fileSet: FileSet): Promise<void> {
     inspectorStore.clear()
     eventsStore.clear()
     atlasStore.clear()
+    profilerStore.clear()
   }
 
   loading.value = true
