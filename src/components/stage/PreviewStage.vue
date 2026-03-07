@@ -26,8 +26,9 @@ import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useInspectorStore } from '@/core/stores/useInspectorStore'
 import { useEventsStore } from '@/core/stores/useEventsStore'
-import { useAtlasStore }    from '@/core/stores/useAtlasStore'
-import { useProfilerStore } from '@/core/stores/useProfilerStore'
+import { useAtlasStore }      from '@/core/stores/useAtlasStore'
+import { useProfilerStore }   from '@/core/stores/useProfilerStore'
+import { useComplexityStore } from '@/core/stores/useComplexityStore'
 import type { IPixiApp, ITrackOverlay } from '@/core/types/IPixiApp'
 import type { ISpineAdapter, TrackState } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
@@ -38,8 +39,9 @@ const skeletonStore  = useSkeletonStore()
 const animationStore = useAnimationStore()
 const inspectorStore = useInspectorStore()
 const eventsStore    = useEventsStore()
-const atlasStore     = useAtlasStore()
-const profilerStore  = useProfilerStore()
+const atlasStore      = useAtlasStore()
+const profilerStore   = useProfilerStore()
+const complexityStore = useComplexityStore()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 const canvasRef    = ref<HTMLCanvasElement | null>(null)
@@ -202,6 +204,7 @@ onUnmounted(() => {
   eventsStore.clear()
   atlasStore.clear()
   profilerStore.clear()
+  complexityStore.clear()
 })
 
 useResizeObserver(containerRef, ([entry]) => {
@@ -247,6 +250,7 @@ async function loadSpine(fileSet: FileSet): Promise<void> {
     eventsStore.clear()
     atlasStore.clear()
     profilerStore.clear()
+    complexityStore.clear()
   }
 
   loading.value = true
@@ -290,6 +294,9 @@ async function loadSpine(fileSet: FileSet): Promise<void> {
     if (typeof fileSet.atlas.fileBody === 'string') {
       atlasStore.load(fileSet.atlas.fileBody, fileSet.images)
     }
+
+    // Complexity analysis (runs once after load, synchronous for JSON)
+    complexityStore.analyze(spineAdapter, fileSet, atlasStore.pages)
   } catch (e) {
     spineError.value = e instanceof Error ? e.message : 'Failed to load Spine'
     console.error('[PreviewStage] loadSpine error:', e)

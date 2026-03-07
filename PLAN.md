@@ -565,7 +565,7 @@ export function buildImageResolver(images: SpineFile[]) {
   - Для кожної анімації — кількість keyframes та density (kf/s)
   - Виявлення redundant keyframes (два сусідні з однаковим значенням)
   - Виявлення stepped curves де linear могло б зменшити дані
-- [ ] `ComplexityPanel.vue`:
+- [ ] `ComplexityPanel.vue`:так 
   - Таблиця метрик з кольоровими індикаторами 🟢🟡🔴
   - Секція "Recommendations" — автоматичні поради
   - Секція "Keyframes" — таблиця анімацій з kf-density

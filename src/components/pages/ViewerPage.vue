@@ -52,6 +52,9 @@
           <n-tab-pane name="perf" tab="Perf" class="tab-pane">
             <ProfilerPanel />
           </n-tab-pane>
+          <n-tab-pane name="compl" tab="Compl" class="tab-pane">
+            <ComplexityPanel />
+          </n-tab-pane>
         </n-tabs>
       </aside>
 
@@ -69,7 +72,8 @@ import AnimationPanel from '@/components/panels/AnimationPanel.vue'
 import SkeletonPanel from '@/components/panels/SkeletonPanel.vue'
 import EventsPanel from '@/components/panels/EventsPanel.vue'
 import AtlasInspector from '@/components/panels/AtlasInspector.vue'
-import ProfilerPanel  from '@/components/panels/ProfilerPanel.vue'
+import ProfilerPanel    from '@/components/panels/ProfilerPanel.vue'
+import ComplexityPanel from '@/components/panels/ComplexityPanel.vue'
 import SettingsPopover from '@/components/ui/SettingsPopover.vue'
 import { useVersionStore } from '@/core/stores/useVersionStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
@@ -82,7 +86,7 @@ const versionStore    = useVersionStore()
 const skeletonStore   = useSkeletonStore()
 const animationStore  = useAnimationStore()
 const stageRef      = ref<InstanceType<typeof PreviewStage> | null>(null)
-const activeTab     = ref<'files' | 'animation' | 'inspector' | 'events' | 'atlas' | 'perf'>('files')
+const activeTab     = ref<'files' | 'animation' | 'inspector' | 'events' | 'atlas' | 'perf' | 'compl'>('files')
 
 // Auto-switch to animation tab when a skeleton loads
 watch(() => skeletonStore.isLoaded, (loaded) => {
