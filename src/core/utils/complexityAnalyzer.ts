@@ -1,3 +1,11 @@
+/**
+ * @file complexityAnalyzer.ts
+ * @project Spine Viewer Pro
+ * @author Andrii Karpus <andryuha.ka@gmail.com>
+ * @copyright 2026 Andrii Karpus
+ * @built-with Claude Code (https://claude.ai/claude-code)
+ */
+
 import type { ISpineAdapter } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
 import type { AtlasPage } from '@/core/utils/atlasTextParser'

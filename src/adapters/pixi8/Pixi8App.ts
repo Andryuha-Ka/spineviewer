@@ -1,3 +1,11 @@
+/**
+ * @file Pixi8App.ts
+ * @project Spine Viewer Pro
+ * @author Andrii Karpus <andryuha.ka@gmail.com>
+ * @copyright 2026 Andrii Karpus
+ * @built-with Claude Code (https://claude.ai/claude-code)
+ */
+
 import * as PIXI from 'pixi8'
 import type { IPixiApp, ITrackOverlay, PixiTicker, RendererStats } from '@/core/types/IPixiApp'
 

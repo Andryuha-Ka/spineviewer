@@ -1,3 +1,11 @@
+/**
+ * @file exportUtils.ts
+ * @project Spine Viewer Pro
+ * @author Andrii Karpus <andryuha.ka@gmail.com>
+ * @copyright 2026 Andrii Karpus
+ * @built-with Claude Code (https://claude.ai/claude-code)
+ */
+
 /** Download a Blob as a file */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)

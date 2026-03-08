@@ -1,3 +1,11 @@
+<!--
+ * @file LoaderPanel.vue
+ * @project Spine Viewer Pro
+ * @author Andrii Karpus <andryuha.ka@gmail.com>
+ * @copyright 2026 Andrii Karpus
+ * @built-with Claude Code (https://claude.ai/claude-code)
+-->
+
 <template>
   <div class="loader-panel">
     <!-- Drop zone -->

@@ -1,3 +1,11 @@
+/**
+ * @file Spine41Adapter.ts
+ * @project Spine Viewer Pro
+ * @author Andrii Karpus <andryuha.ka@gmail.com>
+ * @copyright 2026 Andrii Karpus
+ * @built-with Claude Code (https://claude.ai/claude-code)
+ */
+
 import type {
   ISpineAdapter, BoneInfo, SlotInfo, EventInfo,
   TrackState, BoneTransform, AttachmentInfo, SpineEvent,

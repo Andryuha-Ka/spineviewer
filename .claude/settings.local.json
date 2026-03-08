@@ -15,7 +15,8 @@
       "Bash(npx tsc:*)",
       "Bash(find:*)",
       "Bash(cat:*)",
-      "Bash(xxd:*)"
+      "Bash(xxd:*)",
+      "Bash(python:*)"
     ]
   }
 }

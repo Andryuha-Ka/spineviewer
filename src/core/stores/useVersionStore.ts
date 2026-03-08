@@ -1,3 +1,11 @@
+/**
+ * @file useVersionStore.ts
+ * @project Spine Viewer Pro
+ * @author Andrii Karpus <andryuha.ka@gmail.com>
+ * @copyright 2026 Andrii Karpus
+ * @built-with Claude Code (https://claude.ai/claude-code)
+ */
+
 import { defineStore } from 'pinia'
 
 export type PixiVersion = 7 | 8

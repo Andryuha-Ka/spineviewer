@@ -1,3 +1,11 @@
+/**
+ * @file IPixiApp.ts
+ * @project Spine Viewer Pro
+ * @author Andrii Karpus <andryuha.ka@gmail.com>
+ * @copyright 2026 Andrii Karpus
+ * @built-with Claude Code (https://claude.ai/claude-code)
+ */
+
 export interface RendererStats {
   /** Number of WebGL draw calls in the last frame; null = not available for this Pixi version */
   drawCalls: number | null
