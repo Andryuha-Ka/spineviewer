@@ -4,9 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="step 13">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/panels/ProfilerPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/ProfilerPanel.vue" afterDir="false" />
+    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="added copyright">
+      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/pages/VersionPickerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/VersionPickerPage.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vite.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/vite.config.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -115,7 +117,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1772542772095</updated>
-      <workItem from="1772542773282" duration="80564000" />
+      <workItem from="1772542773282" duration="80956000" />
     </task>
     <task id="LOCAL-00001" summary="перший коміт">
       <option name="closed" value="true" />
@@ -253,7 +255,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772938063400</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="added copyright">
+      <option name="closed" value="true" />
+      <created>1773008445838</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1773008445838</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -284,6 +294,7 @@
     <MESSAGE value="step 12" />
     <MESSAGE value="step 12.5 апдейт лоадінгу файлів та автодетекції версій" />
     <MESSAGE value="step 13" />
-    <option name="LAST_COMMIT_MESSAGE" value="step 13" />
+    <MESSAGE value="added copyright" />
+    <option name="LAST_COMMIT_MESSAGE" value="added copyright" />
   </component>
 </project>

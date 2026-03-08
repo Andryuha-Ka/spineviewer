@@ -4,6 +4,7 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 import path from 'path'
+import pkg from './package.json'
 
 /**
  * Redirects `import … from 'pixi.js'` inside @esotericsoftware/* packages to
@@ -31,6 +32,9 @@ function spinePixi8Redirect(): Plugin {
 }
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [
     vue(),
     spinePixi8Redirect(),

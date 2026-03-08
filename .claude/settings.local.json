@@ -16,7 +16,9 @@
       "Bash(find:*)",
       "Bash(cat:*)",
       "Bash(xxd:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(grep \"\"version\"\":*)",
+      "Bash(sed:*)"
     ]
   }
 }

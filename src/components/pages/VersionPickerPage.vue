@@ -19,6 +19,7 @@
         <span class="t-pro"> Pro</span>
       </h1>
       <p class="hint">Select render engine and Spine runtime version</p>
+      <span class="app-version">v{{ appVersion }}</span>
     </header>
 
     <div class="cards">
@@ -172,6 +173,8 @@ import type { SpineFileType } from '@/core/types/FileSet'
 
 const emit = defineEmits<{ open: [] }>()
 
+const appVersion = __APP_VERSION__
+
 const store       = useVersionStore()
 const loaderStore = useLoaderStore()
 
@@ -290,6 +293,13 @@ function formatSize(bytes: number): string {
   color: var(--c-text-faint);
   font-size: 0.875rem;
   letter-spacing: 0.04em;
+}
+
+.app-version {
+  font-size: 0.65rem;
+  color: var(--c-text-ghost);
+  letter-spacing: 0.06em;
+  margin-top: 2px;
 }
 
 /* ── Cards ───────────────────────────────────────────── */
