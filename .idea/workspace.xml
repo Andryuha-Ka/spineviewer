@@ -4,16 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="step 12">
-      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
+    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="step 12.5 апдейт лоадінгу файлів та автодетекції версій">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/PLAN.md" beforeDir="false" afterPath="$PROJECT_DIR$/PLAN.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/pages/VersionPickerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/VersionPickerPage.vue" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/panels/AtlasInspector.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/AtlasInspector.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/panels/SkeletonPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/SkeletonPanel.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/panels/EventsPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/EventsPanel.vue" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/utils/versionDetector.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/utils/versionDetector.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -122,7 +119,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1772542772095</updated>
-      <workItem from="1772542773282" duration="74338000" />
+      <workItem from="1772542773282" duration="78692000" />
     </task>
     <task id="LOCAL-00001" summary="перший коміт">
       <option name="closed" value="true" />
@@ -244,7 +241,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772929075817</updated>
     </task>
-    <option name="localTasksCounter" value="16" />
+    <task id="LOCAL-00016" summary="step 12.5 апдейт лоадінгу файлів та автодетекції версій">
+      <option name="closed" value="true" />
+      <created>1772933379032</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1772933379032</updated>
+    </task>
+    <option name="localTasksCounter" value="17" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -273,6 +278,7 @@
     <MESSAGE value="step 10" />
     <MESSAGE value="step 11" />
     <MESSAGE value="step 12" />
-    <option name="LAST_COMMIT_MESSAGE" value="step 12" />
+    <MESSAGE value="step 12.5 апдейт лоадінгу файлів та автодетекції версій" />
+    <option name="LAST_COMMIT_MESSAGE" value="step 12.5 апдейт лоадінгу файлів та автодетекції версій" />
   </component>
 </project>

@@ -17,7 +17,7 @@
     </header>
 
     <div class="content">
-      <aside class="side-panel">
+      <aside class="side-panel" :style="{ width: panelWidth + 'px' }">
         <n-tabs
           v-model:value="activeTab"
           type="line"
@@ -64,6 +64,11 @@
         </n-tabs>
       </aside>
 
+      <div
+        class="resize-handle"
+        @mousedown.prevent="onResizeStart"
+      />
+
       <div class="stage-area">
         <PreviewStage ref="stageRef" />
       </div>
@@ -97,6 +102,71 @@ const loaderStore     = useLoaderStore()
 const exportStore     = useExportStore()
 const stageRef      = ref<InstanceType<typeof PreviewStage> | null>(null)
 const activeTab     = ref<'animation' | 'inspector' | 'events' | 'atlas' | 'perf' | 'compl' | 'export'>('animation')
+
+// ── Resizable side panel ──────────────────────────────────────────────────────
+const PANEL_MIN = 180
+const PANEL_MAX = 520
+const panelWidth = ref(
+  Math.min(PANEL_MAX, Math.max(PANEL_MIN, parseInt(localStorage.getItem('svp:panelWidth') ?? '380')))
+)
+
+function onResizeStart(e: MouseEvent) {
+  const startX = e.clientX
+  const startW = panelWidth.value
+
+  const onMove = (ev: MouseEvent) => {
+    panelWidth.value = Math.min(PANEL_MAX, Math.max(PANEL_MIN, startW + ev.clientX - startX))
+  }
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+    localStorage.setItem('svp:panelWidth', String(panelWidth.value))
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+function onKeyDown(e: KeyboardEvent) {
+  const tag = (e.target as HTMLElement).tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return
+
+  switch (e.code) {
+    case 'Space':
+      e.preventDefault()
+      animationStore.isPlaying ? animationStore.pause() : animationStore.play()
+      break
+    case 'ArrowLeft':
+      e.preventDefault()
+      if (animationStore.isPlaying) animationStore.pause()
+      stageRef.value?.seekDelta(animationStore.currentTrack, -1 / 30)
+      break
+    case 'ArrowRight':
+      e.preventDefault()
+      if (animationStore.isPlaying) animationStore.pause()
+      stageRef.value?.seekDelta(animationStore.currentTrack, 1 / 30)
+      break
+    case 'KeyR':
+      stageRef.value?.clearTracks()
+      break
+    case 'KeyL': {
+      const targets = e.shiftKey
+        ? animationStore.tracks
+        : animationStore.tracks.filter(t => t.trackIndex === animationStore.currentTrack)
+      for (const t of targets) {
+        stageRef.value?.setTrackLoop(t.trackIndex, !t.loop)
+      }
+      break
+    }
+    default:
+      if (/^Digit[0-9]$/.test(e.code)) {
+        animationStore.currentTrack = Number(e.code.replace('Digit', ''))
+      }
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeyDown))
+onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 
 function onClickBack() {
   if (!window.confirm('Reset viewer and return to version picker?')) return
@@ -307,12 +377,23 @@ async function onCaptureGif(opts: { track: number; fps: number; quality: number 
 }
 
 .side-panel {
-  width: 280px;
   flex-shrink: 0;
-  border-right: 1px solid var(--c-border-dim);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--c-border-dim);
+  cursor: col-resize;
+  transition: background 0.15s;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: #7c6af5;
 }
 
 .stage-area {
@@ -329,6 +410,15 @@ async function onCaptureGif(opts: { track: number; fps: number; quality: number 
 
 :deep(.side-tabs .n-tabs-nav) {
   flex-shrink: 0;
+}
+
+/* Compact tab labels — reduce horizontal padding */
+:deep(.side-tabs .n-tabs-tab) {
+  padding: 0 8px;
+}
+
+:deep(.side-tabs .n-tabs-tab-pad) {
+  width: 4px !important;
 }
 
 :deep(.side-tabs .n-tab-pane) {

@@ -1,5 +1,14 @@
 <template>
-  <div ref="containerRef" class="stage">
+  <div
+    ref="containerRef"
+    class="stage"
+    :class="{ 'stage--pan': isPanning }"
+    @mousedown="onPanStart"
+    @mousemove="onPanMove"
+    @mouseup="onPanEnd"
+    @mouseleave="onPanEnd"
+    @dblclick="onResetView"
+  >
     <canvas ref="canvasRef" class="canvas" />
 
     <div class="overlay-top-right">
@@ -61,6 +70,68 @@ const fpsClass = computed(() => {
 
 let pixiApp: IPixiApp | null = null
 let spineAdapter: ISpineAdapter | null = null
+
+// ── Viewport ──────────────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let spineObj: any = null   // reference to the mounted spine PIXI.Container
+let baseX = 0              // canvas center X — updated on resize / load
+let baseY = 0              // canvas center Y
+const isPanning = ref(false)
+let panStart = { x: 0, y: 0, px: 0, py: 0 }
+
+function applyViewport() {
+  if (!spineObj) return
+  spineObj.x = baseX + viewerStore.posX
+  spineObj.y = baseY + viewerStore.posY
+  spineObj.scale.set(viewerStore.zoom)
+}
+
+function onWheel(e: WheelEvent) {
+  if (!spineObj || !containerRef.value) return
+  e.preventDefault()
+
+  const rect = containerRef.value.getBoundingClientRect()
+  const mx = e.clientX - rect.left
+  const my = e.clientY - rect.top
+
+  // deltaMode 0 = pixels (touchpad), 1 = lines (mouse wheel)
+  const dz = e.deltaMode === 0
+    ? Math.exp(-e.deltaY * 0.004)
+    : e.deltaY < 0 ? 1.15 : 1 / 1.15
+
+  const newZoom = Math.min(20, Math.max(0.05, viewerStore.zoom * dz))
+  if (newZoom === viewerStore.zoom) return
+
+  // Zoom towards cursor: keep point under cursor fixed in spine-space
+  const spineX = (mx - baseX - viewerStore.posX) / viewerStore.zoom
+  const spineY = (my - baseY - viewerStore.posY) / viewerStore.zoom
+  viewerStore.posX = mx - baseX - spineX * newZoom
+  viewerStore.posY = my - baseY - spineY * newZoom
+  viewerStore.zoom = newZoom
+  applyViewport()
+}
+
+function onPanStart(e: MouseEvent) {
+  if (e.button !== 0) return
+  isPanning.value = true
+  panStart = { x: e.clientX, y: e.clientY, px: viewerStore.posX, py: viewerStore.posY }
+}
+
+function onPanMove(e: MouseEvent) {
+  if (!isPanning.value) return
+  viewerStore.posX = panStart.px + e.clientX - panStart.x
+  viewerStore.posY = panStart.py + e.clientY - panStart.y
+  applyViewport()
+}
+
+function onPanEnd() {
+  isPanning.value = false
+}
+
+function onResetView() {
+  viewerStore.resetView()
+  applyViewport()
+}
 let trackOverlay: ITrackOverlay | null = null
 let tickerFn: ((dt: number) => void) | null = null
 let lastFrameTs    = 0
@@ -69,6 +140,7 @@ let lastInspectorTs = 0  // time-based throttle — avoids aliasing with short a
 onMounted(async () => {
   const canvas    = canvasRef.value!
   const container = containerRef.value!
+  container.addEventListener('wheel', onWheel, { passive: false })
   const { width, height } = container.getBoundingClientRect()
 
   try {
@@ -168,7 +240,11 @@ onMounted(async () => {
             for (const [idxStr, playlist] of Object.entries(animationStore.trackPlaylists)) {
               const trackIndex = Number(idxStr)
               if (!animationStore.isTrackEnabled(trackIndex) || playlist.length === 0) continue
-              spineAdapter.setAnimation(trackIndex, playlist[0].animationName, playlist[0].loop)
+              // Prefer live Spine track loop state — it's set directly when user toggles per-track Loop checkbox
+              // and may differ from playlist if the ticker hasn't propagated the update yet
+              const liveLoop = animationStore.tracks.find(t => t.trackIndex === trackIndex)?.loop
+              const firstLoop = liveLoop ?? playlist[0].loop
+              spineAdapter.setAnimation(trackIndex, playlist[0].animationName, firstLoop)
               for (let i = 1; i < playlist.length; i++) {
                 spineAdapter.addAnimation(trackIndex, playlist[i].animationName, playlist[i].loop)
               }
@@ -199,6 +275,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  containerRef.value?.removeEventListener('wheel', onWheel)
+  spineObj = null
   if (pixiApp && tickerFn) pixiApp.ticker.remove(tickerFn)
   trackOverlay?.destroy()
   spineAdapter?.destroy()
@@ -218,6 +296,9 @@ useResizeObserver(containerRef, ([entry]) => {
   if (width > 0 && height > 0) {
     pixiApp?.resize(width, height)
     trackOverlay?.resize(width, height)
+    baseX = width / 2
+    baseY = height * 0.75
+    applyViewport()
   }
 })
 
@@ -276,13 +357,13 @@ async function loadSpine(fileSet: FileSet): Promise<void> {
     spineAdapter.mount(pixiApp.stage)
     spineAdapter.setTimeScale(animationStore.isPlaying ? animationStore.speed : 0)
 
-    // Position at center — cast to any since stage type is 'unknown'
+    // Grab the mounted spine object and initialise viewport
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const spineObj = (pixiApp.stage as any).children?.at(-1)
-    if (spineObj) {
-      spineObj.x = width / 2
-      spineObj.y = height * 0.75 // slightly below center — typical for characters
-    }
+    spineObj = (pixiApp.stage as any).children?.at(-1) ?? null
+    baseX = width / 2
+    baseY = height * 0.75
+    viewerStore.resetView()
+    applyViewport()
 
     // Fill skeleton store
     skeletonStore.populate({
@@ -375,7 +456,16 @@ defineExpose({
   },
   setTrackLoop: (track: number, loop: boolean) => {
     spineAdapter?.setTrackLoop(track, loop)
-    animationStore.updateTrackPlaylistFirstLoop(track, loop)
+    if (animationStore.trackPlaylists[track]?.length) {
+      animationStore.updateTrackPlaylistFirstLoop(track, loop)
+    } else {
+      // Playlist may be absent if the track was set via an internal adapter path;
+      // create it from the live Spine state so reconstruction works correctly on next Play.
+      const liveTrack = animationStore.tracks.find(t => t.trackIndex === track)
+      if (liveTrack) {
+        animationStore.setTrackPlaylist(track, [{ animationName: liveTrack.animationName, loop }])
+      }
+    }
   },
   removeQueueEntry: (track: number, index: number) => {
     // index+1 because playlist[0] is the currently playing entry
@@ -399,7 +489,9 @@ defineExpose({
   seekDelta: (track: number, delta: number) => {
     const entry = animationStore.tracks.find(t => t.trackIndex === track)
     if (!entry || !spineAdapter) return
-    const clamped = Math.max(0, Math.min(entry.time + delta, entry.duration))
+    // trackTime accumulates for looped animations, so normalise to [0, duration]
+    const base = entry.loop && entry.duration > 0 ? entry.time % entry.duration : entry.time
+    const clamped = Math.max(0, Math.min(base + delta, entry.duration))
     spineAdapter.seekTo(track, clamped)
   },
   seekTo: (track: number, time: number) => {
@@ -422,6 +514,11 @@ defineExpose({
   height: 100%;
   overflow: hidden;
   background: #0d0d0f;
+  cursor: grab;
+}
+
+.stage--pan {
+  cursor: grabbing;
 }
 
 .canvas {

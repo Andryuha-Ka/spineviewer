@@ -103,7 +103,12 @@
                 :style="{ color: nameColor(evt.name) }"
                 :title="evt.name"
               >{{ evt.name }}</span>
-              <button class="copy-btn" title="Copy name" @click="copyName(evt.name)">⎘</button>
+              <button class="copy-btn" title="Copy name" @click="copyName(evt.name)">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </button>
             </span>
             <span class="col-val muted">{{ evt.intValue || '' }}</span>
             <span class="col-val muted">{{ evt.floatValue ? evt.floatValue.toFixed(3) : '' }}</span>
@@ -128,7 +133,12 @@
         >
           <span class="stat-dot" :style="{ background: nameColor(stat.name) }" />
           <span class="stat-name" :title="stat.name">{{ stat.name }}</span>
-          <button class="copy-btn" title="Copy name" @click="copyName(stat.name)">⎘</button>
+          <button class="copy-btn" title="Copy name" @click="copyName(stat.name)">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
           <span class="stat-count">×{{ stat.count }}</span>
         </div>
       </div>
@@ -418,12 +428,14 @@ async function copyName(name: string) {
 /* ── Copy button ── */
 .copy-btn {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--c-text-ghost);
   cursor: pointer;
-  font-size: 0.7rem;
-  padding: 0 2px;
+  padding: 1px 3px;
   line-height: 1;
   border-radius: 3px;
   transition: color 0.12s;

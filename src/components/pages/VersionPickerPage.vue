@@ -139,6 +139,18 @@
     >
       Open Viewer
     </n-button>
+
+    <div class="shortcuts-hint">
+      <span class="shortcuts-title">Keyboard shortcuts</span>
+      <div class="shortcuts-list">
+        <span class="shortcut-item"><kbd>Space</kbd><span>Play / Pause</span></span>
+        <span class="shortcut-item"><kbd>Left</kbd><kbd>Right</kbd><span>Frame step</span></span>
+        <span class="shortcut-item"><kbd>R</kbd><span>Reset pose</span></span>
+        <span class="shortcut-item"><kbd>L</kbd><span>Toggle loop</span></span>
+        <span class="shortcut-item"><kbd>Shift</kbd><kbd>L</kbd><span>Loop all tracks</span></span>
+        <span class="shortcut-item"><kbd>0–9</kbd><span>Track</span></span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -515,5 +527,53 @@ function formatSize(bytes: number): string {
 /* ── Open button ─────────────────────────────────────── */
 .open-btn {
   min-width: 180px;
+}
+
+/* ── Shortcuts hint ──────────────────────────────────── */
+.shortcuts-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 24px;
+}
+
+.shortcuts-title {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--c-text-ghost);
+}
+
+.shortcuts-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+}
+
+.shortcut-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--c-text-faint);
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-family: inherit;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-text-muted);
+  min-width: 28px;
+  white-space: nowrap;
 }
 </style>

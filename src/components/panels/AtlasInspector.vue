@@ -73,7 +73,8 @@
           >{{ p.name }}</button>
         </div>
 
-        <div class="header-spacer" />
+        <!-- spacer only when page-tabs is absent; tabs themselves fill remaining space -->
+        <div v-if="atlasStore.pages.length <= 1" class="header-spacer" />
         <button class="close-btn" @click="modalOpen = false">✕</button>
       </div>
 
@@ -751,7 +752,15 @@ onUnmounted(() => {
   flex-wrap: nowrap;
   overflow-x: auto;
   flex: 1;
+  min-width: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-scroll) transparent;
 }
+
+.page-tabs::-webkit-scrollbar { height: 4px; }
+.page-tabs::-webkit-scrollbar-track { background: transparent; }
+.page-tabs::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
+.page-tabs::-webkit-scrollbar-thumb:hover { background: var(--c-scroll-hov); }
 
 .page-tab {
   background: var(--c-raised);
