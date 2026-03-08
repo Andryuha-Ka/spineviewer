@@ -57,6 +57,11 @@ export class Pixi8App implements IPixiApp {
     return { drawCalls: null }
   }
 
+  async extractFrame(): Promise<HTMLCanvasElement> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (await (this._app.renderer as any).extract.canvas(this._app.stage)) as HTMLCanvasElement
+  }
+
   destroy(): void {
     // false = do not remove canvas — Vue controls the DOM element
     this._app.destroy(false)

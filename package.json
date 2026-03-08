@@ -15,6 +15,7 @@
     "@pixi-spine/all-4.0": "^4.0.6",
     "@pixi-spine/all-4.1": "^4.0.6",
     "@vueuse/core": "^11.0.0",
+    "gif.js": "^0.2.0",
     "naive-ui": "^2.40.0",
     "pinia": "^2.2.0",
     "pixi.js": "^7.4.3",

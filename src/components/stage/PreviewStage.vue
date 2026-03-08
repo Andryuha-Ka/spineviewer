@@ -305,6 +305,56 @@ async function loadSpine(fileSet: FileSet): Promise<void> {
   }
 }
 
+// ── Export helpers ────────────────────────────────────────────────────────────
+
+async function captureCurrentFrame(): Promise<HTMLCanvasElement | null> {
+  if (!pixiApp) return null
+  return pixiApp.extractFrame()
+}
+
+/**
+ * Seeks through an animation frame by frame.
+ * Calls onFrame with each extracted canvas — caller decides what to do with it
+ * (accumulate for sprite sheet, stream to gif encoder, etc.).
+ * Returns false if aborted via signal, true on success.
+ */
+async function captureAnimFrames(
+  track: number,
+  frameCount: number,
+  onFrame: (canvas: HTMLCanvasElement, index: number, total: number) => void,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  if (!pixiApp || !spineAdapter) return false
+  const entry = animationStore.tracks.find(t => t.trackIndex === track)
+  if (!entry || entry.duration <= 0) return false
+
+  const wasPlaying = animationStore.isPlaying
+  spineAdapter.setTimeScale(0)
+
+  const duration = entry.duration
+
+  try {
+    for (let i = 0; i < frameCount; i++) {
+      if (signal?.aborted) return false
+      const t = frameCount === 1 ? 0 : (i / (frameCount - 1)) * duration
+      spineAdapter.seekTo(track, t)
+      // Wait one rAF so Pixi's ticker processes the new trackTime and renders
+      await new Promise<void>(r => requestAnimationFrame(() => r()))
+      if (signal?.aborted) return false
+      const frame = await pixiApp!.extractFrame()
+      onFrame(frame, i, frameCount)
+    }
+  } finally {
+    // Always restore playback state
+    if (wasPlaying) {
+      spineAdapter.setTimeScale(animationStore.speed)
+    }
+    spineAdapter.seekTo(track, 0)
+  }
+
+  return true
+}
+
 defineExpose({
   loadSpine,
   setAnimation: (track: number, name: string, loop: boolean) => {
@@ -353,6 +403,9 @@ defineExpose({
     if (names.length === 0) return
     spineAdapter?.setSkins(names)
   },
+  captureCurrentFrame,
+  captureAnimFrames,
+  getBoneTransformsSnapshot: () => spineAdapter?.getBoneTransforms() ?? [],
 })
 </script>
 

@@ -28,4 +28,6 @@ export interface IPixiApp {
   setBackground(color: number): void
   createTrackOverlay(): ITrackOverlay
   getStats(): RendererStats
+  /** Extract the current rendered frame as an HTMLCanvasElement (handles preserveDrawingBuffer) */
+  extractFrame(): Promise<HTMLCanvasElement>
 }

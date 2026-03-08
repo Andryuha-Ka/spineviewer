@@ -4,11 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="step 10">
+    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="step 11">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/PLAN.md" beforeDir="false" afterPath="$PROJECT_DIR$/PLAN.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/adapters/pixi7/Pixi7App.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/adapters/pixi7/Pixi7App.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/adapters/pixi8/Pixi8App.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/adapters/pixi8/Pixi8App.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/types/IPixiApp.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/types/IPixiApp.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -111,7 +115,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1772542772095</updated>
-      <workItem from="1772542773282" duration="67283000" />
+      <workItem from="1772542773282" duration="70082000" />
     </task>
     <task id="LOCAL-00001" summary="перший коміт">
       <option name="closed" value="true" />
@@ -217,7 +221,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772907405692</updated>
     </task>
-    <option name="localTasksCounter" value="14" />
+    <task id="LOCAL-00014" summary="step 11">
+      <option name="closed" value="true" />
+      <created>1772915421687</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1772915421687</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -244,6 +256,7 @@
     <MESSAGE value="step 8" />
     <MESSAGE value="step 9" />
     <MESSAGE value="step 10" />
-    <option name="LAST_COMMIT_MESSAGE" value="step 10" />
+    <MESSAGE value="step 11" />
+    <option name="LAST_COMMIT_MESSAGE" value="step 11" />
   </component>
 </project>
