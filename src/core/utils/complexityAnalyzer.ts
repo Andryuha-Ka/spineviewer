@@ -78,6 +78,7 @@ function mkMetric(
 // ── Attachment scanning (JSON only) ──────────────────────────────────────────
 
 interface AttachmentStats {
+  regionCount:   number
   meshCount:     number
   clippingCount: number
   totalVertices: number
@@ -90,7 +91,9 @@ function walkSkinSlots(skinAtts: unknown, stats: AttachmentStats): void {
     for (const att of Object.values(slotAtts as object)) {
       const a    = att as Record<string, unknown>
       const type = (a.type as string | undefined) ?? 'region'
-      if (type === 'mesh') {
+      if (type === 'region' || type === undefined) {
+        stats.regionCount++
+      } else if (type === 'mesh') {
         stats.meshCount++
         const uvs = a.uvs
         if (Array.isArray(uvs)) stats.totalVertices += uvs.length / 2
@@ -102,7 +105,7 @@ function walkSkinSlots(skinAtts: unknown, stats: AttachmentStats): void {
 }
 
 function scanAttachments(json: Record<string, unknown>): AttachmentStats {
-  const stats: AttachmentStats = { meshCount: 0, clippingCount: 0, totalVertices: 0 }
+  const stats: AttachmentStats = { regionCount: 0, meshCount: 0, clippingCount: 0, totalVertices: 0 }
   const skins = json.skins
   if (Array.isArray(skins)) {
     // Spine 4.x: array of { name, attachments: { slotName: { attName: {...} } } }
@@ -117,13 +120,15 @@ function scanAttachments(json: Record<string, unknown>): AttachmentStats {
 // ── Attachment stats from runtime adapter (works for .skel too) ───────────────
 
 function collectFromRuntime(adapter: ISpineAdapter): AttachmentStats {
-  const stats: AttachmentStats = { meshCount: 0, clippingCount: 0, totalVertices: 0 }
+  const stats: AttachmentStats = { regionCount: 0, meshCount: 0, clippingCount: 0, totalVertices: 0 }
   const seen = new Set<string>()
   for (const att of adapter.getAllAttachments()) {
     const key = `${att.slotName}::${att.attachmentName}`
     if (seen.has(key)) continue
     seen.add(key)
-    if (att.type === 'mesh') {
+    if (att.type === 'region') {
+      stats.regionCount++
+    } else if (att.type === 'mesh') {
       stats.meshCount++
       if (att.vertexCount != null) stats.totalVertices += att.vertexCount
     } else if (att.type === 'clipping') {
@@ -287,11 +292,12 @@ export function analyzeComplexity(
     : (fileSet.skeleton.fileBody as ArrayBuffer).byteLength
 
   const metrics: ComplexityMetric[] = [
-    mkMetric('Bones',            adapter.bones.length,         50,        100),
-    mkMetric('Slots',            adapter.slots.length,         60,        120),
-    mkMetric('Clipping',         attStats?.clippingCount ?? 0, 1,         3),
-    mkMetric('Meshes',           attStats?.meshCount     ?? 0, 20,        50),
-    mkMetric('Mesh vertices',    attStats?.totalVertices ?? 0, 1000,      3000),
+    mkMetric('Bones',            adapter.bones.length,          50,        100),
+    mkMetric('Slots',            adapter.slots.length,          60,        120),
+    mkMetric('Regions',          attStats?.regionCount   ?? 0,  100,       200),
+    mkMetric('Clipping',         attStats?.clippingCount ?? 0,  1,         3),
+    mkMetric('Meshes',           attStats?.meshCount     ?? 0,  20,        50),
+    mkMetric('Mesh vertices',    attStats?.totalVertices ?? 0,  1000,      3000),
     mkMetric('Atlas VRAM',       vramBytes,                    1024*1024, 4*1024*1024,
       { displayValue: fmtBytes(vramBytes) }),
     mkMetric('Atlas utilization', utilization,                 0.5,       0.3,

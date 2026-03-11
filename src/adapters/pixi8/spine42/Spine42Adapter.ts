@@ -390,12 +390,20 @@ function spine42MeshVertexCount(att: any): number | undefined {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function classifyAttachment(att: any): AttachmentInfo['type'] {
-  const name = att?.constructor?.name ?? ''
-  if (/Region/i.test(name)) return 'region'
-  if (/Mesh/i.test(name)) return 'mesh'
-  if (/Clipping/i.test(name)) return 'clipping'
-  if (/Point/i.test(name)) return 'point'
+  if (!att) return 'other'
+  // Primary: constructor name (works in dev; mangled to 1-2 chars by minifier in prod)
+  const name = att.constructor?.name ?? ''
+  if (/Region/i.test(name))      return 'region'
+  if (/Mesh/i.test(name))        return 'mesh'
+  if (/Clipping/i.test(name))    return 'clipping'
+  if (/Point/i.test(name))       return 'point'
   if (/BoundingBox/i.test(name)) return 'boundingbox'
-  if (/Path/i.test(name)) return 'path'
+  if (/Path/i.test(name))        return 'path'
+  // Fallback: duck-type by property shape (production minified builds)
+  if (att.endSlot  !== undefined)             return 'clipping'  // ClippingAttachment.endSlot
+  if (att.triangles != null)                  return 'mesh'      // MeshAttachment.triangles
+  if (att.lengths   != null)                  return 'path'      // PathAttachment.lengths
+  if (att.width     != null)                  return 'region'    // RegionAttachment.width/height
+  if (att.x         != null && att.y != null) return 'point'     // PointAttachment.x/y
   return 'other'
 }

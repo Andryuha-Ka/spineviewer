@@ -33,7 +33,7 @@
           </div>
         </div>
         <div v-if="!report.fromJson" class="binary-note">
-          Binary skeleton — clipping / mesh / vertex counts unavailable
+          Binary skeleton — keyframe analysis unavailable
         </div>
       </section>
 
