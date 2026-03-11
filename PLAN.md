@@ -621,15 +621,11 @@ export function buildImageResolver(images: SpineFile[]) {
 - [x] **Inspector tab** показує секцію "Loaded Files" зверху (badge + name + size, без drag-drop)
 - [x] Тема dark/light + вибір шрифту — реалізовано в Step 7.5
 
-### Залишилось
+### Реалізовано (додатково)
 
-- [ ] `SplitLayout.vue` — перетягування роздільника між canvas і панелями
-- [ ] **Keyboard shortcuts**:
-  - `Space` — play/pause
-  - `←` / `→` — shift animation ±1 frame
-  - `R` — reset pose
-  - `0–9` — вибір треку
-- [ ] `localStorage` — persist: panel width, zoom/pos
+- [x] `SplitLayout.vue` / resizable sidebar — drag-to-resize панелі; `svp:panelWidth` в localStorage
+- [x] **Keyboard shortcuts** у ViewerPage (Space, ←, →, R, 0–9 тощо)
+- [x] `localStorage` persist: panel width ✅; zoom/pos — не зберігається навмисно (скидається при новому завантаженні скелету)
 
 ---
 
