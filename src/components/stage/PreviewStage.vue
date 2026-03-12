@@ -45,7 +45,7 @@
       }"
     />
 
-    <!-- Top-left overlay: origin toggle -->
+    <!-- Top-left overlay: origin toggle + bg color picker -->
     <div class="overlay-top-left">
       <div class="origin-toggle">
         <input
@@ -55,6 +55,14 @@
           title="Show origin (0,0)"
         />
         <span class="origin-label" title="Center scene" @click="onResetView">origin</span>
+        <input
+          type="color"
+          class="bg-color-input"
+          :value="bgColorHex"
+          title="Background color"
+          @input="onBgColorInput"
+        />
+        <span class="bg-color-label">bg</span>
       </div>
     </div>
 
@@ -286,6 +294,15 @@ function onPanEnd() {
 function onResetView() {
   viewerStore.resetView()
   applyViewport()
+}
+
+const bgColorHex = computed(() =>
+  '#' + viewerStore.bgColor.toString(16).padStart(6, '0'),
+)
+
+function onBgColorInput(e: Event) {
+  const hex = (e.target as HTMLInputElement).value
+  viewerStore.bgColor = parseInt(hex.slice(1), 16)
 }
 let trackOverlay: ITrackOverlay | null = null
 let tickerFn: ((dt: number) => void) | null = null
@@ -757,6 +774,29 @@ defineExpose({
 }
 
 .origin-label:hover { color: rgba(255,255,255,0.85); }
+
+.bg-color-input {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  background: none;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.bg-color-input:hover { opacity: 1; }
+.bg-color-input::-webkit-color-swatch-wrapper { padding: 0; }
+.bg-color-input::-webkit-color-swatch { border: 1px solid rgba(255,255,255,0.2); border-radius: 3px; }
+
+.bg-color-label {
+  color: rgba(255,255,255,0.45);
+  font-size: inherit;
+  user-select: none;
+}
 
 .overlay-top-right {
   position: absolute;

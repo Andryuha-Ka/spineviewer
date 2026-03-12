@@ -719,3 +719,32 @@ export function buildImageResolver(images: SpineFile[]) {
 ### 2.4 — Реструктуризація вкладки Events → Anim ✅
 ### 2.5 — Дерево кісток в Inspector: collapsed by default ✅
 ### 2.6 — Виділення кістки в Pixi-канвасі з Inspector ✅
+
+---
+
+## Баги та допрацювання v1.2 ✅
+
+> **Статус:** Виконано повністю (2026-03-12).
+
+### Виправлені баги
+
+| # | Опис | Файли |
+|---|------|-------|
+| b3.0 | `classifyAttachment` не працює на проді — мініфікатор скорочує `constructor.name` до 1-2 символів → всі типи повертали `'other'`. Додано duck-typing fallback по унікальних властивостях (`endSlot`→mask, `triangles`→mesh, `lengths`→path, `width`→region, `x+y`→point) | `BasePixi7Adapter.ts`, `Spine42Adapter.ts` |
+| b3.3 | Draw calls у Perf завжди показував `—` — `getStats()` повертав `null`. Виправлено через wrapping `gl.drawElements` / `gl.drawArrays` + ticker на priority `-100` (після рендеру Pixi на `-50`) для захоплення per-frame значення | `Pixi7App.ts`, `Pixi8App.ts` |
+| b3.4a | Clipping/Meshes у Perf показували 0 — наслідок `classifyAttachment` проблеми (b3.0) | Виправлено разом з b3.0 |
+| b3.kb | Keyboard shortcuts спрацьовували некоректно при перемиканні на нелатинську розкладку (українська тощо) — додано guard `e.isComposing \|\| e.keyCode === 229` | `ViewerPage.vue` |
+
+### Функціональні доробки
+
+| # | Опис | Файли |
+|---|------|-------|
+| 3.1 | **BG color picker** — кнопка вибору кольору фону канвасу в overlay зліва (поруч з origin checkbox), з лейблом `bg` | `PreviewStage.vue` |
+| 3.2 | **JS Heap у Perf** — новий показник `JS Heap` у stats grid (used / total MB через `performance.memory`; Chrome only, `—` в інших браузерах) | `ProfilerPanel.vue` |
+| 3.4b | **Atlas VRAM / Skeleton size threshold у Compl** — значення метрик тепер у MB (`value = bytes / 1MB`), threshold hints показують `≥ 1 MB` / `≥ 4 MB` замість сирих байтів. Додано `thresholdSuffix` в `ComplexityMetric` | `complexityAnalyzer.ts`, `ComplexityPanel.vue` |
+| 3.5a | **Regions метрика в Compl** — нова метрика `Regions` (кількість region attachments; warn ≥ 100, crit ≥ 200) | `complexityAnalyzer.ts` |
+| 3.5b | **Non-normal blends метрика в Compl** — нова метрика `Non-normal blends` (Additive + Multiply + Screen; warn ≥ 10, crit ≥ 30) + відповідна рекомендація | `complexityAnalyzer.ts` |
+| 3.5c | **Blending секція в Compl** — розбивка слотів по blend mode: Normal / Additive / Multiply / Screen; розміщена між Metrics і Recommendations | `ComplexityPanel.vue` |
+| 3.5d | **Blend mode badge в Insp** — в колонці Type показується кольоровий badge тільки для non-Normal слотів: `add` (оранжевий), `mul` (фіолетовий), `scr` (блакитний) | `SkeletonPanel.vue` |
+| 3.6 | **"Clipping" → "Mask"** — перейменовано всі відображувані лейбли (Compl метрика, Perf stat, Insp badge, рекомендації); внутрішній тип `'clipping'` в коді не змінено | `complexityAnalyzer.ts`, `ProfilerPanel.vue`, `SkeletonPanel.vue` |
+| 3.7 | **Нотатка в Compl** для binary `.skel` — оновлено з "clipping / mesh / vertex counts unavailable" на "keyframe analysis unavailable" (бо mesh/mask/region тепер рахуються через runtime fallback) | `ComplexityPanel.vue` |

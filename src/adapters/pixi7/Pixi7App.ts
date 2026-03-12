@@ -11,6 +11,8 @@ import type { IPixiApp, ITrackOverlay, PixiTicker, RendererStats } from '@/core/
 
 export class Pixi7App implements IPixiApp {
   private readonly _app: PIXI.Application
+  private _frameDrawCalls = 0
+  private _lastDrawCalls: number | null = null
 
   constructor(canvas: HTMLCanvasElement, w: number, h: number) {
     this._app = new PIXI.Application({
@@ -22,6 +24,26 @@ export class Pixi7App implements IPixiApp {
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
     })
+
+    // Count WebGL draw calls by wrapping the GL context.
+    // Ticker at priority -100 runs after Pixi renders (priority -50), capturing per-frame count.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const gl = (this._app.renderer as any).gl as WebGL2RenderingContext
+      if (gl) {
+        const inc = () => { this._frameDrawCalls++ }
+        const origDE = gl.drawElements.bind(gl)
+        const origDA = gl.drawArrays.bind(gl)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(gl as any).drawElements = (...args: any[]) => { inc(); return origDE(...args) }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(gl as any).drawArrays = (...args: any[]) => { inc(); return origDA(...args) }
+        this._app.ticker.add(() => {
+          this._lastDrawCalls = this._frameDrawCalls
+          this._frameDrawCalls = 0
+        }, null, -100)
+      }
+    } catch { /* GL wrapping not available */ }
   }
 
   get stage(): PIXI.Container {
@@ -62,8 +84,7 @@ export class Pixi7App implements IPixiApp {
   }
 
   getStats(): RendererStats {
-    // Pixi 7 does not expose a public draw-call counter — return null
-    return { drawCalls: null }
+    return { drawCalls: this._lastDrawCalls }
   }
 
   async extractFrame(): Promise<HTMLCanvasElement> {

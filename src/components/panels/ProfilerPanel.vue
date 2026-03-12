@@ -31,7 +31,7 @@
         <span class="stat-value stat-value--dim">{{ drawCallsDisplay }}</span>
       </div>
       <div class="stat-cell">
-        <span class="stat-label">Clipping</span>
+        <span class="stat-label">Mask</span>
         <span class="stat-value" :class="clippingClass">{{ profilerStore.clippingCount }}</span>
       </div>
       <div class="stat-cell">
@@ -41,6 +41,10 @@
       <div class="stat-cell">
         <span class="stat-label">VRAM est.</span>
         <span class="stat-value">{{ vramDisplay }}</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-label">JS Heap</span>
+        <span class="stat-value stat-value--dim">{{ heapDisplay }}</span>
       </div>
     </div>
 
@@ -89,7 +93,7 @@
         >
           <span class="slow-fps" :style="{ color: fpsColor(frame.fps) }">{{ frame.fps }}&thinsp;fps</span>
           <span class="slow-ms">{{ frame.frameMs.toFixed(1) }}&thinsp;ms</span>
-          <span class="slow-meta">clip:{{ frame.clipping }} mesh:{{ frame.meshes }}</span>
+          <span class="slow-meta">mask:{{ frame.clipping }} mesh:{{ frame.meshes }}</span>
         </div>
       </div>
     </div>
@@ -210,6 +214,16 @@ const vramDisplay = computed(() => {
   if (bytes === 0) return '—'
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+})
+
+/** JS heap usage via non-standard Chrome performance.memory API */
+const heapDisplay = computed(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mem = (performance as any).memory
+  if (!mem) return '—'
+  const used  = mem.usedJSHeapSize  / (1024 * 1024)
+  const total = mem.totalJSHeapSize / (1024 * 1024)
+  return `${used.toFixed(0)} / ${total.toFixed(0)} MB`
 })
 
 const fpsClass = computed(() => {

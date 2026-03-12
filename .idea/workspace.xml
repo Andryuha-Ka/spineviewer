@@ -4,11 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="updated v1.1">
+    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="updated v1.1 slot type fixed">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/adapters/pixi7/BasePixi7Adapter.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/adapters/pixi7/BasePixi7Adapter.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/adapters/pixi8/spine42/Spine42Adapter.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/adapters/pixi8/spine42/Spine42Adapter.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/adapters/pixi7/Pixi7App.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/adapters/pixi7/Pixi7App.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/adapters/pixi8/Pixi8App.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/adapters/pixi8/Pixi8App.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/panels/ComplexityPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/ComplexityPanel.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/panels/ProfilerPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/ProfilerPanel.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/panels/SkeletonPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/SkeletonPanel.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/utils/complexityAnalyzer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/utils/complexityAnalyzer.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -122,7 +126,7 @@
       <updated>1772542772095</updated>
       <workItem from="1772542773282" duration="107963000" />
       <workItem from="1773162309652" duration="8797000" />
-      <workItem from="1773223827591" duration="2156000" />
+      <workItem from="1773223827591" duration="6983000" />
     </task>
     <task id="LOCAL-00001" summary="перший коміт">
       <option name="closed" value="true" />
@@ -340,7 +344,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773222549274</updated>
     </task>
-    <option name="localTasksCounter" value="28" />
+    <task id="LOCAL-00028" summary="updated v1.1 slot type fixed">
+      <option name="closed" value="true" />
+      <created>1773228031651</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1773228031651</updated>
+    </task>
+    <option name="localTasksCounter" value="29" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -378,6 +390,7 @@
     <MESSAGE value="updated functionality v1 after crash" />
     <MESSAGE value="updated functionality v1 fixed complexityAnalyzer" />
     <MESSAGE value="updated v1.1" />
-    <option name="LAST_COMMIT_MESSAGE" value="updated v1.1" />
+    <MESSAGE value="updated v1.1 slot type fixed" />
+    <option name="LAST_COMMIT_MESSAGE" value="updated v1.1 slot type fixed" />
   </component>
 </project>

@@ -134,6 +134,9 @@ function onResizeStart(e: MouseEvent) {
 function onKeyDown(e: KeyboardEvent) {
   const tag = (e.target as HTMLElement).tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA') return
+  // isComposing=true means an IME/dead-key sequence is in progress — ignore to avoid
+  // misfires when switching to a non-Latin keyboard layout (e.g. Ukrainian/CJK)
+  if (e.isComposing || e.keyCode === 229) return
 
   switch (e.code) {
     case 'Space':

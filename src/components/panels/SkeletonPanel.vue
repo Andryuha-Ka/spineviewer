@@ -116,7 +116,13 @@
             </span>
             <span class="ac ac--slot">{{ att.slotName }}</span>
             <span class="ac ac--type">
-              <span class="attach-type" :class="`type-${att.type}`">{{ att.type }}</span>
+              <span class="attach-type" :class="`type-${att.type}`">{{ att.type === 'clipping' ? 'mask' : att.type }}</span>
+              <span
+                v-if="slotBlendMode(att.slotName) !== 0"
+                class="blend-badge"
+                :class="`blend-${slotBlendMode(att.slotName)}`"
+                :title="`Blend: ${BLEND_LABELS[slotBlendMode(att.slotName)]}`"
+              >{{ BLEND_LABELS[slotBlendMode(att.slotName)] }}</span>
             </span>
           </div>
         </div>
@@ -338,6 +344,12 @@ function onSelectSlot(slotName: string) {
     expandAncestors(boneName)
     scrollToSelected(boneListRef, '.bone-row--selected')
   }
+}
+
+const BLEND_LABELS: Record<number, string> = { 1: 'add', 2: 'mul', 3: 'scr' }
+
+function slotBlendMode(slotName: string): number {
+  return skeletonStore.slots.find(s => s.name === slotName)?.blendMode ?? 0
 }
 
 function fmt(n: number): string {
@@ -715,6 +727,19 @@ function fmtS(n: number): string {
 .type-mesh     { color: #60a5fa; background: rgba(96,  165, 250, 0.1); }
 .type-clipping { color: #f87171; background: rgba(248, 113, 113, 0.1); }
 .type-path     { color: #facc15; background: rgba(250, 204,  21, 0.1); }
+
+.blend-badge {
+  display: inline-block;
+  font-size: 0.58rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 3px;
+  font-weight: 600;
+}
+
+.blend-1 { color: #fb923c; background: rgba(251, 146,  60, 0.12); }  /* additive */
+.blend-2 { color: #c084fc; background: rgba(192, 132, 252, 0.12); }  /* multiply */
+.blend-3 { color: #22d3ee; background: rgba( 34, 211, 238, 0.12); }  /* screen */
 
 .empty-hint {
   padding: 16px;

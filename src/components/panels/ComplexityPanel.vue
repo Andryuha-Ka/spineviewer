@@ -39,6 +39,31 @@
 
       <div class="divider" />
 
+      <!-- ── Blending ───────────────────────────────────────────── -->
+      <section class="section">
+        <label class="label">Blending</label>
+        <div class="blend-grid">
+          <span class="blend-cell blend-normal">
+            <span class="blend-dot">●</span> Normal
+            <span class="blend-num">{{ report.blendStats.normal }}</span>
+          </span>
+          <span class="blend-cell blend-additive">
+            <span class="blend-dot">●</span> Additive
+            <span class="blend-num">{{ report.blendStats.additive }}</span>
+          </span>
+          <span class="blend-cell blend-multiply">
+            <span class="blend-dot">●</span> Multiply
+            <span class="blend-num">{{ report.blendStats.multiply }}</span>
+          </span>
+          <span class="blend-cell blend-screen">
+            <span class="blend-dot">●</span> Screen
+            <span class="blend-num">{{ report.blendStats.screen }}</span>
+          </span>
+        </div>
+      </section>
+
+      <div class="divider" />
+
       <!-- ── Recommendations ────────────────────────────────────── -->
       <section class="section">
         <label class="label">
@@ -107,6 +132,7 @@
 <script setup lang="ts">
 import { useComplexityStore } from '@/core/stores/useComplexityStore'
 import type { ComplexityMetric } from '@/core/utils/complexityAnalyzer'
+// BlendStats imported via report type — no explicit import needed
 
 const complexityStore = useComplexityStore()
 const report = computed(() => complexityStore.report)
@@ -117,7 +143,8 @@ function hintText(m: ComplexityMetric): string {
     return `< ${(threshold * 100).toFixed(0)}%`
   }
   const threshold = m.status === 'crit' ? m.critAt : m.warnAt
-  return `≥ ${threshold}`
+  const sfx = m.thresholdSuffix ?? ''
+  return `≥ ${threshold}${sfx}`
 }
 
 function densityClass(density: number): string {
@@ -324,6 +351,38 @@ function densityClass(density: number): string {
   color: var(--c-text-ghost);
   font-size: 0.75rem;
 }
+
+/* ── Blending breakdown ── */
+.blend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 6px;
+}
+
+.blend-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.blend-cell:hover { background: var(--c-raised); }
+
+.blend-dot { font-size: 0.5rem; }
+
+.blend-num {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.blend-normal   { color: var(--c-text-muted); }
+.blend-additive { color: #fb923c; }
+.blend-multiply { color: #c084fc; }
+.blend-screen   { color: #22d3ee; }
 
 .unsupported-tag {
   font-size: 0.6rem;

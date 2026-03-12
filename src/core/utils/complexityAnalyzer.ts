@@ -23,6 +23,8 @@ export interface ComplexityMetric {
   critAt:       number
   /** If true: lower value is worse (e.g. atlas utilization) */
   inverse:      boolean
+  /** Optional unit suffix appended to threshold value in hint (e.g. ' MB') */
+  thresholdSuffix?: string
 }
 
 export interface AnimKeyframes {
@@ -34,10 +36,18 @@ export interface AnimKeyframes {
   redundant: number
 }
 
+export interface BlendStats {
+  normal:   number
+  additive: number
+  multiply: number
+  screen:   number
+}
+
 export interface ComplexityReport {
   metrics:         ComplexityMetric[]
   recommendations: string[]
   animations:      AnimKeyframes[]
+  blendStats:      BlendStats
   /** false when skeleton is binary (.skel) — keyframe analysis unavailable; mesh stats still available via runtime */
   fromJson:        boolean
 }
@@ -55,7 +65,7 @@ function mkMetric(
   value: number,
   warnAt: number,
   critAt: number,
-  opts: { displayValue?: string; inverse?: boolean } = {},
+  opts: { displayValue?: string; inverse?: boolean; thresholdSuffix?: string } = {},
 ): ComplexityMetric {
   const inverse = opts.inverse ?? false
   let status: MetricStatus
@@ -72,6 +82,7 @@ function mkMetric(
     warnAt,
     critAt,
     inverse,
+    thresholdSuffix: opts.thresholdSuffix,
   }
 }
 
@@ -134,6 +145,19 @@ function collectFromRuntime(adapter: ISpineAdapter): AttachmentStats {
     } else if (att.type === 'clipping') {
       stats.clippingCount++
     }
+  }
+  return stats
+}
+
+// ── Blend mode stats from adapter slots ──────────────────────────────────────
+
+function collectBlendStats(adapter: ISpineAdapter): BlendStats {
+  const stats: BlendStats = { normal: 0, additive: 0, multiply: 0, screen: 0 }
+  for (const slot of adapter.slots) {
+    if      (slot.blendMode === 1) stats.additive++
+    else if (slot.blendMode === 2) stats.multiply++
+    else if (slot.blendMode === 3) stats.screen++
+    else                           stats.normal++
   }
   return stats
 }
@@ -219,6 +243,7 @@ function atlasVram(pages: AtlasPage[]): number {
 function buildRecommendations(
   adapter:       ISpineAdapter,
   stats:         AttachmentStats | null,
+  blendStats:    BlendStats,
   utilization:   number,
   skeletonBytes: number,
   vramBytes:     number,
@@ -240,9 +265,9 @@ function buildRecommendations(
 
   if (stats) {
     if (stats.clippingCount >= 3)
-      recs.push('Multiple clipping attachments (≥3) — each adds a GPU draw call; consider baking masks into textures.')
+      recs.push('Multiple mask attachments (≥3) — each adds a GPU draw call; consider baking masks into textures.')
     else if (stats.clippingCount >= 1)
-      recs.push('Clipping attachment detected — test performance on low-end and mobile devices.')
+      recs.push('Mask attachment detected — test performance on low-end and mobile devices.')
 
     if (stats.meshCount >= 50)
       recs.push('Critical mesh count (≥50) — use region attachments for simple shapes.')
@@ -254,6 +279,12 @@ function buildRecommendations(
     else if (stats.totalVertices >= 1000)
       recs.push('High mesh vertex count (≥1000) — review mesh complexity for mobile targets.')
   }
+
+  const nonNormal = blendStats.additive + blendStats.multiply + blendStats.screen
+  if (nonNormal >= 30)
+    recs.push(`Very high non-normal blend count (${nonNormal}) — each non-normal blend breaks batching and adds draw calls.`)
+  else if (nonNormal >= 10)
+    recs.push(`High non-normal blend count (${nonNormal}) — additive/multiply/screen slots prevent sprite batching.`)
 
   if (utilization > 0 && utilization < 0.3)
     recs.push(`Very low atlas utilization (${(utilization * 100).toFixed(0)}%) — repack the atlas to reduce VRAM usage significantly.`)
@@ -285,31 +316,36 @@ export function analyzeComplexity(
     : null
 
   const attStats    = json ? scanAttachments(json) : collectFromRuntime(adapter)
+  const blendStats  = collectBlendStats(adapter)
   const utilization = atlasUtilization(atlasPages)
   const vramBytes   = atlasVram(atlasPages)
   const skelBytes   = typeof fileSet.skeleton.fileBody === 'string'
     ? fileSet.skeleton.fileBody.length
     : (fileSet.skeleton.fileBody as ArrayBuffer).byteLength
 
+  const nonNormalBlends = blendStats.additive + blendStats.multiply + blendStats.screen
+
   const metrics: ComplexityMetric[] = [
-    mkMetric('Bones',            adapter.bones.length,          50,        100),
-    mkMetric('Slots',            adapter.slots.length,          60,        120),
-    mkMetric('Regions',          attStats?.regionCount   ?? 0,  100,       200),
-    mkMetric('Clipping',         attStats?.clippingCount ?? 0,  1,         3),
-    mkMetric('Meshes',           attStats?.meshCount     ?? 0,  20,        50),
-    mkMetric('Mesh vertices',    attStats?.totalVertices ?? 0,  1000,      3000),
-    mkMetric('Atlas VRAM',       vramBytes,                    1024*1024, 4*1024*1024,
-      { displayValue: fmtBytes(vramBytes) }),
-    mkMetric('Atlas utilization', utilization,                 0.5,       0.3,
+    mkMetric('Bones',             adapter.bones.length,          50,        100),
+    mkMetric('Slots',             adapter.slots.length,          60,        120),
+    mkMetric('Regions',           attStats?.regionCount   ?? 0,  100,       200),
+    mkMetric('Mask',              attStats?.clippingCount ?? 0,  1,         3),
+    mkMetric('Meshes',            attStats?.meshCount     ?? 0,  20,        50),
+    mkMetric('Mesh vertices',     attStats?.totalVertices ?? 0,  1000,      3000),
+    mkMetric('Non-normal blends', nonNormalBlends,               10,        30),
+    mkMetric('Atlas VRAM',        vramBytes / (1024 * 1024),     1,         4,
+      { displayValue: fmtBytes(vramBytes), thresholdSuffix: ' MB' }),
+    mkMetric('Atlas utilization', utilization,                   0.5,       0.3,
       { displayValue: `${(utilization * 100).toFixed(0)}%`, inverse: true }),
-    mkMetric('Skeleton size',    skelBytes,                    500_000,   2_000_000,
-      { displayValue: fmtBytes(skelBytes) }),
+    mkMetric('Skeleton size',     skelBytes / (1024 * 1024),     0.5,       2,
+      { displayValue: fmtBytes(skelBytes), thresholdSuffix: ' MB' }),
   ]
 
   return {
     metrics,
-    recommendations: buildRecommendations(adapter, attStats, utilization, skelBytes, vramBytes),
+    recommendations: buildRecommendations(adapter, attStats, blendStats, utilization, skelBytes, vramBytes),
     animations:      json ? analyzeKeyframes(json) : [],
+    blendStats,
     fromJson,
   }
 }
