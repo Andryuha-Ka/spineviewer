@@ -193,9 +193,18 @@ const TYPE_LABELS: Record<SpineFileType, string> = {
   image:           'IMG',
 }
 
-const atlasFiles = computed(() =>
-  loaderStore.pendingFileInfos.filter(f => f.type === 'atlas' || f.type === 'image'),
-)
+const atlasFiles = computed(() => {
+  const fileSet = loaderStore.activeSlot?.fileSet
+  if (!fileSet) return []
+  const sizeOf = (body: string | ArrayBuffer): number =>
+    typeof body === 'string'
+      ? Math.round(Math.max(0, body.length - body.indexOf(',') - 1) * 0.75)
+      : body.byteLength
+  return [
+    { name: fileSet.atlas.filename, size: sizeOf(fileSet.atlas.fileBody), type: 'atlas' as SpineFileType },
+    ...fileSet.images.map(img => ({ name: img.filename, size: sizeOf(img.fileBody), type: 'image' as SpineFileType })),
+  ]
+})
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`

@@ -13,18 +13,6 @@
     </div>
 
     <template v-else>
-      <!-- ── Skeleton file info ───────────────────────────── -->
-      <div v-if="skeletonInfo" class="skeleton-info-row">
-        <span class="file-type-badge" :class="`file-type-badge--${skeletonInfo.type}`">
-          {{ TYPE_LABELS[skeletonInfo.type] }}
-        </span>
-        <span class="skeleton-filename" :title="skeletonInfo.name">{{ skeletonInfo.name }}</span>
-        <span v-if="loaderStore.detectedVersion" class="version-badge">
-          Spine {{ loaderStore.detectedVersion }}
-        </span>
-        <span class="file-size">{{ formatSize(skeletonInfo.size) }}</span>
-      </div>
-
       <div ref="wrapperRef" class="sections-wrapper">
 
       <!-- ── Bones ─────────────────────────────────────────── -->
@@ -136,30 +124,10 @@
 <script setup lang="ts">
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useInspectorStore } from '@/core/stores/useInspectorStore'
-import { useLoaderStore }    from '@/core/stores/useLoaderStore'
 import type { BoneTransform } from '@/core/types/ISpineAdapter'
-import type { SpineFileType } from '@/core/types/FileSet'
 
 const skeletonStore  = useSkeletonStore()
 const inspectorStore = useInspectorStore()
-const loaderStore    = useLoaderStore()
-
-const TYPE_LABELS: Record<SpineFileType, string> = {
-  'skeleton-json': 'JSON',
-  'skeleton-skel': 'SKEL',
-  atlas:           'ATLAS',
-  image:           'IMG',
-}
-
-const skeletonInfo = computed(() =>
-  loaderStore.pendingFileInfos.find(f => f.type === 'skeleton-json' || f.type === 'skeleton-skel') ?? null,
-)
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
 
 const boneSearch = ref('')
 
@@ -457,57 +425,6 @@ function fmtS(n: number): string {
   height: 1px;
   background: var(--c-border-dim);
   flex-shrink: 0;
-}
-
-/* ── Skeleton info row ── */
-.skeleton-info-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--c-border-dim);
-  font-size: 0.72rem;
-}
-
-.file-type-badge {
-  flex-shrink: 0;
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 1px 4px;
-  border-radius: 3px;
-  min-width: 34px;
-  text-align: center;
-}
-
-.file-type-badge--skeleton-json { background: #1e3a5f; color: #60a5fa; }
-.file-type-badge--skeleton-skel { background: #1e3a5f; color: #93c5fd; }
-.file-type-badge--atlas          { background: #3b2d5a; color: #c4b5fd; }
-.file-type-badge--image          { background: #1e3d2e; color: #86efac; }
-
-.skeleton-filename {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--c-text-dim);
-}
-
-.version-badge {
-  flex-shrink: 0;
-  font-size: 0.6rem;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: rgba(124, 106, 245, 0.15);
-  color: #9d8fff;
-}
-
-.file-size {
-  flex-shrink: 0;
-  color: var(--c-text-faint);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ── Bone list ── */

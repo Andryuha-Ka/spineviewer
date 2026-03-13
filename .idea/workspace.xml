@@ -6,12 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="updated v1.1.1 bugs and functionality">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/pages/VersionPickerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/VersionPickerPage.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/stores/useLoaderStore.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/stores/useLoaderStore.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/types/FileSet.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/types/FileSet.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/utils/fileLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/utils/fileLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/panels/AtlasInspector.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/AtlasInspector.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/panels/SkeletonPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/SkeletonPanel.vue" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

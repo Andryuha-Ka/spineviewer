@@ -13,6 +13,13 @@
       <span class="version-tag">
         Pixi {{ versionStore.pixiVersion }} · Spine {{ versionStore.spineVersion }}
       </span>
+      <span v-if="loaderStore.activeSlot?.fileSet" class="spine-name-tag" :class="`spine-name-tag--${loaderStore.activeSlot.fileSet.skeleton.type}`">
+        <span
+          class="spine-type-badge"
+          :class="`spine-type-badge--${loaderStore.activeSlot.fileSet.skeleton.type}`"
+        >{{ loaderStore.activeSlot.fileSet.skeleton.type === 'skeleton-json' ? 'JSON' : 'SKEL' }}</span>
+        {{ loaderStore.activeSlot.fileSet.skeleton.filename }}
+      </span>
       <div class="toolbar-spacer" />
       <n-button
         size="small"
@@ -384,6 +391,35 @@ async function onCaptureGif(opts: { track: number; fps: number; quality: number 
   font-size: 0.75rem;
   color: var(--c-text-faint);
 }
+
+.spine-name-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.spine-name-tag--skeleton-json { color: #60a5fa; }
+.spine-name-tag--skeleton-skel { color: #93c5fd; }
+
+.spine-type-badge {
+  flex-shrink: 0;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  min-width: 34px;
+  text-align: center;
+}
+
+.spine-type-badge--skeleton-json { background: #1e3a5f; color: #60a5fa; }
+.spine-type-badge--skeleton-skel { background: #1e3a5f; color: #93c5fd; }
 
 .content {
   display: flex;
