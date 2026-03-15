@@ -157,6 +157,16 @@ function onKeyDown(e: KeyboardEvent) {
   // misfires when switching to a non-Latin keyboard layout (e.g. Ukrainian/CJK)
   if (e.isComposing || e.keyCode === 229) return
 
+  // Space on focused interactive controls (checkbox, switch, button) would toggle them
+  // in addition to firing our shortcut. Stop propagation here (capture phase) so the
+  // control never receives the Space event — our handler takes over instead.
+  if (e.code === 'Space') {
+    const role = (e.target as HTMLElement).getAttribute?.('role') ?? ''
+    if (role === 'checkbox' || role === 'switch' || role === 'button') {
+      e.stopPropagation()
+    }
+  }
+
   switch (e.code) {
     case 'Space':
       e.preventDefault()
@@ -191,8 +201,25 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeyDown))
-onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
+// Block Space keyup on interactive controls (NaiveUI handles toggle on keyup,
+// so keydown stopPropagation alone is not enough).
+function onKeyUpCapture(e: KeyboardEvent) {
+  if (e.code !== 'Space') return
+  const role = (e.target as HTMLElement).getAttribute?.('role') ?? ''
+  if (role === 'checkbox' || role === 'switch' || role === 'button') {
+    e.stopPropagation()
+    e.preventDefault()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeyDown, true)
+  window.addEventListener('keyup', onKeyUpCapture, true)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown, true)
+  window.removeEventListener('keyup', onKeyUpCapture, true)
+})
 
 function onClickBack() {
   if (!window.confirm('Reset viewer and return to version picker?')) return

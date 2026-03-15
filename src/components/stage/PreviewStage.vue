@@ -435,11 +435,9 @@ onMounted(async () => {
             for (const [idxStr, playlist] of Object.entries(animationStore.trackPlaylists)) {
               const trackIndex = Number(idxStr)
               if (!animationStore.isTrackEnabled(trackIndex) || playlist.length === 0) continue
-              // Prefer live Spine track loop state — it's set directly when user toggles per-track Loop checkbox
-              // and may differ from playlist if the ticker hasn't propagated the update yet
-              const liveLoop = animationStore.tracks.find(t => t.trackIndex === trackIndex)?.loop
-              const firstLoop = liveLoop ?? playlist[0].loop
-              spineAdapter.setAnimation(trackIndex, playlist[0].animationName, firstLoop)
+              // playlist[0].loop is the authoritative source — updated atomically by setTrackLoop
+              // and onCascaderSelect. animationStore.tracks is ticker-driven and may lag by one frame.
+              spineAdapter.setAnimation(trackIndex, playlist[0].animationName, playlist[0].loop)
               for (let i = 1; i < playlist.length; i++) {
                 spineAdapter.addAnimation(trackIndex, playlist[i].animationName, playlist[i].loop)
               }
@@ -458,6 +456,21 @@ onMounted(async () => {
         }
       },
     )
+
+    // Sync global Loop switch → all active Spine tracks + playlists
+    watch(
+      () => animationStore.loop,
+      (newLoop) => {
+        if (!spineAdapter) return
+        for (const track of animationStore.tracks) {
+          spineAdapter.setTrackLoop(track.trackIndex, newLoop)
+        }
+        for (const idxStr of Object.keys(animationStore.trackPlaylists)) {
+          animationStore.updateTrackPlaylistFirstLoop(Number(idxStr), newLoop)
+        }
+      },
+    )
+
     // Watch for active spine slot changes (multi-spine switching)
     watch(
       () => loaderStore.activeSlotId,

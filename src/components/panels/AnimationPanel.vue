@@ -194,7 +194,7 @@
             <n-checkbox
               size="small"
               :checked="track.loop"
-              @update:checked="emit('setTrackLoop', track.trackIndex, $event)"
+              @update:checked="(v) => emit('setTrackLoop', track.trackIndex, v)"
             />
             <span class="track-loop-text">Loop</span>
           </label>

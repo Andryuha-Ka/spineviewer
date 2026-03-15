@@ -5,7 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="updated v1.1.4 added ui color for atlas names and image names">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/ViewerPage.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/panels/AnimationPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/AnimationPanel.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -377,7 +381,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773394439579</updated>
     </task>
-    <option name="localTasksCounter" value="33" />
+    <task id="LOCAL-00033" summary="updated v1.1.4 added ui color for atlas names and image names">
+      <option name="closed" value="true" />
+      <created>1773394782111</created>
+      <option name="number" value="00033" />
+      <option name="presentableId" value="LOCAL-00033" />
+      <option name="project" value="LOCAL" />
+      <updated>1773394782111</updated>
+    </task>
+    <option name="localTasksCounter" value="34" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
