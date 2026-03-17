@@ -248,6 +248,7 @@ const hoveredMarker   = ref<{ name: string; time: number; trackIndex: number } |
 const DC_BUCKETS = 300
 const _dcRaw = new Array<number | null>(DC_BUCKETS).fill(null)
 const dcByTime = shallowRef<readonly (number | null)[]>([..._dcRaw])
+let _lastDcNormPos = -1  // used to detect loop wrap-around
 
 const dcSparkline = computed(() => {
   const data = dcByTime.value
@@ -428,6 +429,11 @@ onMounted(async () => {
               normSum += pos / t.duration
             }
             const normPos = normSum / validTracks.length
+            // Detect loop wrap-around: normPos jumped back significantly → new cycle
+            if (_lastDcNormPos > 0.5 && normPos < 0.2) {
+              _dcRaw.fill(null)
+            }
+            _lastDcNormPos = normPos
             const bucket  = Math.min(DC_BUCKETS - 1, Math.floor(normPos * DC_BUCKETS))
             _dcRaw[bucket] = frameStats.drawCalls
           }
@@ -513,6 +519,10 @@ onMounted(async () => {
         if (!spineAdapter) return
         if (playing) {
           if (!animationStore.isPaused) {
+            // Reset DC sparkline on each fresh play (not on unpause)
+            _dcRaw.fill(null)
+            dcByTime.value = [..._dcRaw]
+            _lastDcNormPos = -1
             // Reconstruct full sequence for each enabled track from its master playlist.
             // This allows the full sequence to replay even after Spine has advanced through entries.
             for (const [idxStr, playlist] of Object.entries(animationStore.trackPlaylists)) {

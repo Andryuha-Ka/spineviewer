@@ -4,7 +4,8 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 import path from 'path'
-import pkg from './package.json'
+import { readFileSync } from 'fs'
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8')) as { version: string }
 
 /**
  * Redirects `import … from 'pixi.js'` inside @esotericsoftware/* packages to
