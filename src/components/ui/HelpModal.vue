@@ -132,6 +132,27 @@
 
       <n-divider class="divider" />
 
+      <!-- Pixi DevTools -->
+      <section class="help-section">
+        <h3 class="sec-title">Pixi DevTools</h3>
+        <p class="help-p">
+          The app exposes <code>globalThis.__PIXI_APP__</code> for the
+          <a class="about-link" href="https://chromewebstore.google.com/detail/pixi-inspector/aamddddknhcagpehecnhphigffljadon" target="_blank" rel="noopener">Pixi Inspector</a>
+          browser extension.
+        </p>
+        <p class="help-p help-p--warn">
+          After a hard page reload (Ctrl+R) with DevTools already open, the panel may lose its execution context.
+          This is a known extension bug — it doesn't re-register after navigation.
+        </p>
+        <ul class="help-list">
+          <li>Open DevTools <b>after</b> the viewer is loaded and animation is playing</li>
+          <li>Or navigate picker → viewer without reloading the page</li>
+          <li>Or close and reopen DevTools after a page reload</li>
+        </ul>
+      </section>
+
+      <n-divider class="divider" />
+
       <!-- About -->
       <section class="help-section">
         <h3 class="sec-title">About</h3>
@@ -211,6 +232,21 @@ const appVersion = __APP_VERSION__
   letter-spacing: 0.08em;
   color: var(--c-text-ghost);
   margin: 0;
+}
+
+.help-p {
+  font-size: 0.82rem;
+  color: var(--c-text-dim);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.help-p--warn {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.07);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 5px;
+  padding: 5px 8px;
 }
 
 .help-list {

@@ -76,4 +76,9 @@ export default defineConfig({
     // Exclude @esotericsoftware so their pixi.js imports reach spinePixi8Redirect.
     exclude: ['@esotericsoftware/spine-pixi-v8', '@esotericsoftware/spine-core'],
   },
+  esbuild: {
+    // Preserve class and function names in production so Pixi DevTools extension
+    // can identify scene graph nodes (Sprite, Container, etc.) by constructor name.
+    keepNames: true,
+  },
 })

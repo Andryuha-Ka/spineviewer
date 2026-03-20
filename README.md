@@ -174,6 +174,13 @@ The app exposes the active Pixi application instance for the [Pixi DevTools](htt
 globalThis.__PIXI_APP__ = app
 ```
 
+**Known limitation:** After a hard page reload (`Ctrl+R` / `F5`) with DevTools already open, the Pixi Inspector panel may show `uniqueContextId not found`. This is a bug in the extension — it caches the old execution context ID and doesn't re-register after navigation.
+
+Workarounds (pick one):
+- Open DevTools **after** the viewer is loaded and the animation is playing
+- Navigate picker → viewer **without** reloading the page (SPA navigation keeps the same context)
+- After a page reload: close and reopen the DevTools window to get a fresh context
+
 ### Version Injection
 Build version is injected at compile time from `package.json` via `vite.config.ts`:
 ```ts
