@@ -596,13 +596,18 @@ async function onDrop(e: DragEvent) {
   flex: 1;
   min-width: 0;
   font-size: 0.75rem;
-  background: rgba(255,255,255,0.06);
+  background: #1e1e24;
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 4px;
-  color: rgba(255,255,255,0.7);
+  color: #d4d4d8;
   padding: 2px 6px;
   height: 24px;
   cursor: pointer;
+}
+
+.anim-select option {
+  background: #1e1e24;
+  color: #d4d4d8;
 }
 
 .ctrl-btn {
