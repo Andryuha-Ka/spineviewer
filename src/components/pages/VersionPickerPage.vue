@@ -153,10 +153,9 @@
         Open Viewer
       </n-button>
       <n-button
-        v-if="loaderStore.spineSlots.filter(s => !s.error).length >= 2"
         size="large"
         class="compare-btn"
-        @click="emit('open-compare', { left: 0, right: 1 })"
+        @click="onOpenCompare"
       >
         ⇄ Compare
       </n-button>
@@ -191,7 +190,7 @@ import type { SpineFileType } from '@/core/types/FileSet'
 
 const emit = defineEmits<{
   open:         []
-  'open-compare': [payload: { left: number; right: number }]
+  'open-compare': [payload: { left?: number; right?: number }]
 }>()
 
 const appVersion = __APP_VERSION__
@@ -275,6 +274,15 @@ function onClear() {
   loaderStore.clear()
   classifyError.value  = null
   versionUnknown.value = false
+}
+
+function onOpenCompare() {
+  const validSlots = loaderStore.spineSlots.map((s, i) => ({ s, i })).filter(({ s }) => !s.error)
+  if (validSlots.length >= 2) {
+    emit('open-compare', { left: validSlots[0].i, right: validSlots[1].i })
+  } else {
+    emit('open-compare', {})
+  }
 }
 
 function formatSize(bytes: number): string {

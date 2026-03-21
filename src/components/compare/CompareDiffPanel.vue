@@ -64,7 +64,86 @@
     <!-- Diff content -->
     <div class="diff-content">
       <template v-if="diff">
-        <!-- Placeholders section — always first, always expanded -->
+
+        <!-- ── Reskin Overview ── -->
+        <div class="overview-section">
+          <!-- Header -->
+          <div class="ov-header" @click="ovExpanded = !ovExpanded">
+            <span class="ov-toggle">{{ ovExpanded ? '−' : '+' }}</span>
+            <span class="ov-title">🎬 Reskin Overview</span>
+            <span class="ov-counts">
+              <span v-if="animTableIssues > 0" class="ov-badge ov-badge--warn">{{ animTableIssues }} anim</span>
+              <span v-if="animEventIssues > 0" class="ov-badge ov-badge--err">{{ animEventIssues }} event</span>
+              <span v-if="animTableIssues === 0 && animEventIssues === 0" class="ov-badge ov-badge--ok">ok</span>
+            </span>
+          </div>
+
+          <template v-if="ovExpanded">
+            <!-- Animation table -->
+            <div class="ov-sub-header">
+              <span class="ov-sub-title">Animations</span>
+              <span class="ov-sub-hint">{{ diff.animTable.length }} total</span>
+            </div>
+            <div
+              v-for="row in visibleAnimTable"
+              :key="row.name"
+              class="anim-row"
+              :class="`anim-row--${row.status}`"
+            >
+              <span class="anim-row-icon">{{ animRowIcon(row.status) }}</span>
+              <span class="anim-row-name">{{ row.name }}</span>
+              <span class="anim-row-dur anim-row-dur--a">{{ row.durA !== null ? row.durA.toFixed(2) + 's' : '—' }}</span>
+              <span class="anim-row-arrow">→</span>
+              <span class="anim-row-dur anim-row-dur--b">{{ row.durB !== null ? row.durB.toFixed(2) + 's' : '—' }}</span>
+              <span v-if="row.status === 'delta' && row.durA !== null && row.durB !== null" class="anim-row-delta">
+                {{ formatDelta(row.durA, row.durB) }}
+              </span>
+            </div>
+            <div v-if="diffsOnly && diff.animTable.every(r => r.status === 'ok')" class="ov-empty">All animations match</div>
+
+            <!-- Events per animation (JSON only) -->
+            <template v-if="diff.animEvents.length > 0">
+              <div class="ov-sub-header ov-sub-header--events">
+                <span class="ov-sub-title">Events per animation</span>
+                <span class="ov-sub-hint">{{ diff.animEvents.length }} anim with events</span>
+              </div>
+              <template v-for="group in visibleAnimEvents" :key="group.animName">
+                <!-- Group header -->
+                <div
+                  class="ev-group-header"
+                  :class="{ 'ev-group-header--changed': group.hasChanges }"
+                  @click="toggleEvGroup(group.animName)"
+                >
+                  <span class="ev-group-toggle">{{ evGroupExpanded.has(group.animName) ? '−' : '+' }}</span>
+                  <span class="ev-group-name">{{ group.animName }}</span>
+                  <span v-if="group.hasChanges" class="ev-group-badge">{{ group.events.filter(e => e.status !== 'ok').length }} changed</span>
+                  <span v-else class="ev-group-ok">✓</span>
+                </div>
+                <!-- Event rows -->
+                <template v-if="evGroupExpanded.has(group.animName)">
+                  <div
+                    v-for="ev in visibleEventRows(group)"
+                    :key="`${ev.eventName}::${ev.idx}`"
+                    class="ev-row"
+                    :class="`ev-row--${ev.status}`"
+                  >
+                    <span class="ev-row-icon">{{ animRowIcon(ev.status) }}</span>
+                    <span class="ev-row-name">{{ ev.eventName }}<span v-if="ev.idx > 0" class="ev-row-idx">[{{ ev.idx }}]</span></span>
+                    <span class="ev-row-time ev-row-time--a">{{ ev.timeA !== null ? ev.timeA.toFixed(3) + 's' : '—' }}</span>
+                    <span class="ev-row-arrow">→</span>
+                    <span class="ev-row-time ev-row-time--b">{{ ev.timeB !== null ? ev.timeB.toFixed(3) + 's' : '—' }}</span>
+                    <span v-if="ev.status === 'delta' && ev.timeA !== null && ev.timeB !== null" class="ev-row-delta">
+                      {{ formatDelta(ev.timeA, ev.timeB) }}
+                    </span>
+                  </div>
+                </template>
+              </template>
+            </template>
+            <div v-else-if="diff.source === 'runtime-partial'" class="ov-empty">Event timing: JSON files only</div>
+          </template>
+        </div>
+
+        <!-- Placeholders section -->
         <div class="placeholders-section">
           <div class="ph-header">
             <span class="ph-toggle" @click="phExpanded = !phExpanded">{{ phExpanded ? '−' : '+' }}</span>
@@ -116,7 +195,7 @@
 <script setup lang="ts">
 import CompareDiffSection from './CompareDiffSection.vue'
 import { useCompareStore } from '@/core/stores/useCompareStore'
-import type { PlaceholderDiff } from '@/core/utils/spineCompare'
+import type { PlaceholderDiff, AnimEventGroup } from '@/core/utils/spineCompare'
 
 const compareStore = useCompareStore()
 
@@ -126,6 +205,8 @@ const diffError  = computed(() => compareStore.diffError)
 
 const diffsOnly  = ref(false)
 const phExpanded = ref(true)
+const ovExpanded = ref(true)
+const evGroupExpanded = ref(new Set<string>())
 
 const labelA = computed(() => {
   const s = compareStore.leftSlot
@@ -138,6 +219,58 @@ const labelB = computed(() => {
   if (!s) return 'No file'
   return s.label
 })
+
+// ── Reskin overview computed ────────────────────────────────────────────────
+
+const animTableIssues = computed(() =>
+  diff.value?.animTable.filter(r => r.status !== 'ok').length ?? 0,
+)
+
+const animEventIssues = computed(() =>
+  diff.value?.animEvents.reduce((sum, g) => sum + g.events.filter(e => e.status !== 'ok').length, 0) ?? 0,
+)
+
+const visibleAnimTable = computed(() => {
+  if (!diff.value) return []
+  return diffsOnly.value
+    ? diff.value.animTable.filter(r => r.status !== 'ok')
+    : diff.value.animTable
+})
+
+const visibleAnimEvents = computed(() => {
+  if (!diff.value) return []
+  return diffsOnly.value
+    ? diff.value.animEvents.filter(g => g.hasChanges)
+    : diff.value.animEvents
+})
+
+function visibleEventRows(group: AnimEventGroup) {
+  return diffsOnly.value ? group.events.filter(e => e.status !== 'ok') : group.events
+}
+
+function toggleEvGroup(animName: string) {
+  const set = new Set(evGroupExpanded.value)
+  if (set.has(animName)) set.delete(animName)
+  else set.add(animName)
+  evGroupExpanded.value = set
+}
+
+function animRowIcon(status: string): string {
+  switch (status) {
+    case 'ok':     return '✓'
+    case 'delta':  return '~'
+    case 'only-a': return '−'
+    case 'only-b': return '+'
+    default:       return '?'
+  }
+}
+
+function formatDelta(a: number, b: number): string {
+  const ms = Math.round((b - a) * 1000)
+  return (ms > 0 ? '+' : '') + ms + 'ms'
+}
+
+// ── Placeholder computed ────────────────────────────────────────────────────
 
 const changedPlaceholders = computed(() => {
   if (!diff.value) return 0
@@ -316,6 +449,248 @@ function posBtnIcon(pos: 'left' | 'right' | 'bottom'): string {
 .diff-content {
   flex: 1;
   overflow-y: auto;
+}
+
+/* ── Reskin Overview section ──────────────────────────────────────── */
+.overview-section {
+  border-bottom: 1px solid var(--c-border-dim);
+}
+
+.ov-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.ov-header:hover { background: var(--c-raised); }
+
+.ov-toggle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--c-text-ghost);
+  min-width: 14px;
+  text-align: center;
+}
+
+.ov-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--c-text-dim);
+}
+
+.ov-counts {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.ov-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.ov-badge--ok   { background: rgba(74,222,128,0.1);  color: #4ade80; }
+.ov-badge--warn { background: rgba(245,158,11,0.1);  color: #f59e0b; }
+.ov-badge--err  { background: rgba(248,113,113,0.1); color: #f87171; }
+
+.ov-sub-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 3px;
+  background: var(--c-raised);
+  border-top: 1px solid var(--c-border-dim);
+}
+
+.ov-sub-header--events { margin-top: 2px; }
+
+.ov-sub-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--c-text-ghost);
+}
+
+.ov-sub-hint {
+  font-size: 0.65rem;
+  color: var(--c-text-ghost);
+  margin-left: auto;
+}
+
+.ov-empty {
+  padding: 6px 28px;
+  font-size: 0.72rem;
+  color: var(--c-text-ghost);
+  font-style: italic;
+}
+
+/* Animation rows */
+.anim-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  font-size: 0.72rem;
+  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+}
+
+.anim-row--delta  { background: rgba(245,158,11,0.04); }
+.anim-row--only-a { background: rgba(248,113,113,0.04); }
+.anim-row--only-b { background: rgba(74,222,128,0.04); }
+
+.anim-row-icon {
+  font-size: 0.7rem;
+  font-weight: 700;
+  min-width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.anim-row--ok     .anim-row-icon { color: #4ade80; }
+.anim-row--delta  .anim-row-icon { color: #f59e0b; }
+.anim-row--only-a .anim-row-icon { color: #f87171; }
+.anim-row--only-b .anim-row-icon { color: #4ade80; }
+
+.anim-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-text-dim);
+}
+
+.anim-row-dur {
+  flex-shrink: 0;
+  min-width: 44px;
+  text-align: right;
+  font-size: 0.7rem;
+}
+.anim-row-dur--a { color: #f87171; }
+.anim-row-dur--b { color: #4ade80; }
+.anim-row--ok .anim-row-dur--a,
+.anim-row--ok .anim-row-dur--b { color: var(--c-text-muted); }
+
+.anim-row-arrow { color: var(--c-text-ghost); flex-shrink: 0; font-size: 0.65rem; }
+
+.anim-row-delta {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  color: #f59e0b;
+  min-width: 48px;
+  text-align: right;
+}
+
+/* Event groups */
+.ev-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 16px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  user-select: none;
+  border-top: 1px solid var(--c-border-dim);
+}
+.ev-group-header:hover { background: var(--c-raised); }
+.ev-group-header--changed { background: rgba(245,158,11,0.03); }
+
+.ev-group-toggle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--c-text-ghost);
+  min-width: 12px;
+}
+
+.ev-group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-text-dim);
+  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+}
+
+.ev-group-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245,158,11,0.1);
+  border-radius: 3px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+}
+
+.ev-group-ok {
+  font-size: 0.7rem;
+  color: #4ade80;
+  flex-shrink: 0;
+}
+
+/* Event occurrence rows */
+.ev-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 10px 1px 28px;
+  font-size: 0.7rem;
+  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+}
+
+.ev-row--delta  { background: rgba(245,158,11,0.04); }
+.ev-row--only-a { background: rgba(248,113,113,0.04); }
+.ev-row--only-b { background: rgba(74,222,128,0.04); }
+
+.ev-row-icon {
+  font-weight: 700;
+  min-width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 0.68rem;
+}
+.ev-row--ok     .ev-row-icon { color: #4ade80; }
+.ev-row--delta  .ev-row-icon { color: #f59e0b; }
+.ev-row--only-a .ev-row-icon { color: #f87171; }
+.ev-row--only-b .ev-row-icon { color: #4ade80; }
+
+.ev-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-text-muted);
+}
+
+.ev-row-idx {
+  font-size: 0.6rem;
+  color: var(--c-text-ghost);
+  margin-left: 2px;
+}
+
+.ev-row-time {
+  flex-shrink: 0;
+  min-width: 50px;
+  text-align: right;
+  font-size: 0.68rem;
+}
+.ev-row-time--a { color: #f87171; }
+.ev-row-time--b { color: #4ade80; }
+.ev-row--ok .ev-row-time--a,
+.ev-row--ok .ev-row-time--b { color: var(--c-text-muted); }
+
+.ev-row-arrow { color: var(--c-text-ghost); flex-shrink: 0; font-size: 0.6rem; }
+
+.ev-row-delta {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  color: #f59e0b;
+  min-width: 48px;
+  text-align: right;
 }
 
 /* ── Placeholders section ─────────────────────────────────────────── */

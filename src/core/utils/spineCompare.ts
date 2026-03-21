@@ -55,6 +55,30 @@ export interface DiffSection {
   items: DiffItem[]
 }
 
+// ── Reskin-focused types ───────────────────────────────────────────────────────
+
+export interface AnimTableRow {
+  name:   string
+  durA:   number | null   // null = not present
+  durB:   number | null
+  status: 'ok' | 'delta' | 'only-a' | 'only-b'
+}
+
+export interface AnimEventOccurrence {
+  eventName: string
+  idx:       number        // occurrence index within animation (0-based)
+  timeA:     number | null
+  timeB:     number | null
+  status:    'ok' | 'delta' | 'only-a' | 'only-b'
+}
+
+export interface AnimEventGroup {
+  animName:   string
+  animStatus: AnimTableRow['status']
+  events:     AnimEventOccurrence[]
+  hasChanges: boolean
+}
+
 export interface SpineDiff {
   source: 'json-full' | 'runtime-partial'
   summary: {
@@ -63,6 +87,8 @@ export interface SpineDiff {
     changed: number
     equal: number
   }
+  animTable:  AnimTableRow[]
+  animEvents: AnimEventGroup[]   // JSON-only; empty for runtime
   placeholders: PlaceholderDiff[]
   sections: DiffSection[]
 }
@@ -689,6 +715,118 @@ function extractPlaceholders(dataA: SpineData, dataB: SpineData): PlaceholderDif
   return result
 }
 
+// ── Reskin-focused builders ────────────────────────────────────────────────────
+
+function buildAnimTable(dataA: SpineData, dataB: SpineData): AnimTableRow[] {
+  const durMapA = new Map<string, number>()
+  const durMapB = new Map<string, number>()
+  let namesA: string[]
+  let namesB: string[]
+
+  if (dataA.source === 'json') {
+    const anims = getJsonAnimations(dataA.raw as AnyRecord)
+    namesA = Object.keys(anims)
+    for (const [name, anim] of Object.entries(anims))
+      durMapA.set(name, getAnimationDuration(anim as AnyRecord))
+  } else {
+    namesA = dataA.adapter.animations
+  }
+
+  if (dataB.source === 'json') {
+    const anims = getJsonAnimations(dataB.raw as AnyRecord)
+    namesB = Object.keys(anims)
+    for (const [name, anim] of Object.entries(anims))
+      durMapB.set(name, getAnimationDuration(anim as AnyRecord))
+  } else {
+    namesB = dataB.adapter.animations
+  }
+
+  const setA = new Set(namesA)
+  const setB = new Set(namesB)
+  const all  = [...new Set([...namesA, ...namesB])]
+
+  return all.map(name => {
+    const inA = setA.has(name)
+    const inB = setB.has(name)
+    const durA = durMapA.get(name) ?? null
+    const durB = durMapB.get(name) ?? null
+    if (!inA) return { name, durA: null, durB, status: 'only-b' as const }
+    if (!inB) return { name, durA, durB: null, status: 'only-a' as const }
+    const hasDelta = durA !== null && durB !== null && Math.abs(durA - durB) > 0.001
+    return { name, durA, durB, status: hasDelta ? 'delta' as const : 'ok' as const }
+  })
+}
+
+function buildAnimEvents(dataA: SpineData, dataB: SpineData): AnimEventGroup[] {
+  if (dataA.source !== 'json' || dataB.source !== 'json') return []
+
+  const animsA = getJsonAnimations(dataA.raw as AnyRecord)
+  const animsB = getJsonAnimations(dataB.raw as AnyRecord)
+  const allAnimNames = [...new Set([...Object.keys(animsA), ...Object.keys(animsB)])]
+
+  const groups: AnimEventGroup[] = []
+
+  for (const animName of allAnimNames) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const animA = animsA[animName] as AnyRecord | undefined
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const animB = animsB[animName] as AnyRecord | undefined
+
+    const animStatus: AnimTableRow['status'] =
+      !animA ? 'only-b' : !animB ? 'only-a' : 'ok'
+
+    const eventsA: Array<{ name: string; time: number }> = Array.isArray(animA?.events) ? animA.events : []
+    const eventsB: Array<{ name: string; time: number }> = Array.isArray(animB?.events) ? animB.events : []
+
+    if (eventsA.length === 0 && eventsB.length === 0) continue
+
+    // Group by event name with occurrence index
+    const timesA = new Map<string, number[]>()
+    const timesB = new Map<string, number[]>()
+    for (const ev of eventsA) {
+      if (!timesA.has(ev.name)) timesA.set(ev.name, [])
+      timesA.get(ev.name)!.push(ev.time)
+    }
+    for (const ev of eventsB) {
+      if (!timesB.has(ev.name)) timesB.set(ev.name, [])
+      timesB.get(ev.name)!.push(ev.time)
+    }
+
+    const allEventNames = [...new Set([...timesA.keys(), ...timesB.keys()])]
+    const occurrences: AnimEventOccurrence[] = []
+
+    for (const eventName of allEventNames) {
+      const tA = timesA.get(eventName) ?? []
+      const tB = timesB.get(eventName) ?? []
+      const maxLen = Math.max(tA.length, tB.length)
+      for (let i = 0; i < maxLen; i++) {
+        const timeA = tA[i] ?? null
+        const timeB = tB[i] ?? null
+        let status: AnimEventOccurrence['status']
+        if (timeA === null)                          status = 'only-b'
+        else if (timeB === null)                     status = 'only-a'
+        else if (Math.abs(timeA - timeB) > 0.001)   status = 'delta'
+        else                                         status = 'ok'
+        occurrences.push({ eventName, idx: i, timeA, timeB, status })
+      }
+    }
+
+    // Sort by earliest time
+    occurrences.sort((a, b) => (a.timeA ?? a.timeB ?? 0) - (b.timeA ?? b.timeB ?? 0))
+
+    const hasChanges = occurrences.some(o => o.status !== 'ok')
+    groups.push({ animName, animStatus, events: occurrences, hasChanges })
+  }
+
+  // Changed animations first, then alphabetically
+  groups.sort((a, b) => {
+    if (a.hasChanges !== b.hasChanges) return a.hasChanges ? -1 : 1
+    return a.animName.localeCompare(b.animName)
+  })
+
+  return groups
+}
+
 // ── Main comparison entry point ────────────────────────────────────────────────
 
 export async function compareSpines(dataA: SpineData, dataB: SpineData): Promise<SpineDiff> {
@@ -722,6 +860,8 @@ export async function compareSpines(dataA: SpineData, dataB: SpineData): Promise
   }
 
   const placeholders = extractPlaceholders(dataA, dataB)
+  const animTable    = buildAnimTable(dataA, dataB)
+  const animEvents   = buildAnimEvents(dataA, dataB)
 
   // Build summary
   const summary = { added: 0, removed: 0, changed: 0, equal: 0 }
@@ -736,6 +876,8 @@ export async function compareSpines(dataA: SpineData, dataB: SpineData): Promise
   return {
     source:       isJsonFull ? 'json-full' : 'runtime-partial',
     summary,
+    animTable,
+    animEvents,
     placeholders,
     sections,
   }

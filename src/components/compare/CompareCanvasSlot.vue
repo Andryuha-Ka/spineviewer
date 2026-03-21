@@ -44,6 +44,13 @@
       <span class="error-text">{{ loadError }}</span>
     </div>
 
+    <!-- Anim not found toast -->
+    <Transition name="anim-toast">
+      <div v-if="animNotFound" class="anim-not-found-toast">
+        "{{ animNotFound }}" not found
+      </div>
+    </Transition>
+
     <!-- Top-left overlay: bg color + center button -->
     <div v-if="hasFileSet" class="overlay-tl">
       <input
@@ -112,6 +119,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'viewport-change': [vp: { posX: number; posY: number; zoom: number }]
+  'anim-change':     [name: string]
 }>()
 
 // ── DOM refs ───────────────────────────────────────────────────────────────────
@@ -151,6 +159,15 @@ const isPlaying       = ref(false)
 const fps             = ref(0)
 const currentTime     = ref(0)
 const animDuration    = ref(0)
+const animNotFound    = ref<string | null>(null)
+
+let animNotFoundTimer: ReturnType<typeof setTimeout> | null = null
+
+function showAnimNotFound(name: string) {
+  if (animNotFoundTimer) clearTimeout(animNotFoundTimer)
+  animNotFound.value = name
+  animNotFoundTimer = setTimeout(() => { animNotFound.value = null }, 2500)
+}
 
 // Pan state
 let panStart = { x: 0, y: 0, px: 0, py: 0 }
@@ -239,6 +256,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   containerRef.value?.removeEventListener('wheel', onWheel)
+  if (animNotFoundTimer) clearTimeout(animNotFoundTimer)
   destroyAdapter()
   if (pixiAppInst && tickerFn) pixiAppInst.ticker.remove(tickerFn)
   pixiAppInst?.destroy()
@@ -417,6 +435,7 @@ function onAnimChange(e: Event) {
   currentAnimName.value = name
   adapterInst.setAnimation(0, name, true)
   isPlaying.value = true
+  emit('anim-change', name)
 }
 
 // ── Public methods (exposed) ───────────────────────────────────────────────────
@@ -435,6 +454,8 @@ function setAnimationByName(name: string) {
   if (adapterInst.animations.includes(name)) {
     currentAnimName.value = name
     adapterInst.setAnimation(0, name, true)
+  } else {
+    showAnimNotFound(name)
   }
 }
 
@@ -650,5 +671,33 @@ async function onDrop(e: DragEvent) {
 .empty-bar-hint {
   font-size: 0.72rem;
   color: rgba(255,255,255,0.2);
+}
+
+/* ── Anim not-found toast ─────────────────────────────────────────── */
+.anim-not-found-toast {
+  position: absolute;
+  bottom: 46px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 20, 26, 0.88);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #f87171;
+  font-size: 0.72rem;
+  padding: 5px 12px;
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 20;
+}
+
+.anim-toast-enter-active,
+.anim-toast-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+.anim-toast-enter-from,
+.anim-toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(4px);
 }
 </style>

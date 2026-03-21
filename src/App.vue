@@ -38,13 +38,13 @@ import { useSettingsStore } from '@/core/stores/useSettingsStore'
 const settingsStore = useSettingsStore()
 const page     = ref<'picker' | 'viewer' | 'compare'>('picker')
 const fromPage = ref<'picker' | 'viewer'>('picker')
-const compareInitLeft  = ref(0)
-const compareInitRight = ref(1)
+const compareInitLeft  = ref<number | undefined>(undefined)
+const compareInitRight = ref<number | undefined>(undefined)
 
 function onOpenCompare(payload?: { left?: number; right?: number }) {
-  fromPage.value        = page.value as 'picker' | 'viewer'
-  compareInitLeft.value  = payload?.left  ?? 0
-  compareInitRight.value = payload?.right ?? 1
+  fromPage.value         = page.value as 'picker' | 'viewer'
+  compareInitLeft.value  = payload?.left
+  compareInitRight.value = payload?.right
   page.value = 'compare'
 }
 

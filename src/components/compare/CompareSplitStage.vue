@@ -14,6 +14,7 @@
       side="left"
       :file-set="leftFileSet"
       @viewport-change="onLeftViewportChange"
+      @anim-change="onLeftAnimChange"
     />
 
     <!-- Resize handle -->
@@ -31,6 +32,7 @@
       side="right"
       :file-set="rightFileSet"
       @viewport-change="onRightViewportChange"
+      @anim-change="onRightAnimChange"
     />
   </div>
 </template>
@@ -83,6 +85,18 @@ function onRightViewportChange(vp: Viewport) {
   isSyncingViewport = true
   leftSlotRef.value?.setViewport(vp)
   isSyncingViewport = false
+}
+
+// ── Animation sync ─────────────────────────────────────────────────────────────
+
+function onLeftAnimChange(name: string) {
+  if (!compareStore.syncEnabled) return
+  rightSlotRef.value?.setAnimationByName(name)
+}
+
+function onRightAnimChange(name: string) {
+  if (!compareStore.syncEnabled) return
+  leftSlotRef.value?.setAnimationByName(name)
 }
 
 // ── Playback sync ──────────────────────────────────────────────────────────────

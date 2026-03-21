@@ -74,6 +74,9 @@
       <span v-else>⚡ Run Diff</span>
     </button>
 
+    <!-- Settings -->
+    <SettingsPopover />
+
     <!-- Panel position -->
     <div class="panel-pos-group" title="Diff panel position">
       <button
@@ -89,6 +92,7 @@
 
 <script setup lang="ts">
 import CompareFileSlot from './CompareFileSlot.vue'
+import SettingsPopover from '@/components/ui/SettingsPopover.vue'
 import { useCompareStore } from '@/core/stores/useCompareStore'
 
 const emit = defineEmits<{
