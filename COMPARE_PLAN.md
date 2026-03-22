@@ -28,22 +28,39 @@ ComparePage        ──[← Back] ──→  returns to origin page
 ### Visual
 - Two canvases side by side, each with its own Pixi adapter instance
 - Vertical resize handle between the two canvases
-- Per-canvas minimal control bar: filename, current animation, FPS
-- Diff panel with three configurable positions: **left**, **right**, **bottom**
+- Per-canvas control bar: side badge (A/B), skin selector (if >1 skin), animation selector, play/pause (master only), current time, FPS
+- Skin selector auto-selects first non-default skin on load
+- Diff panel with three configurable positions: **left**, **right**, **bottom** (buttons in toolbar only)
 - Position persisted in `localStorage`
 
 ### Synchronized Playback
 - One side is **Master** (full playback controls), other is **Secondary** (mirrors master)
-- Sync can be toggled on/off
-- If the same animation name exists in both → play same name on both
-- If not → secondary stays on its current animation but seek position is mirrored
+- **Time sync** (↺) — toggle on/off; when ON: time position mirrored in real-time via master ticker
+- **Viewport sync** (⊞) — toggle on/off; pan/zoom mirrored between canvases
+- **Animation sync** — when Time ON and user changes animation, same name applied to other side; if name absent → toast "X not found", keep current
+- **Skin sync** — when Time ON and user changes skin, same name applied to other side
 - Master drives time via ticker callback → `secondaryAdapter.seekTrackTo(0, t)`
 
 ### Structural Comparison
 Full diff for `.json`, maximum available for `.skel` (via runtime adapter).
 
+Diff runs **automatically** when a canvas finishes loading a spine — no manual "Run Diff" button needed.
+
+### Reskin Overview (first section in diff panel)
+Dedicated overview for reskin-focused comparison, always shown first:
+
+- **Animations** — name/presence diff + duration delta
+- **Skins** — presence diff; canvas slots show skin selector, auto-selects first non-default skin
+- **Events (global)** — event definition presence diff
+- **Event timing** — per-animation event occurrence and timing diff (JSON only)
+- **Placeholders** — slots/bones/attachments with "placeholder" in name; critical param changes flagged
+
+**Severity color coding in header badges:**
+- 🔴 Red (critical): animation name missing, event name missing, event occurrence missing, placeholder changed
+- 🟠 Orange (non-critical): animation duration delta, skin name diff, event timing delta
+
 ### Placeholders
-Slots, bones, or attachments whose names contain `"placeholder"` (case-insensitive) are extracted into a **dedicated section**, always expanded by default, shown first in the diff panel. Critical parameter changes (blend mode, parent bone) are flagged with a warning badge.
+Moved inside **Reskin Overview** (not a standalone section). Equal items show green ✓.
 
 ---
 
@@ -91,8 +108,10 @@ src/
 - Pass selected slot indices as props to `ComparePage`
 
 **`VersionPickerPage.vue`**
-- Show `Compare` button when `loaderStore.spineSlots.length >= 2`
-- Pre-fills left=slot[0], right=slot[1]
+- `Compare` button always visible (even with 0 or 1 spine loaded) — user may want Compare only
+- 2+ valid slots → pre-fills left=slot[0], right=slot[1]
+- 1 valid slot → pre-fills left=slot[0] only
+- 0 valid slots → opens Compare with empty slots
 
 **`ViewerPage.vue`**
 - Show `Compare` button in toolbar always (user can load files in compare)
@@ -382,13 +401,18 @@ Spine A: skeleton_v1.json    Spine B: skeleton_v2.json
 **CompareToolbar** (top bar):
 ```
 [← Back]  [A: filename_v1.json ▾]  ⟷  [B: filename_v2.json ▾]
-          [↺ Sync ON]  [Master: A|B]  [⚙]  [?]  [◧◨⬓]
+          [↺ Time ON]  [⊞ View ON]  [Master: A|B]  [⚙]  [◧◨⬓]
 ```
 
 - File slot dropdowns: list loaded spines OR "Load file..."
-- Sync toggle
+- **Time sync** toggle (↺) — time position sync
+- **Viewport sync** toggle (⊞) — pan/zoom sync
 - Master side toggle (A / B)
-- Panel position buttons `◧ ◨ ⬓`
+- Panel position buttons `◧ ◨ ⬓` (toolbar only, removed from panel header)
+- Settings popover (⚙) — theme, font
+- **No "Run Diff" button** — diff runs automatically on spine load
+
+**Back button**: shows `confirm` dialog → on confirm clears `compareStore`, `skeletonStore`, `animationStore`, `loaderStore`, `exportStore` and returns to origin page.
 
 **ComparePage layout** — three configurations:
 

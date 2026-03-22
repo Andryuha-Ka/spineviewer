@@ -64,7 +64,7 @@
             <span class="ov-counts">
               <span v-if="animNameIssues > 0"    class="ov-badge ov-badge--err">{{ animNameIssues }} anim</span>
               <span v-if="animDurIssues > 0"     class="ov-badge ov-badge--warn">{{ animDurIssues }} dur</span>
-              <span v-if="skinTableIssues > 0"   class="ov-badge ov-badge--warn">{{ skinTableIssues }} skin</span>
+              <span v-if="skinTableIssues > 0"   class="ov-badge ov-badge--err">{{ skinTableIssues }} skin</span>
               <span v-if="globalEventIssues > 0"      class="ov-badge ov-badge--err">{{ globalEventIssues }} event</span>
               <span v-if="animEventNameIssues > 0"   class="ov-badge ov-badge--err">{{ animEventNameIssues }} ev name</span>
               <span v-if="animEventTimingIssues > 0" class="ov-badge ov-badge--warn">{{ animEventTimingIssues }} ev time</span>
