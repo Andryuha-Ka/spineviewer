@@ -68,8 +68,10 @@
               <span v-if="globalEventIssues > 0"      class="ov-badge ov-badge--err">{{ globalEventIssues }} event</span>
               <span v-if="animEventNameIssues > 0"   class="ov-badge ov-badge--err">{{ animEventNameIssues }} ev name</span>
               <span v-if="animEventTimingIssues > 0" class="ov-badge ov-badge--warn">{{ animEventTimingIssues }} ev time</span>
-              <span v-if="changedPlaceholders > 0" class="ov-badge ov-badge--err">{{ changedPlaceholders }} ph</span>
-              <span v-if="animNameIssues === 0 && animDurIssues === 0 && skinTableIssues === 0 && globalEventIssues === 0 && animEventNameIssues === 0 && animEventTimingIssues === 0 && changedPlaceholders === 0" class="ov-badge ov-badge--ok">ok</span>
+              <span v-if="changedPlaceholders > 0"         class="ov-badge ov-badge--err">{{ changedPlaceholders }} ph</span>
+              <span v-if="constraintCriticalIssues > 0"   class="ov-badge ov-badge--err">{{ constraintCriticalIssues }} cstr</span>
+              <span v-if="constraintParamIssues > 0"      class="ov-badge ov-badge--warn">{{ constraintParamIssues }} cstr param</span>
+              <span v-if="animNameIssues === 0 && animDurIssues === 0 && skinTableIssues === 0 && globalEventIssues === 0 && animEventNameIssues === 0 && animEventTimingIssues === 0 && changedPlaceholders === 0 && constraintTableIssues === 0" class="ov-badge ov-badge--ok">ok</span>
             </span>
           </div>
 
@@ -186,7 +188,14 @@
             <div v-if="diff.placeholders.length === 0" class="ov-empty">No placeholder elements found</div>
             <template v-else>
               <template v-for="ph in visiblePlaceholders" :key="`${ph.kind}::${ph.name}`">
-                <div class="ph-item" :class="`ph-item--${ph.status}`">
+                <div
+                  class="ph-item"
+                  :class="[
+                    `ph-item--${ph.status}`,
+                    { 'ph-item--clickable': ph.kind !== 'attachment', 'ph-item--selected': isHighlightedPh(ph) },
+                  ]"
+                  @click="onPhClick(ph)"
+                >
                   <span class="ph-status-icon">{{ statusIcon(ph.status) }}</span>
                   <span class="ph-kind">{{ ph.kind }}:</span>
                   <span class="ph-name">{{ ph.name }}</span>
@@ -211,6 +220,32 @@
                 </div>
               </template>
             </template>
+
+            <!-- Constraints -->
+            <div class="ov-sub-header">
+              <span class="ov-sub-title">{{ constraintTableIssues > 0 ? '⚠ ' : '' }}Constraints</span>
+              <span class="ov-sub-hint">{{ diff.constraintTable.length }} total</span>
+            </div>
+            <template v-if="diff.constraintTable.length === 0">
+              <div class="ov-empty ov-empty--hint">No constraints (JSON only)</div>
+            </template>
+            <template v-else>
+              <div
+                v-for="row in visibleConstraintTable"
+                :key="`${row.kind}::${row.name}`"
+                class="anim-row"
+                :class="row.status === 'ok' ? 'anim-row--ok' : row.status === 'only-a' ? 'anim-row--only-a' : row.status === 'only-b' ? 'anim-row--only-b' : 'anim-row--delta'"
+              >
+                <span class="anim-row-icon">{{ animRowIcon(row.status) }}</span>
+                <span class="cstr-kind">[{{ row.kind }}]</span>
+                <span class="anim-row-name">{{ row.name }}</span>
+                <span v-if="row.bonesChanged"  class="cstr-tag cstr-tag--critical">bones</span>
+                <span v-if="row.targetChanged" class="cstr-tag cstr-tag--critical">target</span>
+                <span v-if="row.paramsChanged && !row.bonesChanged && !row.targetChanged" class="cstr-tag cstr-tag--param">params</span>
+                <span v-if="row.status === 'ok'" class="anim-row-icon" style="color:#4ade80">✓</span>
+              </div>
+              <div v-if="diffsOnly && diff.constraintTable.every(r => r.status === 'ok')" class="ov-empty">All constraints match</div>
+            </template>
           </template>
         </div>
 
@@ -220,6 +255,9 @@
           :key="section.id"
           :section="section"
           :diffs-only="diffsOnly"
+          :highlight-kind="section.id === 'bones' ? 'bone' : section.id === 'slots' ? 'slot' : undefined"
+          :selected-name="compareStore.selectedHighlight?.name ?? null"
+          @item-click="(key) => compareStore.setHighlight(key, section.id === 'bones' ? 'bone' : 'slot')"
         />
       </template>
     </div>
@@ -229,7 +267,7 @@
 <script setup lang="ts">
 import CompareDiffSection from './CompareDiffSection.vue'
 import { useCompareStore } from '@/core/stores/useCompareStore'
-import type { PlaceholderDiff, AnimEventGroup, GlobalEventRow, SkinRow } from '@/core/utils/spineCompare'
+import type { PlaceholderDiff, AnimEventGroup, GlobalEventRow, SkinRow, ConstraintRow } from '@/core/utils/spineCompare'
 
 const compareStore = useCompareStore()
 
@@ -350,8 +388,32 @@ const visiblePlaceholders = computed<PlaceholderDiff[]>(() => {
     : diff.value.placeholders
 })
 
+// ── Constraint table computed ─────────────────────────────────────────────────
+
+const constraintCriticalIssues = computed(() =>
+  diff.value?.constraintTable.filter(r =>
+    r.status === 'only-a' || r.status === 'only-b' ||
+    (r.status === 'changed' && (r.bonesChanged || r.targetChanged)),
+  ).length ?? 0,
+)
+
+const constraintParamIssues = computed(() =>
+  diff.value?.constraintTable.filter(r =>
+    r.status === 'changed' && !r.bonesChanged && !r.targetChanged && r.paramsChanged,
+  ).length ?? 0,
+)
+
+const constraintTableIssues = computed(() => constraintCriticalIssues.value + constraintParamIssues.value)
+
+const visibleConstraintTable = computed<ConstraintRow[]>(() => {
+  if (!diff.value) return []
+  return diffsOnly.value
+    ? diff.value.constraintTable.filter(r => r.status !== 'ok')
+    : diff.value.constraintTable
+})
+
 // ids moved to Reskin Overview — don't duplicate in generic sections
-const OVERVIEW_SECTION_IDS = new Set(['animations', 'events', 'skins'])
+const OVERVIEW_SECTION_IDS = new Set(['animations', 'events', 'skins', 'constraints'])
 
 const filteredSections = computed(() => {
   if (!diff.value) return []
@@ -369,6 +431,19 @@ function statusIcon(status: PlaceholderDiff['status']): string {
     case 'changed': return '~'
     default:        return '✓'
   }
+}
+
+// ── Highlight helpers ────────────────────────────────────────────────────────
+
+function isHighlightedPh(ph: PlaceholderDiff): boolean {
+  const hl = compareStore.selectedHighlight
+  if (!hl || ph.kind === 'attachment') return false
+  return hl.name === ph.name && hl.kind === ph.kind
+}
+
+function onPhClick(ph: PlaceholderDiff) {
+  if (ph.kind === 'attachment') return
+  compareStore.setHighlight(ph.name, ph.kind as 'bone' | 'slot')
 }
 
 </script>
@@ -641,6 +716,32 @@ function statusIcon(status: PlaceholderDiff['status']): string {
   text-align: right;
 }
 
+/* Constraint rows */
+.cstr-kind {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  color: var(--c-text-ghost);
+  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+}
+
+.cstr-tag {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.cstr-tag--critical {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}
+
+.cstr-tag--param {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
 /* Event groups */
 .ev-group-header {
   display: flex;
@@ -762,9 +863,12 @@ function statusIcon(status: PlaceholderDiff['status']): string {
   font-family: 'JetBrains Mono', 'Fira Mono', monospace;
 }
 
-.ph-item--added   { background: rgba(74, 222, 128, 0.05); }
-.ph-item--removed { background: rgba(248, 113, 113, 0.05); }
-.ph-item--changed { background: rgba(245, 158, 11, 0.05); }
+.ph-item--added    { background: rgba(74, 222, 128, 0.05); }
+.ph-item--removed  { background: rgba(248, 113, 113, 0.05); }
+.ph-item--changed  { background: rgba(245, 158, 11, 0.05); }
+.ph-item--clickable { cursor: pointer; }
+.ph-item--clickable:hover { background: var(--c-raised); }
+.ph-item--selected  { background: rgba(124, 106, 245, 0.12) !important; outline: 1px solid rgba(124, 106, 245, 0.4); outline-offset: -1px; }
 
 .ph-status-icon {
   font-weight: 700;

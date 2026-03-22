@@ -51,6 +51,8 @@ export const useCompareStore = defineStore('compare', () => {
   const diffStatus = ref<'idle' | 'running' | 'done' | 'error'>('idle')
   const diffError  = ref<string | null>(null)
 
+  const selectedHighlight = ref<{ name: string; kind: 'bone' | 'slot' } | null>(null)
+
   // --- Persistence watchers ---
   watch(syncEnabled,  v => localStorage.setItem('svp:compare:syncEnabled', String(v)))
   watch(syncViewport, v => localStorage.setItem('svp:compare:syncViewport', String(v)))
@@ -106,12 +108,21 @@ export const useCompareStore = defineStore('compare', () => {
     diffError.value  = error ?? null
   }
 
+  function setHighlight(name: string, kind: 'bone' | 'slot') {
+    if (selectedHighlight.value?.name === name && selectedHighlight.value.kind === kind) {
+      selectedHighlight.value = null
+    } else {
+      selectedHighlight.value = { name, kind }
+    }
+  }
+
   function reset() {
-    leftSlot.value   = null
-    rightSlot.value  = null
-    diff.value       = null
-    diffStatus.value = 'idle'
-    diffError.value  = null
+    leftSlot.value          = null
+    rightSlot.value         = null
+    diff.value              = null
+    diffStatus.value        = 'idle'
+    diffError.value         = null
+    selectedHighlight.value = null
   }
 
   return {
@@ -130,6 +141,8 @@ export const useCompareStore = defineStore('compare', () => {
     setPanelPos,
     setDiff,
     setDiffStatus,
+    selectedHighlight,
+    setHighlight,
     reset,
   }
 })

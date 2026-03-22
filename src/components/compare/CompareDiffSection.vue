@@ -21,7 +21,14 @@
     <!-- Items -->
     <div v-if="isExpanded" class="section-items">
       <template v-for="item in visibleItems" :key="item.key">
-        <div class="diff-item" :class="`diff-item--${item.status}`">
+        <div
+          class="diff-item"
+          :class="[
+            `diff-item--${item.status}`,
+            { 'diff-item--clickable': props.highlightKind, 'diff-item--selected': props.selectedName === item.key },
+          ]"
+          @click="props.highlightKind ? emit('item-click', item.key) : undefined"
+        >
           <span class="item-status-icon">{{ statusIcon(item.status) }}</span>
           <span class="item-key">{{ item.key }}</span>
           <template v-if="item.status === 'changed' && !item.children">
@@ -61,10 +68,14 @@
 import type { DiffSection, DiffItem } from '@/core/utils/spineCompare'
 
 const props = defineProps<{
-  section: DiffSection
-  diffsOnly: boolean
+  section:          DiffSection
+  diffsOnly:        boolean
   defaultExpanded?: boolean
+  highlightKind?:   'bone' | 'slot'
+  selectedName?:    string | null
 }>()
+
+const emit = defineEmits<{ 'item-click': [key: string] }>()
 
 const isExpanded = ref(props.defaultExpanded ?? props.section.status === 'changed')
 
@@ -170,9 +181,12 @@ function statusIcon(status: DiffItem['status']): string {
   font-family: 'JetBrains Mono', 'Fira Mono', monospace;
 }
 
-.diff-item--added   { background: rgba(74, 222, 128, 0.05); }
-.diff-item--removed { background: rgba(248, 113, 113, 0.05); }
-.diff-item--changed { background: rgba(245, 158, 11, 0.05); }
+.diff-item--added    { background: rgba(74, 222, 128, 0.05); }
+.diff-item--removed  { background: rgba(248, 113, 113, 0.05); }
+.diff-item--changed  { background: rgba(245, 158, 11, 0.05); }
+.diff-item--clickable { cursor: pointer; }
+.diff-item--clickable:hover { background: var(--c-raised); }
+.diff-item--selected  { background: rgba(124, 106, 245, 0.12) !important; outline: 1px solid rgba(124, 106, 245, 0.4); outline-offset: -1px; }
 
 .item-status-icon {
   flex-shrink: 0;

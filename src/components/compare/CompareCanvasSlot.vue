@@ -44,6 +44,25 @@
       <span class="error-text">{{ loadError }}</span>
     </div>
 
+    <!-- Bone crosshair highlight -->
+    <div
+      v-if="highlightBonePos"
+      class="hl-bone-cross"
+      :style="{ left: highlightBonePos.x + 'px', top: highlightBonePos.y + 'px' }"
+    />
+
+    <!-- Slot bounds highlight -->
+    <div
+      v-if="highlightSlotRect"
+      class="hl-slot-bounds"
+      :style="{
+        left:   highlightSlotRect.left   + 'px',
+        top:    highlightSlotRect.top    + 'px',
+        width:  highlightSlotRect.width  + 'px',
+        height: highlightSlotRect.height + 'px',
+      }"
+    />
+
     <!-- Anim not found toast -->
     <Transition name="anim-toast">
       <div v-if="animNotFound" class="anim-not-found-toast">
@@ -158,6 +177,10 @@ const posY  = ref(0)
 const zoom  = ref(1)
 const bgColor = ref(0x111113)
 
+// Highlight overlay
+const highlightBonePos  = ref<{ x: number; y: number } | null>(null)
+const highlightSlotRect = ref<{ left: number; top: number; width: number; height: number } | null>(null)
+
 // Skin controls
 const currentSkinName = ref<string | null>(null)
 const skinNames       = computed(() => adapter.value?.skins ?? [])
@@ -251,6 +274,7 @@ onMounted(async () => {
           currentTime.value  = t0.time
           animDuration.value = t0.duration
         }
+        updateHighlight()
       }
     }
     pixiAppInst.ticker.add(tickerFn)
@@ -346,6 +370,46 @@ async function loadFileSet(fileSet: FileSet) {
     isLoading.value = false
   }
 }
+
+function updateHighlight() {
+  const hl = compareStore.selectedHighlight
+  if (!hl || !adapterInst) {
+    highlightBonePos.value  = null
+    highlightSlotRect.value = null
+    return
+  }
+  if (hl.kind === 'bone') {
+    const bt = adapterInst.getBoneTransforms().find(b => b.name === hl.name)
+    highlightBonePos.value  = bt
+      ? { x: baseX.value + posX.value + bt.x * zoom.value, y: baseY.value + posY.value - bt.y * zoom.value }
+      : null
+    highlightSlotRect.value = null
+  } else {
+    const bounds = adapterInst.getSlotBounds(hl.name)
+    if (bounds) {
+      const sx = baseX.value + posX.value
+      const sy = baseY.value + posY.value
+      const z  = zoom.value
+      highlightSlotRect.value = {
+        left:   sx + bounds.minX * z,
+        top:    sy - bounds.maxY * z,
+        width:  Math.max(1, (bounds.maxX - bounds.minX) * z),
+        height: Math.max(1, (bounds.maxY - bounds.minY) * z),
+      }
+    } else {
+      highlightSlotRect.value = null
+    }
+    highlightBonePos.value = null
+  }
+}
+
+// Clear highlights immediately when selection is removed
+watch(() => compareStore.selectedHighlight, (hl) => {
+  if (!hl) {
+    highlightBonePos.value  = null
+    highlightSlotRect.value = null
+  }
+})
 
 function destroyAdapter() {
   if (!adapterInst) return
@@ -744,5 +808,43 @@ async function onDrop(e: DragEvent) {
 .anim-toast-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(4px);
+}
+
+/* ── Highlight overlays ───────────────────────────────────────────── */
+.hl-bone-cross {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+}
+
+.hl-bone-cross::before,
+.hl-bone-cross::after {
+  content: '';
+  position: absolute;
+  background: rgba(74, 222, 128, 0.9);
+  border-radius: 1px;
+}
+
+.hl-bone-cross::before {
+  width: 10px; height: 1.5px;
+  top: -0.75px; left: -5px;
+}
+
+.hl-bone-cross::after {
+  width: 1.5px; height: 10px;
+  left: -0.75px; top: -5px;
+}
+
+.hl-slot-bounds {
+  position: absolute;
+  pointer-events: none;
+  border: 1.5px solid rgba(96, 165, 250, 0.85);
+  border-radius: 1px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  background: rgba(96, 165, 250, 0.06);
+  z-index: 15;
 }
 </style>

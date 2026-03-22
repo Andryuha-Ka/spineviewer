@@ -89,6 +89,15 @@ export interface SkinRow {
   status: 'ok' | 'only-a' | 'only-b'
 }
 
+export interface ConstraintRow {
+  name:          string
+  kind:          'ik' | 'transform' | 'path'
+  status:        'ok' | 'only-a' | 'only-b' | 'changed'
+  bonesChanged:  boolean  // which bones the constraint drives
+  targetChanged: boolean  // target bone/slot
+  paramsChanged: boolean  // mix, direction, mode, etc.
+}
+
 export interface SpineDiff {
   source: 'json-full' | 'runtime-partial'
   summary: {
@@ -97,10 +106,11 @@ export interface SpineDiff {
     changed: number
     equal: number
   }
-  animTable:    AnimTableRow[]
-  skinTable:    SkinRow[]
-  globalEvents: GlobalEventRow[]   // available for both runtime and JSON
-  animEvents:   AnimEventGroup[]   // per-animation timing; JSON-only
+  animTable:       AnimTableRow[]
+  skinTable:       SkinRow[]
+  globalEvents:    GlobalEventRow[]   // available for both runtime and JSON
+  animEvents:      AnimEventGroup[]   // per-animation timing; JSON-only
+  constraintTable: ConstraintRow[]    // JSON-only
   placeholders: PlaceholderDiff[]
   sections:     DiffSection[]
 }
@@ -455,15 +465,32 @@ function compareConstraintsJson(rawA: AnyRecord, rawB: AnyRecord): DiffSection {
       if (!b) { allItems.push({ key: `[${type}] ${name}`, status: 'removed' }); continue }
 
       const children: DiffItem[] = []
+      // bones
+      const bonesA = (Array.isArray(a.bones) ? (a.bones as string[]) : []).join(', ')
+      const bonesB = (Array.isArray(b.bones) ? (b.bones as string[]) : []).join(', ')
+      if (bonesA !== bonesB)
+        children.push({ key: 'bones', status: 'changed', valueA: bonesA, valueB: bonesB })
       // target
       if (str(a.target) !== str(b.target))
         children.push({ key: 'target', status: 'changed', valueA: str(a.target), valueB: str(b.target) })
       // mix
       if (a.mix !== undefined && str(a.mix) !== str(b.mix))
         children.push({ key: 'mix', status: 'changed', valueA: str(a.mix), valueB: str(b.mix) })
-      // bendDirection
+      // bendDirection / bendPositive
       if (a.bendDirection !== undefined && str(a.bendDirection) !== str(b.bendDirection))
         children.push({ key: 'bendDirection', status: 'changed', valueA: str(a.bendDirection), valueB: str(b.bendDirection) })
+      if (a.bendPositive !== undefined && str(a.bendPositive) !== str(b.bendPositive))
+        children.push({ key: 'bendPositive', status: 'changed', valueA: str(a.bendPositive), valueB: str(b.bendPositive) })
+      // transform mixes
+      for (const k of ['rotateMix', 'translateMix', 'scaleMix', 'shearMix'] as const) {
+        if (a[k] !== undefined && str(a[k]) !== str(b[k]))
+          children.push({ key: k, status: 'changed', valueA: str(a[k]), valueB: str(b[k]) })
+      }
+      // path modes
+      for (const k of ['positionMode', 'spacingMode', 'rotateMode'] as const) {
+        if (a[k] !== undefined && str(a[k]) !== str(b[k]))
+          children.push({ key: k, status: 'changed', valueA: str(a[k]), valueB: str(b[k]) })
+      }
 
       allItems.push({
         key:      `[${type}] ${name}`,
@@ -888,6 +915,52 @@ function buildAnimEvents(dataA: SpineData, dataB: SpineData): AnimEventGroup[] {
 
 // ── Main comparison entry point ────────────────────────────────────────────────
 
+// ── Constraint table (JSON-only) ────────────────────────────────────────────────
+
+const CONSTRAINT_PARAM_KEYS = [
+  'mix', 'bendDirection', 'bendPositive', 'softness', 'compress', 'stretch', 'uniform',
+  'rotateMix', 'translateMix', 'scaleMix', 'shearMix',
+  'positionMode', 'spacingMode', 'rotateMode',
+]
+
+function buildConstraintTable(dataA: SpineData, dataB: SpineData): ConstraintRow[] {
+  if (dataA.source !== 'json' || dataB.source !== 'json') return []
+  const rawA = dataA.raw as AnyRecord
+  const rawB = dataB.raw as AnyRecord
+  const rows: ConstraintRow[] = []
+  const types = ['ik', 'transform', 'path'] as const
+
+  for (const kind of types) {
+    const listA = getJsonConstraints(rawA, kind)
+    const listB = getJsonConstraints(rawB, kind)
+    const mapA  = new Map(listA.map(c => [c.name as string, c]))
+    const mapB  = new Map(listB.map(c => [c.name as string, c]))
+    const allNames = [...new Set([...mapA.keys(), ...mapB.keys()])]
+
+    for (const name of allNames) {
+      const a = mapA.get(name)
+      const b = mapB.get(name)
+      if (!a) { rows.push({ name, kind, status: 'only-b', bonesChanged: false, targetChanged: false, paramsChanged: false }); continue }
+      if (!b) { rows.push({ name, kind, status: 'only-a', bonesChanged: false, targetChanged: false, paramsChanged: false }); continue }
+
+      const bonesA      = (Array.isArray(a.bones) ? (a.bones as string[]) : []).join(',')
+      const bonesB      = (Array.isArray(b.bones) ? (b.bones as string[]) : []).join(',')
+      const bonesChanged  = bonesA !== bonesB
+      const targetChanged = str(a.target) !== str(b.target)
+      const paramsChanged = CONSTRAINT_PARAM_KEYS.some(k => a[k] !== undefined && str(a[k]) !== str(b[k]))
+      const status = (bonesChanged || targetChanged || paramsChanged) ? 'changed' as const : 'ok' as const
+      rows.push({ name, kind, status, bonesChanged, targetChanged, paramsChanged })
+    }
+  }
+
+  rows.sort((a, b) => {
+    if (a.status !== 'ok' && b.status === 'ok') return -1
+    if (a.status === 'ok' && b.status !== 'ok') return 1
+    return a.name.localeCompare(b.name)
+  })
+  return rows
+}
+
 export async function compareSpines(dataA: SpineData, dataB: SpineData): Promise<SpineDiff> {
   const isJsonFull = dataA.source === 'json' && dataB.source === 'json'
   const sections: DiffSection[] = []
@@ -918,11 +991,12 @@ export async function compareSpines(dataA: SpineData, dataB: SpineData): Promise
     sections.push(compareEventsRuntime(aA, aB))
   }
 
-  const placeholders = extractPlaceholders(dataA, dataB)
-  const animTable    = buildAnimTable(dataA, dataB)
-  const skinTable    = buildSkinTable(dataA, dataB)
-  const globalEvents = buildGlobalEvents(dataA, dataB)
-  const animEvents   = buildAnimEvents(dataA, dataB)
+  const placeholders    = extractPlaceholders(dataA, dataB)
+  const animTable       = buildAnimTable(dataA, dataB)
+  const skinTable       = buildSkinTable(dataA, dataB)
+  const globalEvents    = buildGlobalEvents(dataA, dataB)
+  const animEvents      = buildAnimEvents(dataA, dataB)
+  const constraintTable = buildConstraintTable(dataA, dataB)
 
   // Build summary
   const summary = { added: 0, removed: 0, changed: 0, equal: 0 }
@@ -941,6 +1015,7 @@ export async function compareSpines(dataA: SpineData, dataB: SpineData): Promise
     skinTable,
     globalEvents,
     animEvents,
+    constraintTable,
     placeholders,
     sections,
   }
