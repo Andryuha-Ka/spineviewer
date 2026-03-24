@@ -119,10 +119,9 @@
           <span class="spine-vicon">{{ (slot.error || slot.validationErrors?.length) ? '✗' : '✓' }}</span>
           <span class="spine-vname">{{ slot.name }}</span>
           <span v-if="slot.error" class="spine-verr">{{ slot.error }}</span>
-          <span v-else-if="slot.validationErrors?.length" class="spine-verr" :title="slot.validationErrors.join('\n')">
-            {{ slot.validationErrors[0] }}
-            <template v-if="slot.validationErrors.length > 1"> &middot; +{{ slot.validationErrors.length - 1 }} more</template>
-          </span>
+          <template v-else-if="slot.validationErrors?.length">
+            <span v-for="(err, i) in slot.validationErrors" :key="i" class="spine-verr">{{ err }}</span>
+          </template>
         </div>
       </div>
 
@@ -702,7 +701,11 @@ function formatSize(bytes: number): string {
 }
 
 .spine-vrow--ok  { background: rgba(74, 222, 128, 0.06); }
-.spine-vrow--err { background: rgba(248, 113, 113, 0.08); }
+.spine-vrow--err {
+  background: rgba(248, 113, 113, 0.08);
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
 
 .spine-vicon {
   font-size: 0.7rem;
@@ -727,11 +730,21 @@ function formatSize(bytes: number): string {
 .spine-verr {
   color: #f87171;
   font-size: 0.72rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   flex: 1;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spine-vrow--err .spine-verr {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  width: 100%;
+  flex: none;
+  padding-left: 18px;
+  line-height: 1.4;
 }
 
 /* ── Action buttons ──────────────────────────────────── */

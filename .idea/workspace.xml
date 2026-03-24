@@ -4,15 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="fixed pixi inspector">
+    <list default="true" id="76266a3f-c6bb-4d4e-a45c-2b17cdf27e49" name="Changes" comment="added serena project config">
       <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/pages/VersionPickerPage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/pages/VersionPickerPage.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/panels/AnimationPanel.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/panels/AnimationPanel.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/stage/PreviewStage.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/stores/useLoaderStore.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/stores/useLoaderStore.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/types/FileSet.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/types/FileSet.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -107,8 +102,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="npm.build" />
         <item itemvalue="npm.dev" />
+        <item itemvalue="npm.build" />
       </list>
     </recent_temporary>
   </component>
@@ -132,7 +127,7 @@
       <workItem from="1773317897492" duration="5830000" />
       <workItem from="1773741307928" duration="53650000" />
       <workItem from="1774280855080" duration="8717000" />
-      <workItem from="1774361634137" duration="1351000" />
+      <workItem from="1774361634137" duration="2905000" />
     </task>
     <task id="LOCAL-00001" summary="перший коміт">
       <option name="closed" value="true" />
@@ -454,7 +449,23 @@
       <option name="project" value="LOCAL" />
       <updated>1773995841628</updated>
     </task>
-    <option name="localTasksCounter" value="41" />
+    <task id="LOCAL-00041" summary="updated validation logic to include slot/bone">
+      <option name="closed" value="true" />
+      <created>1774363118676</created>
+      <option name="number" value="00041" />
+      <option name="presentableId" value="LOCAL-00041" />
+      <option name="project" value="LOCAL" />
+      <updated>1774363118676</updated>
+    </task>
+    <task id="LOCAL-00042" summary="added serena project config">
+      <option name="closed" value="true" />
+      <created>1774363282562</created>
+      <option name="number" value="00042" />
+      <option name="presentableId" value="LOCAL-00042" />
+      <option name="project" value="LOCAL" />
+      <updated>1774363282562</updated>
+    </task>
+    <option name="localTasksCounter" value="43" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -472,8 +483,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="add white theme" />
-    <MESSAGE value="step 8" />
     <MESSAGE value="step 9" />
     <MESSAGE value="step 10" />
     <MESSAGE value="step 11" />
@@ -497,6 +506,8 @@
     <MESSAGE value="fixed loop wrap-around detection and DC &amp; version bump" />
     <MESSAGE value="added README.md and help popup" />
     <MESSAGE value="fixed pixi inspector" />
-    <option name="LAST_COMMIT_MESSAGE" value="fixed pixi inspector" />
+    <MESSAGE value="updated validation logic to include slot/bone" />
+    <MESSAGE value="added serena project config" />
+    <option name="LAST_COMMIT_MESSAGE" value="added serena project config" />
   </component>
 </project>
