@@ -319,6 +319,12 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     return result
   }
 
+  getAnimationDuration(animationName: string): number | null {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anim = this._skeletonData?.animations?.find((a: any) => a.name === animationName)
+    return anim?.duration ?? null
+  }
+
   getAnimationEvents(animationName: string): AnimationEventMarker[] {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const anim = this._skeletonData?.animations?.find((a: any) => a.name === animationName)

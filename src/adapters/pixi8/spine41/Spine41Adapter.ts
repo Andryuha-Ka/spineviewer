@@ -43,6 +43,7 @@ export default class StubAdapter implements ISpineAdapter {
   getActiveAttachments(): AttachmentInfo[] { return [] }
   getAllAttachments(): AttachmentInfo[] { return [] }
   onEvent(_cb: (e: SpineEvent) => void): () => void { return () => {} }
+  getAnimationDuration(_animationName: string): number | null { return null }
   getAnimationEvents(_animationName: string): AnimationEventMarker[] { return [] }
   getSlotBounds(_slotName: string): SlotBounds | null { return null }
   setPlaceholderLabels(_items: Array<{ name: string; kind: 'bone' | 'slot' | 'attachment' }>): void { /* no-op */ }

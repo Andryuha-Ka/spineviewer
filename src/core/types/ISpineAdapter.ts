@@ -130,6 +130,8 @@ export interface ISpineAdapter {
 
   // Returns event markers (name + time) for a given animation
   getAnimationEvents(animationName: string): AnimationEventMarker[]
+  // Returns total duration in seconds for a given animation, or null if unavailable
+  getAnimationDuration(animationName: string): number | null
 
   // Returns AABB of the slot's attachment in Spine world space (Y-up), or null if unavailable
   getSlotBounds(slotName: string): SlotBounds | null

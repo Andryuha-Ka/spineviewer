@@ -22,12 +22,16 @@
         </span>
       </div>
       <div v-if="diff" class="summary-counts">
-        <span class="count count--added">+{{ diff.summary.added }}</span>
-        <span class="count-sep">·</span>
-        <span class="count count--removed">-{{ diff.summary.removed }}</span>
-        <span class="count-sep">·</span>
-        <span class="count count--changed">~{{ diff.summary.changed }}</span>
-        <span class="count-sep">·</span>
+        <template v-if="criticalIssuesTotal === 0 && warnIssuesTotal === 0">
+          <span class="count count--ok">reskin ok</span>
+          <span class="count-sep">·</span>
+        </template>
+        <template v-else>
+          <span v-if="criticalIssuesTotal > 0" class="count count--critical">{{ criticalIssuesTotal }} critical</span>
+          <span v-if="criticalIssuesTotal > 0 && warnIssuesTotal > 0" class="count-sep">·</span>
+          <span v-if="warnIssuesTotal > 0" class="count count--warn">{{ warnIssuesTotal }} warn</span>
+          <span class="count-sep">·</span>
+        </template>
         <span class="source-badge">{{ diff.source === 'json-full' ? 'JSON' : 'runtime' }}</span>
       </div>
       <div v-else-if="diffStatus === 'running'" class="summary-running">Running diff…</div>
@@ -71,7 +75,8 @@
               <span v-if="changedPlaceholders > 0"         class="ov-badge ov-badge--err">{{ changedPlaceholders }} ph</span>
               <span v-if="constraintCriticalIssues > 0"   class="ov-badge ov-badge--err">{{ constraintCriticalIssues }} cstr</span>
               <span v-if="constraintParamIssues > 0"      class="ov-badge ov-badge--warn">{{ constraintParamIssues }} cstr param</span>
-              <span v-if="animNameIssues === 0 && animDurIssues === 0 && skinTableIssues === 0 && globalEventIssues === 0 && animEventNameIssues === 0 && animEventTimingIssues === 0 && changedPlaceholders === 0 && constraintTableIssues === 0" class="ov-badge ov-badge--ok">ok</span>
+
+              <span v-if="animNameIssues === 0 && skinTableIssues === 0 && globalEventIssues === 0 && animEventNameIssues === 0 && changedPlaceholders === 0 && constraintCriticalIssues === 0" class="ov-badge ov-badge--ok">ok</span>
             </span>
           </div>
 
@@ -89,12 +94,9 @@
             >
               <span class="anim-row-icon">{{ animRowIcon(row.status) }}</span>
               <span class="anim-row-name">{{ row.name }}</span>
-              <span class="anim-row-dur anim-row-dur--a">{{ row.durA !== null ? row.durA.toFixed(2) + 's' : '—' }}</span>
-              <span class="anim-row-arrow">→</span>
-              <span class="anim-row-dur anim-row-dur--b">{{ row.durB !== null ? row.durB.toFixed(2) + 's' : '—' }}</span>
-              <span v-if="row.status === 'delta' && row.durA !== null && row.durB !== null" class="anim-row-delta">
-                {{ formatDelta(row.durA, row.durB) }}
-              </span>
+              <span class="anim-row-delta">{{ (row.status === 'delta' && row.durA !== null && row.durB !== null) ? formatDelta(row.durA, row.durB) : '' }}</span>
+              <span class="anim-row-dur" :class="durAClass">{{ row.durA !== null ? row.durA.toFixed(2) + 's' : '—' }}</span>
+              <span class="anim-row-dur" :class="durBClass">{{ row.durB !== null ? row.durB.toFixed(2) + 's' : '—' }}</span>
             </div>
             <div v-if="diffsOnly && diff.animTable.every(r => r.status === 'ok')" class="ov-empty">All animations match</div>
 
@@ -164,12 +166,9 @@
                   >
                     <span class="ev-row-icon">{{ animRowIcon(ev.status) }}</span>
                     <span class="ev-row-name">{{ ev.eventName }}<span v-if="ev.idx > 0" class="ev-row-idx">[{{ ev.idx }}]</span></span>
-                    <span class="ev-row-time ev-row-time--a">{{ ev.timeA !== null ? ev.timeA.toFixed(3) + 's' : '—' }}</span>
-                    <span class="ev-row-arrow">→</span>
-                    <span class="ev-row-time ev-row-time--b">{{ ev.timeB !== null ? ev.timeB.toFixed(3) + 's' : '—' }}</span>
-                    <span v-if="ev.status === 'delta' && ev.timeA !== null && ev.timeB !== null" class="ev-row-delta">
-                      {{ formatDelta(ev.timeA, ev.timeB) }}
-                    </span>
+                    <span class="ev-row-delta">{{ (ev.status === 'delta' && ev.timeA !== null && ev.timeB !== null) ? formatDelta(ev.timeA, ev.timeB) : '' }}</span>
+                    <span class="ev-row-time" :class="durAClass">{{ ev.timeA !== null ? ev.timeA.toFixed(3) + 's' : '—' }}</span>
+                    <span class="ev-row-time" :class="durBClass">{{ ev.timeB !== null ? ev.timeB.toFixed(3) + 's' : '—' }}</span>
                   </div>
                 </template>
               </template>
@@ -303,6 +302,9 @@ const animDurIssues = computed(() =>
 
 const animTableIssues = computed(() => animNameIssues.value + animDurIssues.value)
 
+const durAClass = computed(() => compareStore.masterSide === 'left' ? 'anim-row-dur--master' : 'anim-row-dur--variant')
+const durBClass = computed(() => compareStore.masterSide === 'right' ? 'anim-row-dur--master' : 'anim-row-dur--variant')
+
 const skinTableIssues = computed(() =>
   diff.value?.skinTable.filter(s => s.status !== 'ok').length ?? 0,
 )
@@ -404,6 +406,15 @@ const constraintParamIssues = computed(() =>
 )
 
 const constraintTableIssues = computed(() => constraintCriticalIssues.value + constraintParamIssues.value)
+
+const criticalIssuesTotal = computed(() =>
+  animNameIssues.value + skinTableIssues.value + globalEventIssues.value +
+  animEventNameIssues.value + changedPlaceholders.value + constraintCriticalIssues.value,
+)
+const warnIssuesTotal = computed(() =>
+  animDurIssues.value + animEventTimingIssues.value + constraintParamIssues.value,
+)
+
 
 const visibleConstraintTable = computed<ConstraintRow[]>(() => {
   if (!diff.value) return []
@@ -513,9 +524,9 @@ function onPhClick(ph: PlaceholderDiff) {
 }
 
 .count { font-weight: 600; }
-.count--added   { color: #4ade80; }
-.count--removed { color: #f87171; }
-.count--changed { color: #f59e0b; }
+.count--ok       { color: #4ade80; }
+.count--critical { color: #f87171; }
+.count--warn     { color: #f59e0b; }
 .count-sep      { color: var(--c-text-ghost); }
 
 .source-badge {
@@ -701,17 +712,15 @@ function onPhClick(ph: PlaceholderDiff) {
   text-align: right;
   font-size: 0.7rem;
 }
-.anim-row-dur--a { color: #f87171; }
-.anim-row-dur--b { color: #4ade80; }
-.anim-row--ok .anim-row-dur--a,
-.anim-row--ok .anim-row-dur--b { color: var(--c-text-muted); }
-
-.anim-row-arrow { color: var(--c-text-ghost); flex-shrink: 0; font-size: 0.65rem; }
+.anim-row-dur--master  { color: #4ade80; }
+.anim-row-dur--variant { color: #f59e0b; }
+.anim-row--ok .anim-row-dur--master,
+.anim-row--ok .anim-row-dur--variant { color: var(--c-text-muted); }
 
 .anim-row-delta {
   flex-shrink: 0;
   font-size: 0.65rem;
-  color: #f59e0b;
+  color: #f87171;
   min-width: 48px;
   text-align: right;
 }
@@ -836,17 +845,15 @@ function onPhClick(ph: PlaceholderDiff) {
   text-align: right;
   font-size: 0.68rem;
 }
-.ev-row-time--a { color: #f87171; }
-.ev-row-time--b { color: #4ade80; }
-.ev-row--ok .ev-row-time--a,
-.ev-row--ok .ev-row-time--b { color: var(--c-text-muted); }
-
-.ev-row-arrow { color: var(--c-text-ghost); flex-shrink: 0; font-size: 0.6rem; }
+.ev-row-time.anim-row-dur--master  { color: #4ade80; }
+.ev-row-time.anim-row-dur--variant { color: #f59e0b; }
+.ev-row--ok .ev-row-time.anim-row-dur--master,
+.ev-row--ok .ev-row-time.anim-row-dur--variant { color: var(--c-text-muted); }
 
 .ev-row-delta {
   flex-shrink: 0;
   font-size: 0.62rem;
-  color: #f59e0b;
+  color: #f87171;
   min-width: 48px;
   text-align: right;
 }

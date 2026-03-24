@@ -816,6 +816,10 @@ function buildAnimTable(dataA: SpineData, dataB: SpineData): AnimTableRow[] {
       durMapA.set(name, getAnimationDuration(anim as AnyRecord))
   } else {
     namesA = dataA.adapter.animations
+    for (const name of namesA) {
+      const d = dataA.adapter.getAnimationDuration(name)
+      if (d !== null) durMapA.set(name, d)
+    }
   }
 
   if (dataB.source === 'json') {
@@ -825,6 +829,10 @@ function buildAnimTable(dataA: SpineData, dataB: SpineData): AnimTableRow[] {
       durMapB.set(name, getAnimationDuration(anim as AnyRecord))
   } else {
     namesB = dataB.adapter.animations
+    for (const name of namesB) {
+      const d = dataB.adapter.getAnimationDuration(name)
+      if (d !== null) durMapB.set(name, d)
+    }
   }
 
   const setA = new Set(namesA)
@@ -844,25 +852,33 @@ function buildAnimTable(dataA: SpineData, dataB: SpineData): AnimTableRow[] {
 }
 
 function buildAnimEvents(dataA: SpineData, dataB: SpineData): AnimEventGroup[] {
-  if (dataA.source !== 'json' || dataB.source !== 'json') return []
+  const namesA = dataA.source === 'json'
+    ? Object.keys(getJsonAnimations(dataA.raw as AnyRecord))
+    : dataA.adapter.animations
+  const namesB = dataB.source === 'json'
+    ? Object.keys(getJsonAnimations(dataB.raw as AnyRecord))
+    : dataB.adapter.animations
 
-  const animsA = getJsonAnimations(dataA.raw as AnyRecord)
-  const animsB = getJsonAnimations(dataB.raw as AnyRecord)
-  const allAnimNames = [...new Set([...Object.keys(animsA), ...Object.keys(animsB)])]
+  const allAnimNames = [...new Set([...namesA, ...namesB])]
+  const setA = new Set(namesA)
+  const setB = new Set(namesB)
+
+  const getEventsForAnim = (data: SpineData, animName: string): Array<{ name: string; time: number }> => {
+    if (data.source === 'json') {
+      const anim = getJsonAnimations(data.raw as AnyRecord)[animName] as AnyRecord | undefined
+      return Array.isArray(anim?.events) ? anim.events as Array<{ name: string; time: number }> : []
+    }
+    return data.adapter.getAnimationEvents(animName)
+  }
 
   const groups: AnimEventGroup[] = []
 
   for (const animName of allAnimNames) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const animA = animsA[animName] as AnyRecord | undefined
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const animB = animsB[animName] as AnyRecord | undefined
-
     const animStatus: AnimTableRow['status'] =
-      !animA ? 'only-b' : !animB ? 'only-a' : 'ok'
+      !setA.has(animName) ? 'only-b' : !setB.has(animName) ? 'only-a' : 'ok'
 
-    const eventsA: Array<{ name: string; time: number }> = Array.isArray(animA?.events) ? animA.events : []
-    const eventsB: Array<{ name: string; time: number }> = Array.isArray(animB?.events) ? animB.events : []
+    const eventsA = getEventsForAnim(dataA, animName)
+    const eventsB = getEventsForAnim(dataB, animName)
 
     if (eventsA.length === 0 && eventsB.length === 0) continue
 
