@@ -11,3 +11,9 @@ example/
 # TypeScript generated
 src/auto-imports.d.ts
 src/components.d.ts
+
+# Local dev docs
+CLAUDE.md
+PLAN.md
+COMPARE_PLAN.md
+animation.md
