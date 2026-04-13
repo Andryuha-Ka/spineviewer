@@ -91,62 +91,6 @@
       <span class="fps" :class="fpsClass">{{ fps }} FPS</span>
     </div>
 
-    <!-- Progress bars overlay -->
-    <div v-if="animationStore.tracks.length > 0" class="progress-overlay">
-      <div
-        v-for="track in animationStore.tracks"
-        :key="track.trackIndex"
-        class="progress-track"
-        @mousedown.stop.prevent="onProgressDragStart($event, track.trackIndex)"
-      >
-        <div class="progress-info">
-          <span class="progress-name">
-            <span class="progress-idx">#{{ track.trackIndex }}</span>
-            {{ track.animationName }}
-          </span>
-          <span class="progress-time">{{ formatTrackTime(track) }}</span>
-        </div>
-        <div
-          class="progress-bar-wrap"
-          @mousemove.stop="onBarMouseMove($event, track)"
-          @mouseleave.stop="hoveredMarker = null"
-        >
-          <div
-            class="progress-bar-fill"
-            :style="{ width: getTrackProgress(track) + '%' }"
-          />
-          <template v-for="marker in (eventMarkersMap.get(track.trackIndex) ?? [])" :key="marker.name + marker.time">
-            <div
-              class="progress-marker"
-              :style="{ left: track.duration > 0 ? (marker.time / track.duration * 100) + '%' : '0%' }"
-            />
-            <div
-              class="progress-marker-label"
-              :style="{ left: track.duration > 0 ? (marker.time / track.duration * 100) + '%' : '0%' }"
-            >{{ marker.name }} <span class="pml-time">{{ marker.time.toFixed(2) }}s</span></div>
-          </template>
-        </div>
-      </div>
-
-      <!-- Draw call sparkline -->
-      <div v-if="dcSparkline.points" class="dc-graph">
-        <div class="dc-header">
-          <span class="dc-title">DC</span>
-          <span class="dc-stats">
-            <span class="dc-val dc-val--muted">{{ dcSparkline.min }}</span>
-            <span class="dc-sep">–</span>
-            <span class="dc-val dc-val--cur">{{ dcSparkline.cur }}</span>
-            <span class="dc-sep">–</span>
-            <span class="dc-val dc-val--muted">{{ dcSparkline.max }}</span>
-          </span>
-        </div>
-        <svg class="dc-svg" viewBox="0 0 300 36" preserveAspectRatio="none">
-          <polygon :points="dcSparkline.fill" class="dc-fill" />
-          <polyline :points="dcSparkline.points" class="dc-line" />
-        </svg>
-      </div>
-    </div>
-
     <div v-if="spineError" class="error-banner">
       {{ spineError }}
     </div>
@@ -172,9 +116,12 @@ import { useAtlasStore }      from '@/core/stores/useAtlasStore'
 import { useProfilerStore }   from '@/core/stores/useProfilerStore'
 import { useComplexityStore } from '@/core/stores/useComplexityStore'
 import { useLoaderStore }    from '@/core/stores/useLoaderStore'
-import type { IPixiApp, ITrackOverlay } from '@/core/types/IPixiApp'
-import type { ISpineAdapter, TrackState, AnimationEventMarker } from '@/core/types/ISpineAdapter'
+import type { IPixiApp } from '@/core/types/IPixiApp'
+import type { IProgressOverlay } from '@/core/types/IProgressOverlay'
+import type { TrackDisplayState, MarkerDisplay } from '@/core/types/IProgressOverlay'
+import type { ISpineAdapter, AnimationEventMarker } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
+import { makeLoopState, computeNorm, resetLoopState, hitTestOverlay } from '@/core/overlay/overlayMath'
 
 const versionStore   = useVersionStore()
 const viewerStore    = useViewerStore()
@@ -282,66 +229,42 @@ watch(
 
 // ── Event markers per track ────────────────────────────────────────────────────
 const eventMarkersMap = ref<Map<number, AnimationEventMarker[]>>(new Map())
-const hoveredMarker   = ref<{ name: string; time: number; trackIndex: number } | null>(null)
 
-// ── Draw call sparkline (normalized-position-based) ───────────────────────────
-// X-axis is the average normalized position (0–1) across all active tracks.
-// Each track contributes equally regardless of duration, so all track bars
-// share the same full-width axis and the DC graph aligns with all of them.
-// Raw array is written every frame (non-reactive); dcByTime snapshot triggers
-// the computed at the same 100 ms throttle as the profiler update.
+// ── DC sparkline raw data (written every frame, no Vue reactivity) ─────────────
 const DC_BUCKETS = 300
 const _dcRaw = new Array<number | null>(DC_BUCKETS).fill(null)
-const dcByTime = shallowRef<readonly (number | null)[]>([..._dcRaw])
-let _lastDcNormPos = -1  // used to detect loop wrap-around
+let _lastDcNormPos = -1
 
-const dcSparkline = computed(() => {
-  const data = dcByTime.value
-  const vals = data.filter((v): v is number => v !== null)
-  if (vals.length < 2) return { points: '', fill: '', min: 0, max: 0, cur: 0 }
+// ── Loop state machine (per track, persistent across frames) ───────────────────
+const loopStates = new Map<number, ReturnType<typeof makeLoopState>>()
 
-  const max   = Math.max(...vals)
-  const min   = Math.min(...vals)
-  const range = max - min || 1
-  const W = 300, H = 36
-
-  let firstX = W, lastX = 0
-  const pts: string[] = []
-  data.forEach((v, i) => {
-    if (v === null) return
-    const x = (i / (DC_BUCKETS - 1)) * W
-    const y = H - ((v - min) / range) * (H - 6) - 3
-    if (x < firstX) firstX = x
-    if (x > lastX)  lastX  = x
-    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`)
-  })
-
-  const points = pts.join(' ')
-  const fill   = `${firstX.toFixed(1)},${H} ${points} ${lastX.toFixed(1)},${H}`
-  const cur    = vals[vals.length - 1]
-  return { points, fill, min, max, cur }
-})
-
-function onBarMouseMove(e: MouseEvent, track: TrackState) {
-  if (track.duration <= 0) return
-  const wrap = e.currentTarget as HTMLElement
-  const rect = wrap.getBoundingClientRect()
-  const pct  = (e.clientX - rect.left) / rect.width
-  const hoverTime = pct * track.duration
-  const markers = eventMarkersMap.value.get(track.trackIndex) ?? []
-  const THRESH_PX = 8
-  let best: AnimationEventMarker | null = null
-  let bestDist = Infinity
-  for (const m of markers) {
-    const mPx = (m.time / track.duration) * rect.width
-    const dist = Math.abs(e.clientX - rect.left - mPx)
-    if (dist < bestDist && dist < THRESH_PX) { bestDist = dist; best = m }
-  }
-  void hoverTime
-  hoveredMarker.value = best ? { name: best.name, time: best.time, trackIndex: track.trackIndex } : null
-}
+// ── Overlay hover state ────────────────────────────────────────────────────────
+let _overlayHoverTrackIndex = -1
 const isPanning = ref(false)
 let panStart = { x: 0, y: 0, px: 0, py: 0 }
+
+// ── Seek drag state ────────────────────────────────────────────────────────────
+let _seekDragActive = false
+
+function _onSeekDragMove(e: MouseEvent) {
+  if (!_seekDragActive || !progressOverlay || !containerRef.value) return
+  const rect = (containerRef.value as HTMLElement).getBoundingClientRect()
+  const r = progressOverlay.handleSeekDrag(e.clientX - rect.left, e.clientY - rect.top)
+  if (r) {
+    const track = animationStore.tracks.find(t => t.trackIndex === r.trackIndex)
+    if (track) {
+      spineAdapter?.seekTo(r.trackIndex, r.pct * track.duration)
+      const ls = loopStates.get(r.trackIndex)
+      if (ls) resetLoopState(ls, r.pct)
+    }
+  }
+}
+
+function _onSeekDragEnd() {
+  _seekDragActive = false
+  window.removeEventListener('mousemove', _onSeekDragMove)
+  window.removeEventListener('mouseup', _onSeekDragEnd)
+}
 
 function applyViewport() {
   const x = baseX.value + viewerStore.posX
@@ -410,11 +333,49 @@ function onWheel(e: WheelEvent) {
 
 function onPanStart(e: MouseEvent) {
   if (e.button !== 0) return
+
+  // Check if click hit the overlay seek zone
+  if (progressOverlay && animationStore.tracks.length > 0 && containerRef.value) {
+    const rect = (containerRef.value as HTMLElement).getBoundingClientRect()
+    const localX = e.clientX - rect.left
+    const localY = e.clientY - rect.top
+    const seekResult = progressOverlay.handleSeekClick(localX, localY)
+    if (seekResult) {
+      _seekDragActive = true
+      const track = animationStore.tracks.find(t => t.trackIndex === seekResult.trackIndex)
+      if (track) {
+        spineAdapter?.seekTo(seekResult.trackIndex, seekResult.pct * track.duration)
+        const ls = loopStates.get(seekResult.trackIndex)
+        if (ls) resetLoopState(ls, seekResult.pct)
+      }
+      window.addEventListener('mousemove', _onSeekDragMove)
+      window.addEventListener('mouseup', _onSeekDragEnd)
+      return  // do NOT start pan
+    }
+  }
+
   isPanning.value = true
   panStart = { x: e.clientX, y: e.clientY, px: viewerStore.posX, py: viewerStore.posY }
 }
 
 function onPanMove(e: MouseEvent) {
+  // Update overlay hover
+  if (progressOverlay && animationStore.tracks.length > 0 && containerRef.value) {
+    const rect = (containerRef.value as HTMLElement).getBoundingClientRect()
+    const hasDC = _dcRaw.some(v => v !== null)
+    const hit = hitTestOverlay(
+      e.clientX - rect.left,
+      e.clientY - rect.top,
+      rect.width,
+      rect.height,
+      animationStore.tracks.length,
+      hasDC,
+    )
+    _overlayHoverTrackIndex = hit.inOverlay ? hit.trackRowIndex : -1
+  } else {
+    _overlayHoverTrackIndex = -1
+  }
+
   if (!isPanning.value) return
   viewerStore.posX = panStart.px + e.clientX - panStart.x
   viewerStore.posY = panStart.py + e.clientY - panStart.y
@@ -438,7 +399,7 @@ function onBgColorInput(e: Event) {
   const hex = (e.target as HTMLInputElement).value
   viewerStore.bgColor = parseInt(hex.slice(1), 16)
 }
-let trackOverlay: ITrackOverlay | null = null
+let progressOverlay: IProgressOverlay | null = null
 let tickerFn: ((dt: number) => void) | null = null
 let lastFrameTs    = 0
 let lastInspectorTs = 0  // time-based throttle — avoids aliasing with short animation loops
@@ -460,13 +421,7 @@ onMounted(async () => {
     // Enable zIndex-based sorting on the stage for spine z-order control
     ;(pixiApp.stage as any).sortableChildren = true
 
-    trackOverlay = pixiApp.createTrackOverlay()
-    trackOverlay.resize(width, height)
-    // Keep the track overlay text above all spine objects
-    const stageChildren = (pixiApp.stage as any).children as any[]
-    if (stageChildren.length > 0) {
-      stageChildren[stageChildren.length - 1].zIndex = 10000
-    }
+    progressOverlay = pixiApp.createProgressOverlay(width, height)
 
     lastFrameTs = lastInspectorTs = performance.now()
     tickerFn = () => {
@@ -480,7 +435,6 @@ onMounted(async () => {
         spineAdapter.tickPlaceholderLabels()
         const states = spineAdapter.getTrackStates()
         animationStore.setTracks(states)
-        trackOverlay?.updateText('')
 
         // Keep disabled tracks frozen — applies to both looped and non-looped
         for (const state of states) {
@@ -504,11 +458,29 @@ onMounted(async () => {
         if (skeletonStore.selectedBone) inspectorStore.updateBones(spineAdapter.getBoneTransforms())
         if (skeletonStore.selectedSlot) updateSelectedSlotRect()
 
-        // Sample DC by average normalized position across all active tracks.
-        // normPos = mean(time_i % duration_i / duration_i) for all valid tracks.
+        // ── Loop state machine: build display states for overlay ─────────────
+        // Sync loopStates map with current track set
+        const activeTrackIds = new Set(states.map(s => s.trackIndex))
+        for (const id of loopStates.keys()) {
+          if (!activeTrackIds.has(id)) loopStates.delete(id)
+        }
+        const displayTracks: TrackDisplayState[] = states.map(s => {
+          if (!loopStates.has(s.trackIndex)) loopStates.set(s.trackIndex, makeLoopState())
+          const loopSt = loopStates.get(s.trackIndex)!
+          const normPos = computeNorm(s.time, s.duration, s.loop, loopSt)
+          return {
+            trackIndex:    s.trackIndex,
+            animationName: s.animationName,
+            normPos,
+            displayTime:   normPos * s.duration,
+            duration:      s.duration,
+          }
+        })
+
+        // ── Sample DC by average normalized position ─────────────────────────
         const frameStats = pixiApp!.getStats()
         if (typeof frameStats.drawCalls === 'number') {
-          const validTracks = states.filter(t => t.duration > 0)
+          const validTracks = states.filter(t => t.duration > 0 && animationStore.isTrackEnabled(t.trackIndex))
           if (validTracks.length > 0) {
             let normSum = 0
             for (const t of validTracks) {
@@ -516,7 +488,6 @@ onMounted(async () => {
               normSum += pos / t.duration
             }
             const normPos = normSum / validTracks.length
-            // Detect loop wrap-around: normPos jumped back significantly → new cycle
             if (_lastDcNormPos > 0.5 && normPos < 0.2) {
               _dcRaw.fill(null)
             }
@@ -526,9 +497,30 @@ onMounted(async () => {
           }
         }
 
-        // Inspector + Atlas + Profiler: time-based throttle ~10 fps (100 ms).
-        // Time-based avoids aliasing with short animation loops whose length
-        // happens to be a multiple of a fixed frame count.
+        // ── Update PIXI overlay every frame ───────────────────────────────────
+        if (progressOverlay) {
+          const { width: stageW, height: stageH } = (containerRef.value as HTMLElement).getBoundingClientRect()
+          // Build MarkerDisplay map from eventMarkersMap
+          const markersPerTrack = new Map<number, MarkerDisplay[]>()
+          for (const [trackIdx, markers] of eventMarkersMap.value) {
+            const track = states.find(s => s.trackIndex === trackIdx)
+            if (!track || track.duration <= 0) continue
+            markersPerTrack.set(trackIdx, markers.map(m => ({
+              name:    m.name,
+              normPos: m.time / track.duration,
+            })))
+          }
+          progressOverlay.update({
+            tracks:            displayTracks,
+            markersPerTrack,
+            dcBuckets:         _dcRaw,
+            stageW,
+            stageH,
+            hoveredTrackIndex: _overlayHoverTrackIndex,
+          })
+        }
+
+        // ── Inspector + Atlas + Profiler: throttled @ 100ms ───────────────────
         if (now - lastInspectorTs >= 100) {
           lastInspectorTs = now
           const attachments = spineAdapter.getActiveAttachments()
@@ -539,7 +531,6 @@ onMounted(async () => {
               .map(a => a.attachmentName),
           )
           profilerStore.updateStats(frameStats, attachments)
-          dcByTime.value = [..._dcRaw]
         }
       }
     }
@@ -556,7 +547,6 @@ onMounted(async () => {
       () => animationStore.tracks.map(t => `${t.trackIndex}:${t.animationName}`).join(','),
       () => {
         _dcRaw.fill(null)
-        dcByTime.value = [..._dcRaw]
       },
       { deep: false },
     )
@@ -607,7 +597,6 @@ onMounted(async () => {
           if (!animationStore.isPaused) {
             // Reset DC sparkline on each fresh play (not on unpause)
             _dcRaw.fill(null)
-            dcByTime.value = [..._dcRaw]
             _lastDcNormPos = -1
             // Reconstruct full sequence for each enabled track from its master playlist.
             // This allows the full sequence to replay even after Spine has advanced through entries.
@@ -870,9 +859,12 @@ onMounted(async () => {
 
 onUnmounted(() => {
   containerRef.value?.removeEventListener('wheel', onWheel)
+  window.removeEventListener('mousemove', _onSeekDragMove)
+  window.removeEventListener('mouseup', _onSeekDragEnd)
   spineObj = null
   if (pixiApp && tickerFn) pixiApp.ticker.remove(tickerFn)
-  trackOverlay?.destroy()
+  progressOverlay?.destroy()
+  progressOverlay = null
   // Destroy all mounted adapters (active + pinned non-active)
   for (const adapter of mountedAdapters.values()) {
     adapter.destroy()
@@ -882,7 +874,6 @@ onUnmounted(() => {
   spineAdapter = null
   pixiApp?.destroy()
   pixiApp = null
-  trackOverlay = null
   inspectorStore.clear()
   eventsStore.clear()
   atlasStore.clear()
@@ -894,46 +885,12 @@ useResizeObserver(containerRef, ([entry]) => {
   const { width, height } = entry.contentRect
   if (width > 0 && height > 0) {
     pixiApp?.resize(width, height)
-    trackOverlay?.resize(width, height)
+    progressOverlay?.resize(width, height)
     baseX.value = width / 2
     baseY.value = height * 0.5
     applyViewport()
   }
 })
-
-// ── Progress bar helpers ──────────────────────────────────────────────────────
-
-function getTrackProgress(track: TrackState): number {
-  if (track.duration <= 0) return 0
-  const t = track.loop ? track.time % track.duration : Math.min(track.time, track.duration)
-  return Math.min(100, (t / track.duration) * 100)
-}
-
-function formatTrackTime(track: TrackState): string {
-  const t = track.loop ? track.time % track.duration : Math.min(track.time, track.duration)
-  return `${t.toFixed(2)}s / ${track.duration.toFixed(2)}s`
-}
-
-function onProgressDragStart(e: MouseEvent, trackIndex: number) {
-  const wrap = (e.currentTarget as HTMLElement).querySelector('.progress-bar-wrap') as HTMLElement
-  if (!wrap) return
-
-  function seek(ev: MouseEvent) {
-    const rect = wrap.getBoundingClientRect()
-    const pct  = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width))
-    const track = animationStore.tracks.find(t => t.trackIndex === trackIndex)
-    if (track && track.duration > 0) spineAdapter?.seekTo(trackIndex, pct * track.duration)
-  }
-
-  seek(e)
-  const onMove = (ev: MouseEvent) => seek(ev)
-  const onUp   = () => {
-    window.removeEventListener('mousemove', onMove)
-    window.removeEventListener('mouseup', onUp)
-  }
-  window.addEventListener('mousemove', onMove)
-  window.addEventListener('mouseup', onUp)
-}
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -942,7 +899,7 @@ async function loadSpine(fileSet: FileSet, slotId?: string): Promise<void> {
   spineError.value = null
 
   _dcRaw.fill(null)
-  dcByTime.value = [..._dcRaw]
+  _lastDcNormPos = -1
 
   // Destroy previous ACTIVE adapter only (pinned non-active adapters stay mounted)
   if (spineAdapter) {
@@ -1414,164 +1371,4 @@ defineExpose({
   background: rgba(96, 165, 250, 0.06);
 }
 
-/* ── Progress overlay ── */
-.progress-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 12px;
-  right: 12px;
-  padding-bottom: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  z-index: 20;
-  pointer-events: all;
-}
-
-.progress-track {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  cursor: pointer;
-}
-
-.progress-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 0 2px;
-}
-
-.progress-name {
-  font-size: 0.68rem;
-  color: rgba(255,255,255,0.55);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 60%;
-}
-
-.progress-idx {
-  color: rgba(255,255,255,0.3);
-  margin-right: 4px;
-  font-variant-numeric: tabular-nums;
-}
-
-.progress-time {
-  font-size: 0.65rem;
-  font-variant-numeric: tabular-nums;
-  color: rgba(255,255,255,0.35);
-  flex-shrink: 0;
-}
-
-.progress-bar-wrap {
-  position: relative;
-  height: 4px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 2px;
-  overflow: visible;
-  transition: height 0.15s;
-}
-
-.progress-track:hover .progress-bar-wrap {
-  height: 6px;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  background: rgba(124,106,245,0.85);
-  border-radius: 2px;
-  transition: width 0.05s linear;
-}
-
-.progress-marker {
-  position: absolute;
-  top: -3px;
-  bottom: -3px;
-  width: 1.5px;
-  background: rgba(250,204,21,0.85);
-  transform: translateX(-50%);
-  border-radius: 1px;
-  pointer-events: none;
-}
-
-.progress-marker-label {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 3px;
-  pointer-events: none;
-  white-space: nowrap;
-  font-size: 0.65rem;
-  font-weight: 600;
-  color: rgba(250,204,21,0.95);
-  line-height: 1;
-}
-
-.pml-time {
-  font-size: 0.6rem;
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-  color: rgba(255,255,255,0.45);
-}
-
-/* ── Draw call sparkline ── */
-.dc-graph {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 2px;
-}
-
-.dc-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 0 2px;
-}
-
-.dc-title {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,0.25);
-}
-
-.dc-stats {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 0.62rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.dc-val--muted { color: rgba(255,255,255,0.28); }
-.dc-val--cur   { color: #7c6af5; font-weight: 600; }
-
-.dc-sep { color: rgba(255,255,255,0.15); }
-
-.dc-svg {
-  width: 100%;
-  height: 36px;
-  display: block;
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.dc-fill {
-  fill: rgba(124,106,245,0.12);
-}
-
-.dc-line {
-  fill: none;
-  stroke: rgba(124,106,245,0.75);
-  stroke-width: 1.5px;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-}
 </style>

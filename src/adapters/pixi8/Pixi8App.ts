@@ -7,7 +7,9 @@
  */
 
 import * as PIXI from 'pixi8'
-import type { IPixiApp, ITrackOverlay, PixiTicker, RendererStats } from '@/core/types/IPixiApp'
+import type { IPixiApp, PixiTicker, RendererStats } from '@/core/types/IPixiApp'
+import type { IProgressOverlay } from '@/core/types/IProgressOverlay'
+import { Pixi8ProgressOverlay } from './Pixi8ProgressOverlay'
 
 export class Pixi8App implements IPixiApp {
   private _frameDrawCalls = 0
@@ -71,22 +73,8 @@ export class Pixi8App implements IPixiApp {
     this._app.renderer.background.color = color
   }
 
-  createTrackOverlay(): ITrackOverlay {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const text = new (PIXI as any).Text({
-      text: '',
-      style: { fontFamily: 'monospace', fontSize: 11, fill: 0xffffff, lineHeight: 16 },
-    })
-    text.alpha = 0.75
-    text.anchor.set(0, 1)
-    text.x = 8
-    text.y = this._app.renderer.height - 8
-    this._app.stage.addChild(text)
-    return {
-      updateText: (s: string) => { text.text = s },
-      resize: (_w: number, h: number) => { text.y = h - 8 },
-      destroy: () => { this._app.stage.removeChild(text); text.destroy() },
-    }
+  createProgressOverlay(w: number, h: number): IProgressOverlay {
+    return new Pixi8ProgressOverlay(this._app.stage, w, h)
   }
 
   getStats(): RendererStats {

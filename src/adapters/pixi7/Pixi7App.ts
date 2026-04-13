@@ -7,7 +7,9 @@
  */
 
 import * as PIXI from 'pixi.js'
-import type { IPixiApp, ITrackOverlay, PixiTicker, RendererStats } from '@/core/types/IPixiApp'
+import type { IPixiApp, PixiTicker, RendererStats } from '@/core/types/IPixiApp'
+import type { IProgressOverlay } from '@/core/types/IProgressOverlay'
+import { Pixi7ProgressOverlay } from './Pixi7ProgressOverlay'
 
 export class Pixi7App implements IPixiApp {
   private readonly _app: PIXI.Application
@@ -69,23 +71,8 @@ export class Pixi7App implements IPixiApp {
     ;(this._app.renderer as any).background.color = color
   }
 
-  createTrackOverlay(): ITrackOverlay {
-    const text = new PIXI.Text('', new PIXI.TextStyle({
-      fontFamily: 'monospace',
-      fontSize: 11,
-      fill: 0xffffff,
-      lineHeight: 16,
-    }))
-    text.alpha = 0.75
-    text.anchor.set(0, 1)
-    text.x = 8
-    text.y = this._app.renderer.height - 8
-    this._app.stage.addChild(text)
-    return {
-      updateText: (s: string) => { text.text = s },
-      resize: (_w: number, h: number) => { text.y = h - 8 },
-      destroy: () => { this._app.stage.removeChild(text); text.destroy() },
-    }
+  createProgressOverlay(w: number, h: number): IProgressOverlay {
+    return new Pixi7ProgressOverlay(this._app.stage, w, h)
   }
 
   getStats(): RendererStats {

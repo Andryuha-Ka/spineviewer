@@ -5,6 +5,7 @@
  * @copyright 2026 Andrii Karpus
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
+import type { IProgressOverlay } from './IProgressOverlay'
 
 export interface RendererStats {
   /** Number of WebGL draw calls in the last frame; null = not available for this Pixi version */
@@ -15,12 +16,6 @@ export interface PixiTicker {
   readonly FPS: number
   add(fn: (dt: number) => void): this
   remove(fn: (dt: number) => void): this
-}
-
-export interface ITrackOverlay {
-  updateText(text: string): void
-  resize(width: number, height: number): void
-  destroy(): void
 }
 
 /**
@@ -34,7 +29,7 @@ export interface IPixiApp {
   resize(w: number, h: number): void
   destroy(): void
   setBackground(color: number): void
-  createTrackOverlay(): ITrackOverlay
+  createProgressOverlay(w: number, h: number): IProgressOverlay
   getStats(): RendererStats
   /** Extract the current rendered frame as an HTMLCanvasElement (handles preserveDrawingBuffer) */
   extractFrame(): Promise<HTMLCanvasElement>
