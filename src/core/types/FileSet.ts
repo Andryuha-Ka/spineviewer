@@ -41,6 +41,11 @@ export interface SpineSlotSavedState {
   // Placeholders
   showPlaceholders: boolean
   disabledPlaceholders: string[]
+  // Independent movement
+  syncEnabled: boolean
+  indPosX: number
+  indPosY: number
+  indZoom: number
 }
 
 export interface SpineSlot {
@@ -50,4 +55,9 @@ export interface SpineSlot {
   error?: string                // set for unmatched / incomplete slots (classification)
   validationErrors?: string[]   // content validation errors (missing images, regions, etc.)
   savedState?: SpineSlotSavedState
+  // Independent movement (desynced from global viewport)
+  syncEnabled?: boolean         // default: true
+  indPosX?: number              // default: 0
+  indPosY?: number              // default: 0
+  indZoom?: number              // default: 1
 }

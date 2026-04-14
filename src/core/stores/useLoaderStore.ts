@@ -8,7 +8,22 @@
 
 import { defineStore } from 'pinia'
 import { guessFileType } from '@/core/utils/fileLoader'
-import type { SpineFileType, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
+import type { FileSet, SpineFile, SpineFileType, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
+
+/** Deep-clone a FileSet, correctly handling ArrayBuffer (binary .skel) via slice(). */
+function cloneFileSet(fs: FileSet): FileSet {
+  const cloneFile = (f: SpineFile): SpineFile => ({
+    filename: f.filename,
+    fileBody: f.fileBody instanceof ArrayBuffer ? f.fileBody.slice(0) : f.fileBody,
+    type: f.type,
+    mimeType: f.mimeType,
+  })
+  return {
+    skeleton: cloneFile(fs.skeleton),
+    atlas: cloneFile(fs.atlas),
+    images: fs.images.map(cloneFile),
+  }
+}
 
 export interface PendingFileInfo {
   name: string
@@ -70,9 +85,19 @@ export const useLoaderStore = defineStore('loader', () => {
     pinnedSlotIds.value   = new Set()
   }
 
+  /** Initialise independent-movement defaults on a slot (idempotent). */
+  function initSlotDefaults(slot: SpineSlot): void {
+    if (slot.syncEnabled === undefined) slot.syncEnabled = true
+    if (slot.indPosX === undefined) slot.indPosX = 0
+    if (slot.indPosY === undefined) slot.indPosY = 0
+    if (slot.indZoom === undefined) slot.indZoom = 1
+  }
+
   /** Replace all slots; activates the first fully-valid slot. */
   function setSlots(slots: SpineSlot[], version: string | null) {
-    spineSlots.value      = slots.slice(0, SPINE_SLOTS_LIMIT)
+    const limited = slots.slice(0, SPINE_SLOTS_LIMIT)
+    limited.forEach(initSlotDefaults)
+    spineSlots.value      = limited
     detectedVersion.value = version
     const first           = spineSlots.value.find(s => !s.error && !(s.validationErrors?.length))
     activeSlotId.value    = first?.id ?? null
@@ -111,6 +136,54 @@ export const useLoaderStore = defineStore('loader', () => {
     spineSlots.value = arr
   }
 
+  /** Add a single slot respecting SPINE_SLOTS_LIMIT; initialises ind* defaults. */
+  function addSlot(slot: SpineSlot): void {
+    if (spineSlots.value.length >= SPINE_SLOTS_LIMIT) return
+    initSlotDefaults(slot)
+    spineSlots.value = [...spineSlots.value, slot]
+  }
+
+  /**
+   * Deep-clone the slot with the given id.
+   * Returns the new slot (not yet active), or null when limit is reached or source has errors.
+   */
+  function cloneSlot(id: string): SpineSlot | null {
+    const src = spineSlots.value.find(s => s.id === id)
+    if (!src) return null
+    if (src.error) return null
+    if (spineSlots.value.length >= SPINE_SLOTS_LIMIT) return null
+
+    // Build a unique name like "Name (2)", "Name (3)", …
+    const baseName = src.name.replace(/ \(\d+\)$/, '')
+    const existingNames = new Set(spineSlots.value.map(s => s.name))
+    let suffix = 2
+    let newName = `${baseName} (${suffix})`
+    while (existingNames.has(newName)) {
+      suffix++
+      newName = `${baseName} (${suffix})`
+    }
+
+    const newSlot: SpineSlot = {
+      id: `slot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: newName,
+      fileSet: src.fileSet ? cloneFileSet(src.fileSet) : undefined,
+      savedState: src.savedState ? JSON.parse(JSON.stringify(src.savedState)) : undefined,
+      syncEnabled: src.syncEnabled ?? true,
+      indPosX: src.indPosX ?? 0,
+      indPosY: src.indPosY ?? 0,
+      indZoom: src.indZoom ?? 1,
+    }
+
+    spineSlots.value = [...spineSlots.value, newSlot]
+    return newSlot
+  }
+
+  /** Update `syncEnabled` for the slot with the given id. */
+  function setSyncEnabled(id: string, v: boolean): void {
+    const slot = spineSlots.value.find(s => s.id === id)
+    if (slot) slot.syncEnabled = v
+  }
+
   function clear() {
     pendingFiles.value    = []
     spineSlots.value      = []
@@ -140,5 +213,8 @@ export const useLoaderStore = defineStore('loader', () => {
     setPinned,
     isPinned,
     reorderSlots,
+    addSlot,
+    cloneSlot,
+    setSyncEnabled,
   }
 })

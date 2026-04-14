@@ -47,7 +47,7 @@
           :tabs-padding="8"
           class="side-tabs"
         >
-          <n-tab-pane v-if="loaderStore.spineSlots.length > 1" name="spines" tab="Spines" class="tab-pane">
+          <n-tab-pane v-if="loaderStore.spineSlots.length > 1 || backgroundStore.isLoaded" name="spines" tab="Spines" class="tab-pane">
             <SpinesPanel />
           </n-tab-pane>
           <n-tab-pane name="animation" tab="Anim" class="tab-pane">
@@ -94,7 +94,11 @@
         @mousedown.prevent="onResizeStart"
       />
 
-      <div class="stage-area">
+      <div
+        class="stage-area"
+        @dragover.prevent
+        @drop.prevent="onCanvasDrop"
+      >
         <PreviewStage ref="stageRef" />
       </div>
     </div>
@@ -118,6 +122,9 @@ import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useLoaderStore } from '@/core/stores/useLoaderStore'
 import { useExportStore } from '@/core/stores/useExportStore'
+import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
+import { groupSpineFiles, readFileAsDataURL } from '@/core/utils/fileLoader'
+import { validateSpineFileSet } from '@/core/utils/spineValidator'
 import { downloadBlob, downloadJson, canvasToBlob, buildSpriteSheet } from '@/core/utils/exportUtils'
 
 const emit = defineEmits<{
@@ -125,20 +132,27 @@ const emit = defineEmits<{
   'open-compare': [payload?: { left?: number }]
 }>()
 
-const versionStore    = useVersionStore()
-const skeletonStore   = useSkeletonStore()
-const animationStore  = useAnimationStore()
-const loaderStore     = useLoaderStore()
-const exportStore     = useExportStore()
-const stageRef      = ref<InstanceType<typeof PreviewStage> | null>(null)
-const activeTab     = ref<'spines' | 'animation' | 'inspector' | 'bones' | 'atlas' | 'perf' | 'compl' | 'export'>('animation')
+const versionStore     = useVersionStore()
+const skeletonStore    = useSkeletonStore()
+const animationStore   = useAnimationStore()
+const loaderStore      = useLoaderStore()
+const exportStore      = useExportStore()
+const backgroundStore  = useBackgroundStore()
+const stageRef         = ref<InstanceType<typeof PreviewStage> | null>(null)
+const activeTab        = ref<'spines' | 'animation' | 'inspector' | 'bones' | 'atlas' | 'perf' | 'compl' | 'export'>('animation')
 
-// Auto-switch away from Spines tab when only 1 spine remains
+// Auto-switch away from Spines tab when only 1 spine remains and no background
 watch(
   () => loaderStore.spineSlots.length,
   (count) => {
-    if (count <= 1 && activeTab.value === 'spines') activeTab.value = 'animation'
+    if (count <= 1 && !backgroundStore.isLoaded && activeTab.value === 'spines') activeTab.value = 'animation'
   },
+)
+
+// Auto-switch to Spines tab when background is first loaded
+watch(
+  () => backgroundStore.isLoaded,
+  (loaded) => { if (loaded) activeTab.value = 'spines' },
 )
 
 // ── Resizable side panel ──────────────────────────────────────────────────────
@@ -242,7 +256,48 @@ function onClickBack() {
   animationStore.reset()
   loaderStore.clear()
   exportStore.finish()
+  backgroundStore.clearAll()
   emit('back')
+}
+
+async function onCanvasDrop(e: DragEvent) {
+  const files = Array.from(e.dataTransfer?.files ?? [])
+  if (files.length === 0) return
+
+  const imageExts = /\.(png|jpe?g|webp|gif|avif)$/i
+  const spineExts = /\.(json|skel|atlas)$/i
+  const hasImages = files.some(f => imageExts.test(f.name))
+  const hasSpine  = files.some(f => spineExts.test(f.name))
+
+  if (!hasSpine && hasImages) {
+    const imgFile = files.find(f => imageExts.test(f.name))!
+    const dataUrl = await readFileAsDataURL(imgFile)
+    const img = new Image()
+    img.src = dataUrl
+    await new Promise<void>(r => { img.onload = () => r() })
+    if (backgroundStore.isLoaded) {
+      const ok = window.confirm('Replace current background image?')
+      if (!ok) return
+    }
+    backgroundStore.set({ dataUrl, width: img.naturalWidth, height: img.naturalHeight })
+    backgroundStore.setListIndex(loaderStore.spineSlots.length)
+    return
+  }
+
+  if (hasSpine) {
+    const result = await groupSpineFiles(files)
+    if (result.globalError) {
+      window.alert(result.globalError)
+      return
+    }
+    for (const slot of result.slots) {
+      if (!slot.error && slot.fileSet) {
+        const errs = validateSpineFileSet(slot.fileSet)
+        if (errs.length > 0) slot.validationErrors = errs
+      }
+      loaderStore.addSlot(slot)
+    }
+  }
 }
 
 function onSetAnimation(track: number, name: string, loop: boolean) {

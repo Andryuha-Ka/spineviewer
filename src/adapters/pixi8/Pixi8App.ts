@@ -86,6 +86,12 @@ export class Pixi8App implements IPixiApp {
     return (await (this._app.renderer as any).extract.canvas(this._app.stage)) as HTMLCanvasElement
   }
 
+  createSprite(dataUrl: string): unknown {
+    const sprite = PIXI.Sprite.from(dataUrl)
+    sprite.anchor.set(0.5, 0.5)
+    return sprite
+  }
+
   destroy(): void {
     // false = do not remove canvas — Vue controls the DOM element
     this._app.destroy(false)

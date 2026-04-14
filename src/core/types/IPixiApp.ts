@@ -33,4 +33,6 @@ export interface IPixiApp {
   getStats(): RendererStats
   /** Extract the current rendered frame as an HTMLCanvasElement (handles preserveDrawingBuffer) */
   extractFrame(): Promise<HTMLCanvasElement>
+  /** Create a PIXI.Sprite from a data URL; anchor is set to (0.5, 0.5). Returns unknown to avoid version coupling. */
+  createSprite(dataUrl: string): unknown
 }

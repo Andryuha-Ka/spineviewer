@@ -116,6 +116,7 @@ import { useAtlasStore }      from '@/core/stores/useAtlasStore'
 import { useProfilerStore }   from '@/core/stores/useProfilerStore'
 import { useComplexityStore } from '@/core/stores/useComplexityStore'
 import { useLoaderStore }    from '@/core/stores/useLoaderStore'
+import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
 import type { IPixiApp } from '@/core/types/IPixiApp'
 import type { IProgressOverlay } from '@/core/types/IProgressOverlay'
 import type { TrackDisplayState, MarkerDisplay } from '@/core/types/IProgressOverlay'
@@ -132,7 +133,11 @@ const eventsStore    = useEventsStore()
 const atlasStore      = useAtlasStore()
 const profilerStore   = useProfilerStore()
 const complexityStore = useComplexityStore()
-const loaderStore     = useLoaderStore()
+const loaderStore       = useLoaderStore()
+const backgroundStore   = useBackgroundStore()
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let bgSprite: any | null = null
 
 const containerRef = ref<HTMLDivElement | null>(null)
 const canvasRef    = ref<HTMLCanvasElement | null>(null)
@@ -242,6 +247,10 @@ const loopStates = new Map<number, ReturnType<typeof makeLoopState>>()
 let _overlayHoverTrackIndex = -1
 const isPanning = ref(false)
 let panStart = { x: 0, y: 0, px: 0, py: 0 }
+type PanTarget = 'global' | 'background' | 'slot'
+let panTarget: PanTarget = 'global'
+// Guard: prevents the sync-re-enable watcher from overwriting ind* during slot-state restore
+let _restoringSlotState = false
 
 // ── Seek drag state ────────────────────────────────────────────────────────────
 let _seekDragActive = false
@@ -270,10 +279,35 @@ function applyViewport() {
   const x = baseX.value + viewerStore.posX
   const y = baseY.value + viewerStore.posY
   const z = viewerStore.zoom
-  for (const obj of mountedSpineObjects.values()) {
-    obj.x = x
-    obj.y = y
-    obj.scale.set(z)
+  for (const [slotId, obj] of mountedSpineObjects.entries()) {
+    const slot = loaderStore.spineSlots.find(s => s.id === slotId)
+    const synced = slot?.syncEnabled !== false
+    if (synced) {
+      // Global viewport + personal offset in scene space (scales with zoom so all synced
+      // objects zoom uniformly around the scene origin/cursor, not around each object's own center)
+      obj.x = x + (slot?.indPosX ?? 0) * z
+      obj.y = y + (slot?.indPosY ?? 0) * z
+      obj.scale.set(z * (slot?.indZoom ?? 1))
+    } else {
+      // Independent: absolute screen-space position, ignores global
+      obj.x = baseX.value + (slot!.indPosX ?? 0)
+      obj.y = baseY.value + (slot!.indPosY ?? 0)
+      obj.scale.set(slot!.indZoom ?? 1)
+    }
+  }
+  // Background sprite
+  if (bgSprite) {
+    if (backgroundStore.syncEnabled) {
+      // Global viewport + personal offset in scene space
+      bgSprite.x = x + backgroundStore.posX * z
+      bgSprite.y = y + backgroundStore.posY * z
+      bgSprite.scale.set(z * backgroundStore.zoom)
+    } else {
+      // Independent: absolute screen-space position
+      bgSprite.x = baseX.value + backgroundStore.posX
+      bgSprite.y = baseY.value + backgroundStore.posY
+      bgSprite.scale.set(backgroundStore.zoom)
+    }
   }
 }
 
@@ -295,15 +329,27 @@ function applySkins() {
 }
 
 /** Sync Pixi stage zIndex of all mounted spines based on list order.
- *  Slot at list index 0 (top of UI) gets the highest zIndex (rendered on top). */
+ *  Slot at list index 0 (top of UI) gets the highest zIndex (rendered on top).
+ *  Background sprite is inserted at bgStore.listIndex in the merged ordering. */
 function syncZOrder() {
   if (!pixiApp) return
   const slots = loaderStore.spineSlots
   const n = slots.length
-  slots.forEach((slot, i) => {
+  const bgListIdx = Math.max(0, Math.min(n, backgroundStore.listIndex))
+
+  // Assign z-indices to spine objects: adjust for bg position in merged list
+  slots.forEach((slot, spineArrIdx) => {
     const obj = mountedSpineObjects.get(slot.id)
-    if (obj) obj.zIndex = n - 1 - i
+    if (!obj) return
+    // merged position of this spine: if it's at or after bg insertion point, shift by 1
+    const mergedPos = spineArrIdx < bgListIdx ? spineArrIdx : spineArrIdx + 1
+    obj.zIndex = n - mergedPos
   })
+
+  // Background sprite z-index
+  if (bgSprite) {
+    bgSprite.zIndex = n - bgListIdx
+  }
 }
 
 function onWheel(e: WheelEvent) {
@@ -319,15 +365,41 @@ function onWheel(e: WheelEvent) {
     ? Math.exp(-e.deltaY * 0.004)
     : e.deltaY < 0 ? 1.15 : 1 / 1.15
 
-  const newZoom = Math.min(20, Math.max(0.05, viewerStore.zoom * dz))
-  if (newZoom === viewerStore.zoom) return
+  const activeSlot = loaderStore.activeSlot
 
-  // Zoom towards cursor: keep point under cursor fixed in spine-space
-  const spineX = (mx - baseX.value - viewerStore.posX) / viewerStore.zoom
-  const spineY = (my - baseY.value - viewerStore.posY) / viewerStore.zoom
-  viewerStore.posX = mx - baseX.value - spineX * newZoom
-  viewerStore.posY = my - baseY.value - spineY * newZoom
-  viewerStore.zoom = newZoom
+  if (backgroundStore.isActive && !backgroundStore.syncEnabled) {
+    // Zoom background independently, anchored to cursor
+    const newZoom = Math.min(20, Math.max(0.05, backgroundStore.zoom * dz))
+    if (newZoom === backgroundStore.zoom) return
+    const spineX = (mx - baseX.value - backgroundStore.posX) / backgroundStore.zoom
+    const spineY = (my - baseY.value - backgroundStore.posY) / backgroundStore.zoom
+    backgroundStore.setTransform(
+      mx - baseX.value - spineX * newZoom,
+      my - baseY.value - spineY * newZoom,
+      newZoom,
+    )
+  } else if (activeSlot && activeSlot.syncEnabled === false) {
+    // Zoom active spine independently, anchored to cursor
+    const curZoom = activeSlot.indZoom ?? 1
+    const curPosX = activeSlot.indPosX ?? 0
+    const curPosY = activeSlot.indPosY ?? 0
+    const newZoom = Math.min(20, Math.max(0.05, curZoom * dz))
+    if (newZoom === curZoom) return
+    const spineX = (mx - baseX.value - curPosX) / curZoom
+    const spineY = (my - baseY.value - curPosY) / curZoom
+    activeSlot.indPosX = mx - baseX.value - spineX * newZoom
+    activeSlot.indPosY = my - baseY.value - spineY * newZoom
+    activeSlot.indZoom = newZoom
+  } else {
+    // Global zoom (existing logic)
+    const newZoom = Math.min(20, Math.max(0.05, viewerStore.zoom * dz))
+    if (newZoom === viewerStore.zoom) return
+    const spineX = (mx - baseX.value - viewerStore.posX) / viewerStore.zoom
+    const spineY = (my - baseY.value - viewerStore.posY) / viewerStore.zoom
+    viewerStore.posX = mx - baseX.value - spineX * newZoom
+    viewerStore.posY = my - baseY.value - spineY * newZoom
+    viewerStore.zoom = newZoom
+  }
   applyViewport()
 }
 
@@ -355,7 +427,22 @@ function onPanStart(e: MouseEvent) {
   }
 
   isPanning.value = true
-  panStart = { x: e.clientX, y: e.clientY, px: viewerStore.posX, py: viewerStore.posY }
+
+  // Determine pan target at drag start
+  const activeSlot = loaderStore.activeSlot
+  if (e.shiftKey) {
+    panTarget = 'global'
+    panStart = { x: e.clientX, y: e.clientY, px: viewerStore.posX, py: viewerStore.posY }
+  } else if (backgroundStore.isActive && !backgroundStore.syncEnabled) {
+    panTarget = 'background'
+    panStart = { x: e.clientX, y: e.clientY, px: backgroundStore.posX, py: backgroundStore.posY }
+  } else if (activeSlot && activeSlot.syncEnabled === false) {
+    panTarget = 'slot'
+    panStart = { x: e.clientX, y: e.clientY, px: activeSlot.indPosX ?? 0, py: activeSlot.indPosY ?? 0 }
+  } else {
+    panTarget = 'global'
+    panStart = { x: e.clientX, y: e.clientY, px: viewerStore.posX, py: viewerStore.posY }
+  }
 }
 
 function onPanMove(e: MouseEvent) {
@@ -377,8 +464,22 @@ function onPanMove(e: MouseEvent) {
   }
 
   if (!isPanning.value) return
-  viewerStore.posX = panStart.px + e.clientX - panStart.x
-  viewerStore.posY = panStart.py + e.clientY - panStart.y
+
+  const dx = e.clientX - panStart.x
+  const dy = e.clientY - panStart.y
+
+  if (panTarget === 'background') {
+    backgroundStore.setTransform(panStart.px + dx, panStart.py + dy, backgroundStore.zoom)
+  } else if (panTarget === 'slot') {
+    const slot = loaderStore.activeSlot
+    if (slot) {
+      slot.indPosX = panStart.px + dx
+      slot.indPosY = panStart.py + dy
+    }
+  } else {
+    viewerStore.posX = panStart.px + dx
+    viewerStore.posY = panStart.py + dy
+  }
   applyViewport()
 }
 
@@ -542,6 +643,104 @@ onMounted(async () => {
       { immediate: true },
     )
 
+    // Background image: mount/replace/remove PIXI sprite when store image changes
+    watch(
+      () => backgroundStore.image,
+      (img) => {
+        if (bgSprite) {
+          ;(pixiApp!.stage as any).removeChild(bgSprite)
+          bgSprite.destroy?.({ texture: true })
+          bgSprite = null
+        }
+        if (img) {
+          bgSprite = pixiApp!.createSprite(img.dataUrl) as any
+          ;(pixiApp!.stage as any).addChild(bgSprite)
+          applyViewport()
+          syncZOrder()
+        }
+      },
+    )
+
+    // When background syncEnabled toggles, convert posX/Y/zoom between absolute and relative.
+    // sync ON→OFF: relative offset → absolute position (visual stays the same)
+    // sync OFF→ON: absolute position → relative offset (visual stays the same)
+    watch(
+      () => backgroundStore.syncEnabled,
+      (newSync, oldSync) => {
+        if (oldSync !== undefined && newSync !== oldSync) {
+          if (oldSync && !newSync) {
+            // Synced → Desynced: scene-space offset → absolute screen position
+            backgroundStore.setTransform(
+              viewerStore.posX + backgroundStore.posX * viewerStore.zoom,
+              viewerStore.posY + backgroundStore.posY * viewerStore.zoom,
+              viewerStore.zoom * backgroundStore.zoom,
+            )
+          } else if (!oldSync && newSync) {
+            // Desynced → Synced: absolute screen position → scene-space offset
+            const z = viewerStore.zoom > 0 ? viewerStore.zoom : 1
+            backgroundStore.setTransform(
+              (backgroundStore.posX - viewerStore.posX) / z,
+              (backgroundStore.posY - viewerStore.posY) / z,
+              backgroundStore.zoom / z,
+            )
+          }
+        }
+        applyViewport()
+      },
+    )
+
+    // Re-apply viewport when background position/zoom changes (synced or desynced)
+    watch(
+      () => [backgroundStore.posX, backgroundStore.posY, backgroundStore.zoom],
+      () => { if (bgSprite) applyViewport() },
+    )
+
+    // Re-sync z-order when background list index changes
+    watch(
+      () => backgroundStore.listIndex,
+      () => syncZOrder(),
+    )
+
+    // When a slot's syncEnabled changes, convert indPosX/Y/indZoom between absolute and relative.
+    // flush: 'sync' ensures this fires immediately (before _restoringSlotState is reset) so the
+    // guard works correctly when slot state is restored during slot-switch.
+    //
+    // sync ON→OFF: relative offset → absolute position  (visual stays the same, no jump)
+    // sync OFF→ON: absolute position → relative offset  (visual stays the same, no jump)
+    //
+    // With both modes using the same applyViewport formula:
+    //   synced:   pos = globalPos + indPos (relative)
+    //   desynced: pos = indPos (absolute)
+    watch(
+      () => loaderStore.spineSlots.map(s => ({ id: s.id, sync: s.syncEnabled !== false })),
+      (newVals, oldVals) => {
+        if (oldVals && !_restoringSlotState) {
+          for (const newV of newVals) {
+            const oldV = oldVals.find(o => o.id === newV.id)
+            if (!oldV || oldV.sync === newV.sync) continue
+            const slot = loaderStore.spineSlots.find(s => s.id === newV.id)
+            if (!slot) continue
+            if (oldV.sync && !newV.sync) {
+              // Synced → Desynced: scene-space offset → absolute screen position
+              // abs = globalPos + sceneOffset * globalZoom
+              slot.indPosX = viewerStore.posX + (slot.indPosX ?? 0) * viewerStore.zoom
+              slot.indPosY = viewerStore.posY + (slot.indPosY ?? 0) * viewerStore.zoom
+              slot.indZoom = viewerStore.zoom * (slot.indZoom ?? 1)
+            } else if (!oldV.sync && newV.sync) {
+              // Desynced → Synced: absolute screen position → scene-space offset
+              // sceneOffset = (abs - globalPos) / globalZoom
+              const z = viewerStore.zoom > 0 ? viewerStore.zoom : 1
+              slot.indPosX = ((slot.indPosX ?? 0) - viewerStore.posX) / z
+              slot.indPosY = ((slot.indPosY ?? 0) - viewerStore.posY) / z
+              slot.indZoom = (slot.indZoom ?? 1) / z
+            }
+          }
+        }
+        applyViewport()
+      },
+      { deep: false, flush: 'sync' },
+    )
+
     // Reset DC position buffer when the animation set changes
     watch(
       () => animationStore.tracks.map(t => `${t.trackIndex}:${t.animationName}`).join(','),
@@ -647,6 +846,7 @@ onMounted(async () => {
 
         // 1. Save full state of the slot we're leaving
         if (oldId) {
+          const leavingSlot = loaderStore.spineSlots.find(s => s.id === oldId)
           loaderStore.saveSlotState(oldId, {
             speed:              animationStore.speed,
             posX:               viewerStore.posX,
@@ -661,6 +861,10 @@ onMounted(async () => {
             selectedSkins:        [...skeletonStore.activeSkins],
             showPlaceholders:     viewerStore.showPlaceholders,
             disabledPlaceholders: [...viewerStore.disabledPlaceholders],
+            syncEnabled:          leavingSlot?.syncEnabled ?? true,
+            indPosX:              leavingSlot?.indPosX ?? 0,
+            indPosY:              leavingSlot?.indPosY ?? 0,
+            indZoom:              leavingSlot?.indZoom ?? 1,
           })
         }
 
@@ -731,6 +935,15 @@ onMounted(async () => {
           if (s.disabledPlaceholders?.length) {
             viewerStore.disabledPlaceholders = new Set(s.disabledPlaceholders)
           }
+          // Restore independent movement state to the slot itself
+          const target = loaderStore.spineSlots.find(sl => sl.id === newId)
+          if (target) {
+            target.syncEnabled = s.syncEnabled ?? true
+            target.indPosX     = s.indPosX ?? 0
+            target.indPosY     = s.indPosY ?? 0
+            target.indZoom     = s.indZoom ?? 1
+          }
+          applyViewport()
         }
 
         // 5a. New slot is already mounted (was pinned on scene) → reuse adapter
@@ -764,7 +977,9 @@ onMounted(async () => {
                 .filter(b => PH_RE_5A.test(b.name) && !phSlots5A.has(b.name))
                 .map(b => ({ name: b.name, kind: 'bone' as const })),
             ]
+            _restoringSlotState = true
             restoreState(slot.savedState)
+            _restoringSlotState = false
             applySkins()
             applyPlaceholderLabels()
           } catch (e) {
@@ -776,7 +991,9 @@ onMounted(async () => {
         } else {
           // 5b. Load fresh
           await loadSpine(slot.fileSet, newId)
+          _restoringSlotState = true
           restoreState(slot.savedState)
+          _restoringSlotState = false
           applySkins()
           applyPlaceholderLabels()
         }
@@ -865,6 +1082,11 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', _onSeekDragMove)
   window.removeEventListener('mouseup', _onSeekDragEnd)
   spineObj = null
+  if (bgSprite) {
+    bgSprite.destroy?.({ texture: true })
+    bgSprite = null
+  }
+  backgroundStore.clearAll()
   if (pixiApp && tickerFn) pixiApp.ticker.remove(tickerFn)
   progressOverlay?.destroy()
   progressOverlay = null

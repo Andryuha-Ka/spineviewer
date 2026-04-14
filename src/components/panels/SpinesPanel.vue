@@ -16,15 +16,15 @@
         :class="{
           'spine-item--active':       slot.id === loaderStore.activeSlotId,
           'spine-item--pinned':       loaderStore.isPinned(slot.id) && slot.id !== loaderStore.activeSlotId,
-          'spine-item--error':        !!slot.error,
+          'spine-item--error':        isSlotError(slot),
           'spine-item--modified':     isModified(slot),
           'spine-item--dragging':     dragSrcIndex === index,
           'spine-item--drop-top':     dragOverIndex === index && dropPosition === 'top',
           'spine-item--drop-bottom':  dragOverIndex === index && dropPosition === 'bottom',
         }"
-        :title="slot.error ?? slot.name"
-        :draggable="!slot.error"
-        @click="!slot.error && loaderStore.setActiveSlot(slot.id)"
+        :title="slot.error ?? (slot.validationErrors?.length ? slot.validationErrors[0] : slot.name)"
+        :draggable="!isSlotError(slot)"
+        @click="!isSlotError(slot) && (loaderStore.setActiveSlot(slot.id), backgroundStore.setActive(false))"
         @dragstart="onDragStart($event, index)"
         @dragover="onDragOver($event, index)"
         @dragleave="onDragLeave"
@@ -32,7 +32,7 @@
         @dragend="onDragEnd"
       >
         <span
-          v-if="!slot.error"
+          v-if="!isSlotError(slot)"
           class="spine-drag-handle"
           title="Drag to reorder (top = higher z-index)"
         >
@@ -49,13 +49,49 @@
         <span class="spine-dot" />
         <span class="spine-name">{{ slot.name }}</span>
         <span
-          v-if="isModified(slot) && !slot.error"
+          v-if="isModified(slot) && !isSlotError(slot)"
           class="spine-modified-dot"
           :title="modifiedHint(slot)"
         />
-        <span v-if="slot.error" class="spine-err-badge" :title="slot.error">!</span>
+        <span
+          v-if="slot.error"
+          class="spine-err-badge"
+          :title="slot.error"
+        >!</span>
+        <span
+          v-else-if="slot.validationErrors?.length"
+          class="spine-err-badge spine-err-badge--validation"
+          :title="slot.validationErrors.join('\n')"
+        >!</span>
+        <!-- Sync toggle -->
         <button
-          v-if="!slot.error"
+          v-if="!isSlotError(slot)"
+          class="spine-sync-btn"
+          :class="{ 'spine-sync-btn--desynced': slot.syncEnabled === false }"
+          title="Sync with global viewport"
+          @click.stop="loaderStore.setSyncEnabled(slot.id, slot.syncEnabled !== false ? false : true)"
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7a5 5 0 0 1 0-10h2"/>
+            <line x1="8" y1="12" x2="16" y2="12"/>
+          </svg>
+        </button>
+        <!-- Clone button (active slot only) -->
+        <button
+          v-if="slot.id === loaderStore.activeSlotId && !isSlotError(slot)"
+          class="spine-clone-btn"
+          :disabled="loaderStore.spineSlots.length >= SPINE_SLOTS_LIMIT"
+          title="Clone this spine slot"
+          @click.stop="onClone(slot.id)"
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </button>
+        <!-- Pin button -->
+        <button
+          v-if="!isSlotError(slot)"
           class="spine-pin-btn"
           :class="{ 'spine-pin-btn--pinned': loaderStore.isPinned(slot.id) }"
           title="Keep on scene when switching"
@@ -66,6 +102,62 @@
           </svg>
         </button>
       </div>
+
+      <!-- Background image item (special: no pin, sync only) -->
+      <div
+        v-if="backgroundStore.isLoaded"
+        class="spine-item spine-item--background"
+        :class="{
+          'spine-item--active':      backgroundStore.isActive,
+          'spine-item--drop-top':    bgDropPosition === 'top' && bgDragOver,
+          'spine-item--drop-bottom': bgDropPosition === 'bottom' && bgDragOver,
+          'spine-item--dragging':    dragSrcIsBg,
+        }"
+        draggable="true"
+        title="Background image"
+        @click="onActivateBackground"
+        @dragstart="onBgDragStart"
+        @dragover="onBgDragOver"
+        @dragleave="onBgDragLeave"
+        @drop="onBgDrop"
+        @dragend="onDragEnd"
+      >
+        <span class="spine-drag-handle">
+          <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor">
+            <circle cx="2" cy="2"  r="1.2"/>
+            <circle cx="6" cy="2"  r="1.2"/>
+            <circle cx="2" cy="6"  r="1.2"/>
+            <circle cx="6" cy="6"  r="1.2"/>
+            <circle cx="2" cy="10" r="1.2"/>
+            <circle cx="6" cy="10" r="1.2"/>
+          </svg>
+        </span>
+        <span class="spine-dot spine-dot--image" />
+        <span class="spine-name">Background</span>
+        <!-- Sync toggle for background -->
+        <button
+          class="spine-sync-btn"
+          :class="{ 'spine-sync-btn--desynced': !backgroundStore.syncEnabled }"
+          title="Sync background with global viewport"
+          @click.stop="backgroundStore.setSyncEnabled(!backgroundStore.syncEnabled)"
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7a5 5 0 0 1 0-10h2"/>
+            <line x1="8" y1="12" x2="16" y2="12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Drop zone for images and spine file sets -->
+    <div
+      class="spines-dropzone"
+      :class="{ 'spines-dropzone--over': dropzoneActive }"
+      @dragover.prevent="dropzoneActive = true"
+      @dragleave="dropzoneActive = false"
+      @drop.prevent="onDropzoneFiles"
+    >
+      Drop image or spine files here
     </div>
 
     <div class="spines-footer">
@@ -78,29 +170,91 @@
 </template>
 
 <script setup lang="ts">
-import { useLoaderStore } from '@/core/stores/useLoaderStore'
+import { useLoaderStore, SPINE_SLOTS_LIMIT } from '@/core/stores/useLoaderStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useViewerStore } from '@/core/stores/useViewerStore'
-import type { SpineSlot } from '@/core/types/FileSet'
+import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
+import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
+import { groupSpineFiles, readFileAsDataURL } from '@/core/utils/fileLoader'
+import { validateSpineFileSet } from '@/core/utils/spineValidator'
+import type { SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 
-const loaderStore    = useLoaderStore()
-const animationStore = useAnimationStore()
-const viewerStore    = useViewerStore()
+const loaderStore     = useLoaderStore()
+const animationStore  = useAnimationStore()
+const viewerStore     = useViewerStore()
+const backgroundStore = useBackgroundStore()
+const skeletonStore   = useSkeletonStore()
 
-const validCount = computed(() => loaderStore.spineSlots.filter(s => !s.error).length)
-const errorCount = computed(() => loaderStore.spineSlots.filter(s =>  s.error).length)
+/** True for both classification errors (slot.error) and content validation errors (slot.validationErrors). */
+function isSlotError(slot: SpineSlot): boolean {
+  return !!slot.error || !!(slot.validationErrors?.length)
+}
+
+const validCount = computed(() => loaderStore.spineSlots.filter(s => !isSlotError(s)).length)
+const errorCount = computed(() => loaderStore.spineSlots.filter(s =>  isSlotError(s)).length)
+
+// ── Background ────────────────────────────────────────────────────────────────
+function onActivateBackground() {
+  backgroundStore.setActive(true)
+}
+
+// ── Clone ────────────────────────────────────────────────────────────────────
+function onClone(id: string) {
+  const src = loaderStore.spineSlots.find(s => s.id === id)
+  if (!src || src.error) return
+
+  // Flush the current live state into savedState before cloning so the clone
+  // receives the full current state (animation, viewport, skins, sync) — not
+  // the stale snapshot from the last slot-switch.
+  const liveState: SpineSlotSavedState = {
+    speed:               animationStore.speed,
+    posX:                viewerStore.posX,
+    posY:                viewerStore.posY,
+    zoom:                viewerStore.zoom,
+    selectedAnimation:   animationStore.selectedAnimation,
+    currentTrack:        animationStore.currentTrack,
+    loop:                animationStore.loop,
+    trackEnabled:        { ...animationStore.trackEnabled },
+    trackPlaylists:      JSON.parse(JSON.stringify(animationStore.trackPlaylists)),
+    wasPlaying:          animationStore.isPlaying,
+    selectedSkins:       [...skeletonStore.activeSkins],
+    showPlaceholders:    viewerStore.showPlaceholders,
+    disabledPlaceholders: [...viewerStore.disabledPlaceholders],
+    syncEnabled:         src.syncEnabled ?? true,
+    indPosX:             src.indPosX ?? 0,
+    indPosY:             src.indPosY ?? 0,
+    indZoom:             src.indZoom ?? 1,
+  }
+  loaderStore.saveSlotState(id, liveState)
+
+  const newSlot = loaderStore.cloneSlot(id)
+  if (!newSlot) return
+  loaderStore.setActiveSlot(newSlot.id)
+}
 
 // ── Drag-and-drop reorder ────────────────────────────────────────────────────
-const dragSrcIndex  = ref<number | null>(null)
-const dragOverIndex = ref<number | null>(null)
-/** 'top' = insert before, 'bottom' = insert after */
-const dropPosition  = ref<'top' | 'bottom'>('top')
+const dragSrcIndex   = ref<number | null>(null)
+const dragOverIndex  = ref<number | null>(null)
+const dropPosition   = ref<'top' | 'bottom'>('top')
+const dragSrcIsBg    = ref(false)
+const bgDragOver     = ref(false)
+const bgDropPosition = ref<'top' | 'bottom'>('top')
 
 function onDragStart(e: DragEvent, index: number) {
   dragSrcIndex.value = index
+  dragSrcIsBg.value  = false
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(index))
+  }
+}
+
+function onBgDragStart(e: DragEvent) {
+  dragSrcIsBg.value  = true
+  dragSrcIndex.value = null
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', 'bg')
   }
 }
 
@@ -108,49 +262,144 @@ function onDragOver(e: DragEvent, index: number) {
   e.preventDefault()
   if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
   dragOverIndex.value = index
-  // Determine whether cursor is in top or bottom half of the element
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   dropPosition.value = (e.clientY - rect.top) < rect.height / 2 ? 'top' : 'bottom'
+}
+
+function onBgDragOver(e: DragEvent) {
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  bgDragOver.value = true
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  bgDropPosition.value = (e.clientY - rect.top) < rect.height / 2 ? 'top' : 'bottom'
 }
 
 function onDragLeave() {
   dragOverIndex.value = null
 }
 
+function onBgDragLeave() {
+  bgDragOver.value = false
+}
+
 function onDrop(e: DragEvent, toIndex: number) {
   e.preventDefault()
+
+  if (dragSrcIsBg.value) {
+    // Background being dropped onto a spine item
+    const targetListIdx = dropPosition.value === 'top' ? toIndex : toIndex + 1
+    backgroundStore.setListIndex(targetListIdx)
+    dragSrcIsBg.value  = false
+    dragOverIndex.value = null
+    return
+  }
+
   if (dragSrcIndex.value === null) return
+
   let target = toIndex
   if (dropPosition.value === 'bottom') target = toIndex + 1
-  // Adjust target for removal of source item
   const src = dragSrcIndex.value
   if (target > src) target -= 1
+
+  // Adjust bg listIndex when a spine crosses its position
+  if (backgroundStore.isLoaded) {
+    const bgIdx = backgroundStore.listIndex
+    if (src < bgIdx && target >= bgIdx) {
+      backgroundStore.setListIndex(bgIdx - 1)
+    } else if (src >= bgIdx && target < bgIdx) {
+      backgroundStore.setListIndex(bgIdx + 1)
+    }
+  }
+
   loaderStore.reorderSlots(src, target)
   dragSrcIndex.value  = null
   dragOverIndex.value = null
 }
 
+function onBgDrop(e: DragEvent) {
+  e.preventDefault()
+  bgDragOver.value    = false
+  dragSrcIndex.value  = null
+  dragOverIndex.value = null
+  dragSrcIsBg.value   = false
+}
+
 function onDragEnd() {
   dragSrcIndex.value  = null
   dragOverIndex.value = null
+  dragSrcIsBg.value   = false
+  bgDragOver.value    = false
 }
 
-/** Returns true if the slot has been changed from its default state. */
+// ── Drop zone ────────────────────────────────────────────────────────────────
+const dropzoneActive = ref(false)
+
+async function onDropzoneFiles(e: DragEvent) {
+  dropzoneActive.value = false
+  const files = Array.from(e.dataTransfer?.files ?? [])
+  await handleDroppedFiles(files)
+}
+
+async function handleDroppedFiles(files: File[]): Promise<void> {
+  if (files.length === 0) return
+
+  const imageExts  = /\.(png|jpe?g|webp|gif|avif)$/i
+  const spineExts  = /\.(json|skel|atlas)$/i
+  const hasImages  = files.some(f => imageExts.test(f.name))
+  const hasSpine   = files.some(f => spineExts.test(f.name))
+
+  if (!hasSpine && hasImages) {
+    // Image-only drop → set as background
+    const imgFile = files.find(f => imageExts.test(f.name))!
+    const dataUrl = await readFileAsDataURL(imgFile)
+    const img = new Image()
+    img.src = dataUrl
+    await new Promise<void>(r => { img.onload = () => r() })
+    if (backgroundStore.isLoaded) {
+      const ok = window.confirm('Replace current background image?')
+      if (!ok) return
+    }
+    backgroundStore.set({ dataUrl, width: img.naturalWidth, height: img.naturalHeight })
+    backgroundStore.setListIndex(loaderStore.spineSlots.length)
+    return
+  }
+
+  if (hasSpine) {
+    const result = await groupSpineFiles(files)
+    if (result.globalError) {
+      window.alert(result.globalError)
+      return
+    }
+    for (const slot of result.slots) {
+      if (!slot.error && slot.fileSet) {
+        const errs = validateSpineFileSet(slot.fileSet)
+        if (errs.length > 0) slot.validationErrors = errs
+      }
+      loaderStore.addSlot(slot)
+    }
+  }
+}
+
+defineExpose({ handleDroppedFiles })
+
+// ── Modified indicator ───────────────────────────────────────────────────────
 function isModified(slot: SpineSlot): boolean {
   if (slot.error) return false
 
-  // Active slot — read live state from stores
   if (slot.id === loaderStore.activeSlotId) {
     return (
       Object.keys(animationStore.trackPlaylists).length > 0 ||
       animationStore.speed !== 1 ||
       viewerStore.zoom !== 1 ||
       viewerStore.posX !== 0 ||
-      viewerStore.posY !== 0
+      viewerStore.posY !== 0 ||
+      slot.syncEnabled === false ||
+      (slot.indPosX ?? 0) !== 0 ||
+      (slot.indPosY ?? 0) !== 0 ||
+      (slot.indZoom ?? 1) !== 1
     )
   }
 
-  // Inactive slot — read from saved state
   const s = slot.savedState
   if (!s) return false
   return (
@@ -158,11 +407,14 @@ function isModified(slot: SpineSlot): boolean {
     s.speed !== 1 ||
     s.zoom !== 1 ||
     s.posX !== 0 ||
-    s.posY !== 0
+    s.posY !== 0 ||
+    (s.syncEnabled === false) ||
+    (s.indPosX ?? 0) !== 0 ||
+    (s.indPosY ?? 0) !== 0 ||
+    (s.indZoom ?? 1) !== 1
   )
 }
 
-/** Tooltip describing what was changed. */
 function modifiedHint(slot: SpineSlot): string {
   const parts: string[] = []
 
@@ -186,15 +438,35 @@ function modifiedHint(slot: SpineSlot): string {
     ? animationStore.speed
     : (slot.savedState?.speed ?? 1)
 
+  const syncEnabled = slot.id === loaderStore.activeSlotId
+    ? (slot.syncEnabled !== false)
+    : (slot.savedState?.syncEnabled !== false)
+
+  const indZoom = slot.id === loaderStore.activeSlotId
+    ? (slot.indZoom ?? 1)
+    : (slot.savedState?.indZoom ?? 1)
+
+  const indPosX = slot.id === loaderStore.activeSlotId
+    ? (slot.indPosX ?? 0)
+    : (slot.savedState?.indPosX ?? 0)
+
+  const indPosY = slot.id === loaderStore.activeSlotId
+    ? (slot.indPosY ?? 0)
+    : (slot.savedState?.indPosY ?? 0)
+
   if (Object.keys(playlists).length > 0) {
-    const names = Object.values(playlists)
-      .flat()
-      .map(e => e.animationName)
+    const names = Object.values(playlists).flat().map(e => e.animationName)
     parts.push(`Anim: ${[...new Set(names)].join(', ')}`)
   }
-  if (zoom !== 1)            parts.push(`Zoom: ${zoom.toFixed(2)}×`)
+  if (zoom !== 1) parts.push(`Zoom: ${zoom.toFixed(2)}×`)
   if (posX !== 0 || posY !== 0) parts.push(`Pan: (${Math.round(posX)}, ${Math.round(posY)})`)
-  if (speed !== 1)           parts.push(`Speed: ${speed}×`)
+  if (speed !== 1) parts.push(`Speed: ${speed}×`)
+  if (!syncEnabled) {
+    const hints: string[] = ['Desynced']
+    if (indZoom !== 1) hints.push(`zoom ${indZoom.toFixed(2)}×`)
+    if (indPosX !== 0 || indPosY !== 0) hints.push(`pan (${Math.round(indPosX)}, ${Math.round(indPosY)})`)
+    parts.push(hints.join(' '))
+  }
 
   return parts.join(' · ')
 }
@@ -217,8 +489,8 @@ function modifiedHint(slot: SpineSlot): string {
 .spine-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px 6px 8px;
+  gap: 6px;
+  padding: 6px 10px 6px 8px;
   border-radius: 6px;
   margin: 0 6px 2px;
   cursor: pointer;
@@ -286,6 +558,15 @@ function modifiedHint(slot: SpineSlot): string {
   cursor: default;
 }
 
+/* Background item special styling */
+.spine-item--background {
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.spine-item--background.spine-item--active {
+  border-color: rgba(124, 106, 245, 0.4);
+}
+
 .spine-dot {
   width: 6px;
   height: 6px;
@@ -301,6 +582,15 @@ function modifiedHint(slot: SpineSlot): string {
 
 .spine-item--pinned .spine-dot {
   background: #4ade80;
+}
+
+.spine-dot--image {
+  background: #60a5fa;
+  border-radius: 2px;
+}
+
+.spine-item--active .spine-dot--image {
+  background: #93c5fd;
 }
 
 .spine-name {
@@ -341,6 +631,76 @@ function modifiedHint(slot: SpineSlot): string {
   flex-shrink: 0;
 }
 
+/* Validation errors use amber instead of red to distinguish from classification errors */
+.spine-err-badge--validation {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+/* Sync button */
+.spine-sync-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #4ade80;
+  cursor: pointer;
+  padding: 2px 3px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+}
+
+.spine-item:hover .spine-sync-btn,
+.spine-sync-btn--desynced {
+  opacity: 1;
+}
+
+.spine-sync-btn--desynced {
+  color: #f59e0b;
+}
+
+.spine-sync-btn:not(.spine-sync-btn--desynced):hover {
+  background: var(--c-raised);
+}
+
+.spine-sync-btn--desynced:hover {
+  background: var(--c-raised);
+}
+
+/* Clone button */
+.spine-clone-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--c-text-ghost);
+  cursor: pointer;
+  padding: 2px 3px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+}
+
+.spine-item:hover .spine-clone-btn {
+  opacity: 1;
+}
+
+.spine-clone-btn:hover {
+  background: var(--c-raised);
+  color: var(--c-text-muted);
+}
+
+.spine-clone-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .spine-pin-btn {
   flex-shrink: 0;
   display: inline-flex;
@@ -375,10 +735,31 @@ function modifiedHint(slot: SpineSlot): string {
   color: #4ade80;
 }
 
+/* Drop zone */
+.spines-dropzone {
+  margin: 4px 8px 0;
+  padding: 8px;
+  border: 1px dashed var(--c-border);
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--c-text-ghost);
+  transition: border-color 0.15s, background 0.15s;
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.spines-dropzone--over {
+  border-color: #9d8fff;
+  background: rgba(157, 143, 255, 0.08);
+  color: var(--c-text-dim);
+}
+
 .spines-footer {
   padding: 8px 12px;
   font-size: 0.7rem;
   color: var(--c-text-ghost);
   border-top: 1px solid var(--c-border);
+  flex-shrink: 0;
 }
 </style>

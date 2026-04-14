@@ -59,6 +59,7 @@
           <li>Toggle <b>origin crosshair</b> in settings (⚙)</li>
           <li>Change <b>background color</b> via the color picker in the bottom-right corner of the canvas</li>
           <li><b>Placeholder labels</b> — toggle the <code>ph</code> checkbox to show/hide named placeholder overlays; expand the list below to enable/disable individual placeholders; toggle state and per-item visibility saved per skeleton</li>
+          <li><b>Independent pan/zoom</b> — disable the sync toggle (🔗) on a skeleton or background image in the Spines tab; drag and scroll then affect only that item; hold <kbd>Shift</kbd> to pan/zoom the global scene instead</li>
         </ul>
       </section>
 
@@ -70,7 +71,7 @@
         <div class="tab-grid">
           <div class="tab-item">
             <span class="tab-badge">Spines</span>
-            <span>Appears when 2+ skeletons are loaded — click to switch the active skeleton; <b>drag</b> the 6-dot handle to reorder (top = highest z-index on stage); <b>pin</b> (📌) to keep a skeleton visible while browsing others. Viewport, animation, skin, and placeholder state saved per skeleton</span>
+            <span>Appears when 2+ skeletons or a background image is loaded — click to switch the active skeleton; <b>drag</b> the 6-dot handle to reorder (top = highest z-index on stage); <b>pin</b> (📌) to keep a skeleton visible while browsing others. Viewport, animation, skin, and placeholder state saved per skeleton. <b>Sync toggle</b> (🔗) — disable to move/zoom the active item independently (Shift+drag moves the scene). <b>Clone</b> button duplicates the active skeleton with its full state. <b>Drop zone</b> at the bottom — drop an image to set a background, or drop spine files to add new skeletons</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Anim</span>
@@ -169,6 +170,48 @@
           <li>Or navigate picker → viewer without reloading the page</li>
           <li>Or close and reopen DevTools after a page reload</li>
         </ul>
+      </section>
+
+      <n-divider class="divider" />
+
+      <!-- What's New -->
+      <section class="help-section">
+        <h3 class="sec-title">What's New</h3>
+        <div class="changelog">
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.0</span>
+            <ul class="help-list">
+              <li><b>Background image</b> — drop a PNG/JPG/WebP onto the Spines drop zone to add a scene background; supports z-order DnD, sync toggle, and independent pan/zoom</li>
+              <li><b>Independent viewport per item</b> — sync toggle (🔗) per spine slot and background; when disabled, drag/wheel affects only that item; Shift+drag moves the global scene</li>
+              <li><b>Clone spine</b> — duplicate the active skeleton with its full state (animation, skin, position); the clone is fully independent</li>
+              <li><b>Spines tab drop zone</b> — drop images or spine files directly in the Spines tab; spine files go through version detection and validation</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
+            <span class="cl-ver">v1.2.11</span>
+            <ul class="help-list">
+              <li><b>FreeBone panel</b> — manually position and rotate individual bones on the stage</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
+            <span class="cl-ver">v1.2.0</span>
+            <ul class="help-list">
+              <li><b>Compare mode</b> — side-by-side comparison of two skeletons; time / viewport / animation / skin sync; Diff panel with Reskin Overview; severity badges (🔴 / 🟠)</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
+            <span class="cl-ver">v1.1.0</span>
+            <ul class="help-list">
+              <li><b>Multi-Spine</b> — load up to 30 skeletons simultaneously; Spines tab, drag-to-reorder, Pin button; per-skeleton state preserved independently</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
+            <span class="cl-ver">v1.0.0</span>
+            <ul class="help-list">
+              <li>Initial release: Spine 3.8–4.2 · Pixi 7 &amp; 8 · animation playback · skins · inspector · atlas viewer · complexity analyzer · export (PNG / Sprite Sheet / GIF / Pose JSON) · file history</li>
+            </ul>
+          </div>
+        </div>
       </section>
 
       <n-divider class="divider" />
@@ -393,6 +436,38 @@ kbd {
 
 .ver-table td {
   color: var(--c-text-dim);
+}
+
+/* Changelog */
+.changelog {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cl-entry {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.cl-ver {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  min-width: 48px;
+  text-align: center;
+  margin-top: 2px;
+}
+
+.cl-entry .help-list {
+  flex: 1;
 }
 
 /* About block */
