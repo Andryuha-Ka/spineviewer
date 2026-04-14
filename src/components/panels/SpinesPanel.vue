@@ -15,6 +15,7 @@
         class="spine-item"
         :class="{
           'spine-item--active':       slot.id === loaderStore.activeSlotId,
+          'spine-item--pinned':       loaderStore.isPinned(slot.id) && slot.id !== loaderStore.activeSlotId,
           'spine-item--error':        !!slot.error,
           'spine-item--modified':     isModified(slot),
           'spine-item--dragging':     dragSrcIndex === index,
@@ -276,6 +277,10 @@ function modifiedHint(slot: SpineSlot): string {
   background: rgba(124, 106, 245, 0.18) !important;
 }
 
+.spine-item--pinned {
+  background: rgba(74, 222, 128, 0.07);
+}
+
 .spine-item--error {
   opacity: 0.45;
   cursor: default;
@@ -292,6 +297,10 @@ function modifiedHint(slot: SpineSlot): string {
 
 .spine-item--active .spine-dot {
   background: #9d8fff;
+}
+
+.spine-item--pinned .spine-dot {
+  background: #4ade80;
 }
 
 .spine-name {
@@ -356,9 +365,14 @@ function modifiedHint(slot: SpineSlot): string {
   color: #4ade80;
 }
 
-.spine-pin-btn:hover {
+.spine-pin-btn:not(.spine-pin-btn--pinned):hover {
   background: var(--c-raised);
   color: var(--c-text-muted);
+}
+
+.spine-pin-btn--pinned:hover {
+  background: var(--c-raised);
+  color: #4ade80;
 }
 
 .spines-footer {

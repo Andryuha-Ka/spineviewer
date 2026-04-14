@@ -670,6 +670,9 @@ onMounted(async () => {
             // Park: keep on stage, freeze/play based on wasPlaying
             const ss = loaderStore.spineSlots.find(s => s.id === oldId)?.savedState
             spineAdapter.setTimeScale(ss?.wasPlaying ? (ss.speed ?? 1) : 0)
+            // Track adapter so it can be reused (path 5a), z-ordered, and destroyed on unpin
+            mountedAdapters.set(oldId, spineAdapter)
+            if (spineObj) mountedSpineObjects.set(oldId, spineObj)
           } else {
             spineAdapter.destroy()
             mountedAdapters.delete(oldId)
