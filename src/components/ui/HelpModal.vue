@@ -181,34 +181,55 @@
           <div class="cl-entry">
             <span class="cl-ver">v1.3.0</span>
             <ul class="help-list">
-              <li><b>Background image</b> — drop a PNG/JPG/WebP onto the Spines drop zone to add a scene background; supports z-order DnD, sync toggle, and independent pan/zoom</li>
-              <li><b>Independent viewport per item</b> — sync toggle (🔗) per spine slot and background; when disabled, drag/wheel affects only that item; Shift+drag moves the global scene</li>
-              <li><b>Clone spine</b> — duplicate the active skeleton with its full state (animation, skin, position); the clone is fully independent</li>
-              <li><b>Spines tab drop zone</b> — drop images or spine files directly in the Spines tab; spine files go through version detection and validation</li>
+              <li><b>Background image</b> — drop a PNG/JPG/WebP/AVIF onto the Spines drop zone; z-order DnD, sync toggle, independent pan/zoom</li>
+              <li><b>Sync toggle</b> (🔗) per spine/background — disable to move/zoom that item independently; Shift+drag moves the global scene</li>
+              <li><b>Clone spine</b> — duplicate the active skeleton with its full state; fully independent copy</li>
+              <li><b>Spines drop zone</b> — drop images or spine files directly in the tab; spine files are validated before loading</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
+            <span class="cl-ver">v1.2.15</span>
+            <ul class="help-list">
+              <li>Visual pin state indicator per entry in the Spines tab</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
+            <span class="cl-ver">v1.2.13</span>
+            <ul class="help-list">
+              <li>Skin restored on slot switch; <b>drag-to-reorder</b> skeletons (z-order); <b>Pin button</b> per slot</li>
+              <li>Per-spine placeholder list with individual checkboxes; toggle state saved per skeleton</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
+            <span class="cl-ver">v1.2.12</span>
+            <ul class="help-list">
+              <li><b>Animation list</b> — alphabetically sorted; folder opens on hover; selected path stays highlighted</li>
+              <li><b>Placeholder labels</b> — <code>ph</code> checkbox shows named overlays on canvas; individual per-item checkboxes; state saved per skeleton</li>
+              <li><b>File history sidebar</b> — last 20 sessions; one-click auto-reload (Chrome/Edge); per-session delete</li>
             </ul>
           </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.2.11</span>
             <ul class="help-list">
-              <li><b>FreeBone panel</b> — manually position and rotate individual bones on the stage</li>
+              <li><b>FreeBone panel</b> (Bones tab) — manually position/rotate unkeyframed bones; free-bone diff in Compare</li>
             </ul>
           </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.2.0</span>
             <ul class="help-list">
-              <li><b>Compare mode</b> — side-by-side comparison of two skeletons; time / viewport / animation / skin sync; Diff panel with Reskin Overview; severity badges (🔴 / 🟠)</li>
+              <li><b>Compare mode</b> — side-by-side comparison; viewport / animation / skin sync; Reskin Overview with severity badges (🔴 / 🟠); auto-diff on load; bone/slot highlight on canvas</li>
             </ul>
           </div>
           <div class="cl-entry">
-            <span class="cl-ver">v1.1.0</span>
+            <span class="cl-ver">v1.1.2</span>
             <ul class="help-list">
-              <li><b>Multi-Spine</b> — load up to 30 skeletons simultaneously; Spines tab, drag-to-reorder, Pin button; per-skeleton state preserved independently</li>
+              <li><b>Multi-Spine</b> — load up to 30 skeletons simultaneously; Spines tab for switching; per-skeleton state preserved independently</li>
             </ul>
           </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.0.0</span>
             <ul class="help-list">
-              <li>Initial release: Spine 3.8–4.2 · Pixi 7 &amp; 8 · animation playback · skins · inspector · atlas viewer · complexity analyzer · export (PNG / Sprite Sheet / GIF / Pose JSON) · file history</li>
+              <li>Initial release: Spine 3.8–4.2 · Pixi 7 &amp; 8 · animation playback · skins · inspector · atlas viewer · complexity analyzer · export (PNG / Sprite Sheet / GIF / Pose JSON) · keyboard shortcuts</li>
             </ul>
           </div>
         </div>

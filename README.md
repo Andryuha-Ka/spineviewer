@@ -51,10 +51,10 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - Each skeleton's viewport position, animation, skin, placeholder toggle, and playback state is preserved independently
 - **Sync toggle** (🔗) per skeleton — when disabled, the active skeleton moves and scales independently from the global scene; drag moves only it, scroll wheel scales only it; hold **Shift** to move the global scene while sync is off
 - **Clone button** — duplicate the active skeleton with its full current state (animation, skin, position, sync); the clone is fully independent of the original
-- **Drop zone** at the bottom of the Spines tab — drop image files (PNG / JPG / WebP) to add a background image, or drop spine file sets to add new skeletons with automatic version detection and validation
+- **Drop zone** at the bottom of the Spines tab — drop image files (PNG / JPG / WebP / AVIF) to add a background image, or drop spine file sets to add new skeletons with automatic version detection and validation
 
 ### Background Image
-- Drop a **PNG / JPG / WebP** file onto the Spines tab drop zone (or the canvas) to load it as a scene background
+- Drop a **PNG / JPG / WebP / AVIF** file onto the Spines tab drop zone (or the canvas) to load it as a scene background
 - Background image appears as a special item in the Spines tab with z-order DnD (always rendered behind spine slots by default)
 - Has its own **sync toggle** — when disabled and active, drag and zoom affect only the background independently
 - Replacing an existing background asks for confirmation
@@ -202,40 +202,66 @@ When you drop multiple Spine skeletons, all are loaded into slots. The **Spines*
 ## Changelog
 
 ### v1.3.0
-- **Background image** — load a PNG/JPG/WebP as a scene background from the Spines tab drop zone; supports z-order DnD, sync toggle, and independent pan/zoom
+- **Background image** — load a PNG/JPG/WebP/AVIF as a scene background from the Spines tab drop zone; supports z-order DnD, sync toggle, and independent pan/zoom
 - **Independent viewport per item** — sync toggle (🔗) per spine slot and background image; when disabled, drag/wheel affects only that item; Shift+drag moves the global scene
 - **Clone spine** — duplicate the active spine slot with its full state (animation, skin, position); the clone is fully independent of the original
 - **Spines tab drop zone** — drop images or spine file sets directly in the Spines tab; spine files go through version detection and validation before loading
 
+### v1.2.15
+- Visual pin state indicator per skeleton entry in the Spines tab (shows which slots are currently pinned)
+
 ### v1.2.14
-- Progress bar and draw-call sparkline migrated from HTML overlay to PIXI rendering; seek-on-click/drag routed through the new overlay
+- Progress bar and draw-call sparkline migrated from HTML overlay to PIXI rendering; seek-on-click/drag routed through the new PIXI overlay
 
 ### v1.2.13
-- Multi-spine UX: skin restored on slot switch; per-spine independent placeholder list
+- **Skin restore on slot switch** — active skin is saved and reapplied when switching back to a skeleton
+- **Drag-and-drop reorder** in the Spines tab — changes z-order directly on stage (top = front)
+- **Pin button** per skeleton slot — keep a skeleton visible on stage while browsing others
+- Per-spine independent placeholder list with individual enable/disable checkboxes
+- Placeholder toggle state and per-item visibility saved/restored per skeleton
+
+### v1.2.12
+- **Animation list** — alphabetically sorted, folder hover-expand (no extra click), selected animation and parent folder stay highlighted
+- **Placeholder labels toggle** (`ph` checkbox) — show/hide named placeholder overlays on canvas; individual per-item checkboxes below; state saved per skeleton; same toggle in Compare canvases
+- **File history sidebar** — last 20 sessions on the picker page; one-click auto-reload (Chrome/Edge via FSAA + IndexedDB); per-session delete; clear all button
 
 ### v1.2.11
-- **FreeBone panel** — manually position and rotate individual bones directly on the stage
+- **FreeBone panel** (Bones tab) — detect and manually position/rotate individual unkeyframed bones directly on stage
+- Free-bone diff section added to Compare mode
 
 ### v1.2.6
-- **Reskin-aware diff** — animation duration deltas, per-animation event timing diffs, and severity badges (🔴 critical / 🟠 non-critical) in Compare mode
+- Reskin-aware diff improvements: animation duration deltas, per-animation event timing diffs with severity
 
 ### v1.2.3
 - Bone and slot selection highlighted directly on the canvas
-- Constraint diff (IK / Transform / Path) added to Reskin Overview in Compare mode
+- Placeholder labels rendered as PIXI objects (slot/bone children in scene hierarchy)
+- IK / Transform / Path constraint diff added to Reskin Overview in Compare mode
+
+### v1.2.2
+- Auto-diff runs automatically when both Compare canvases finish loading (no manual trigger)
+- Color-coded severity badges: 🔴 critical (missing name, missing event, placeholder changed) · 🟠 non-critical (duration delta, timing delta)
+
+### v1.2.1
+- Viewport controls in Compare mode: per-canvas pan/zoom/bg/center + viewport sync toggle (⊞)
+- **Reskin Overview** panel — animation presence table, skin diff, event timing diff per animation
 
 ### v1.2.0
-- **Compare mode** — side-by-side visual and structural comparison of two skeletons; time / viewport / animation / skin sync; Diff panel with Reskin Overview; placeholder labels per canvas
+- **Compare mode** — side-by-side visual and structural comparison of two Spine skeletons
+- Diff panel: Bones · Slots · Skins · Animations · Events · Constraints
+- Animation sync and Skin sync between canvases
 
 ### v1.1.4
 - Atlas and image file names color-coded in the Skeleton tab
 
+### v1.1.2
+- **Multi-Spine** — load up to 30 skeletons simultaneously; Spines tab for switching; per-skeleton viewport, animation, skin, and placeholder state preserved independently
+
 ### v1.1.0
-- **Multi-Spine** — load up to 30 skeletons simultaneously; Spines tab for switching, drag-to-reorder (z-order), Pin button; per-skeleton viewport/animation/skin/placeholder state preserved independently
 - **Draw call sparkline** in the progress overlay
 - **Pixi Inspector** integration (`globalThis.__PIXI_APP__`)
 
 ### v1.0.0
-- Initial release: Spine 3.8–4.2 · Pixi 7 & 8 · multi-track animation playback · skins · Skin Composer · bone inspector · atlas viewer · complexity analyzer · export (PNG / Sprite Sheet / GIF / Pose JSON) · file history · keyboard shortcuts
+- Initial release: Spine 3.8–4.2 · Pixi 7 & 8 · multi-track animation playback (tracks 0–11) · animation queue · skins · Skin Composer · bone inspector · atlas viewer · performance profiler · complexity analyzer · export (PNG / Sprite Sheet / GIF / Pose JSON) · keyboard shortcuts · background color picker
 
 ---
 
