@@ -201,6 +201,11 @@ When you drop multiple Spine skeletons, all are loaded into slots. The **Spines*
 
 ## Changelog
 
+### v1.3.1
+- **Viewport sync model fix** — global pan/zoom (`posX/posY/zoom`) shared across all spines; desynced spines carry personal scene-space offsets (`indPosX/Y/indZoom`) composed on top via a single unified rendering formula; no coordinate conversion on sync toggle (eliminates position jump on toggle)
+- **Spines panel** — Pin, Sync, and Clone buttons now always visible regardless of skeleton count
+- **State persistence** — global viewport position no longer saved/restored per-slot; slot save/restore covers only personal offsets + `syncEnabled`
+
 ### v1.3.0
 - **Background image** — load a PNG/JPG/WebP/AVIF as a scene background from the Spines tab drop zone; supports z-order DnD, sync toggle, and independent pan/zoom
 - **Independent viewport per item** — sync toggle (🔗) per spine slot and background image; when disabled, drag/wheel affects only that item; Shift+drag moves the global scene
@@ -286,7 +291,7 @@ src/
 
 ## Tech Stack
 
-- **Vite 5** + **Vue 3** + **TypeScript**
+- **Vite 6** + **Vue 3** + **TypeScript**
 - **Pinia** — state management
 - **Naive UI** — component library
 - **Pixi.js 7** — renderer for Spine 3.8–4.1

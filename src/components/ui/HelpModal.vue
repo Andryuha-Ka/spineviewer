@@ -179,6 +179,14 @@
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
           <div class="cl-entry">
+            <span class="cl-ver">v1.3.1</span>
+            <ul class="help-list">
+              <li><b>Viewport sync model</b> — global pan/zoom shared by all spines; desynced items carry scene-space personal offsets; no position jump when toggling sync on/off</li>
+              <li><b>Spines panel</b> — Pin, Sync, and Clone buttons always visible</li>
+              <li>State persistence fix: global viewport no longer saved/restored per-slot</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
             <span class="cl-ver">v1.3.0</span>
             <ul class="help-list">
               <li><b>Background image</b> — drop a PNG/JPG/WebP/AVIF onto the Spines drop zone; z-order DnD, sync toggle, independent pan/zoom</li>
@@ -191,6 +199,12 @@
             <span class="cl-ver">v1.2.15</span>
             <ul class="help-list">
               <li>Visual pin state indicator per entry in the Spines tab</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
+            <span class="cl-ver">v1.2.14</span>
+            <ul class="help-list">
+              <li><b>Progress bar &amp; draw-call graph</b> migrated from HTML overlay to PIXI rendering; seek-on-click/drag routed through the PIXI overlay</li>
             </ul>
           </div>
           <div class="cl-entry">
