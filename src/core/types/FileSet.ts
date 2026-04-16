@@ -25,9 +25,6 @@ export interface FileSet {
 export interface SpineSlotSavedState {
   // Viewport
   speed: number
-  posX: number
-  posY: number
-  zoom: number
   // Animation
   selectedAnimation: string | null
   currentTrack: number
