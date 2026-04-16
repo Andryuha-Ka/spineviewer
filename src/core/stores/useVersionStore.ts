@@ -18,7 +18,12 @@ const spineOptionsMap: Record<PixiVersion, SpineVersion[]> = {
   8: ['4.2'], // @esotericsoftware/spine-pixi-v8 only has 4.2.x releases
 }
 
-function loadFromStorage(): { pixiVersion: PixiVersion | null; spineVersion: SpineVersion | null } {
+interface StoredVersions {
+  pixiVersion: PixiVersion | null
+  spineVersion: SpineVersion | null
+}
+
+function loadFromStorage(): StoredVersions {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { pixiVersion: null, spineVersion: null }

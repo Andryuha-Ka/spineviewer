@@ -57,7 +57,7 @@
       ref="fileInputRef"
       type="file"
       multiple
-      style="display:none"
+      class="hidden-input"
       accept=".json,.skel,.atlas,.png,.jpg,.jpeg,.webp,.avif"
       @change="onFileInput"
     />
@@ -260,4 +260,6 @@ declare module '@vue/runtime-core' {
 
 .dropdown-item--load   { color: var(--c-text-muted); }
 .dropdown-item--clear  { color: #f87171; }
+
+.hidden-input { display: none; }
 </style>

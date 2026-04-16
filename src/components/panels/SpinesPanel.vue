@@ -76,9 +76,9 @@
             <line x1="8" y1="12" x2="16" y2="12"/>
           </svg>
         </button>
-        <!-- Clone button (active slot only) -->
+        <!-- Clone button -->
         <button
-          v-if="slot.id === loaderStore.activeSlotId && !isSlotError(slot)"
+          v-if="!isSlotError(slot)"
           class="spine-clone-btn"
           :disabled="loaderStore.spineSlots.length >= SPINE_SLOTS_LIMIT"
           title="Clone this spine slot"
@@ -203,29 +203,27 @@ function onClone(id: string) {
   const src = loaderStore.spineSlots.find(s => s.id === id)
   if (!src || src.error) return
 
-  // Flush the current live state into savedState before cloning so the clone
-  // receives the full current state (animation, viewport, skins, sync) — not
-  // the stale snapshot from the last slot-switch.
-  const liveState: SpineSlotSavedState = {
-    speed:               animationStore.speed,
-    posX:                viewerStore.posX,
-    posY:                viewerStore.posY,
-    zoom:                viewerStore.zoom,
-    selectedAnimation:   animationStore.selectedAnimation,
-    currentTrack:        animationStore.currentTrack,
-    loop:                animationStore.loop,
-    trackEnabled:        { ...animationStore.trackEnabled },
-    trackPlaylists:      JSON.parse(JSON.stringify(animationStore.trackPlaylists)),
-    wasPlaying:          animationStore.isPlaying,
-    selectedSkins:       [...skeletonStore.activeSkins],
-    showPlaceholders:    viewerStore.showPlaceholders,
-    disabledPlaceholders: [...viewerStore.disabledPlaceholders],
-    syncEnabled:         src.syncEnabled ?? true,
-    indPosX:             src.indPosX ?? 0,
-    indPosY:             src.indPosY ?? 0,
-    indZoom:             src.indZoom ?? 1,
+  // Only flush live state when cloning the active slot — for inactive slots
+  // the saved state already reflects their last known state correctly.
+  if (id === loaderStore.activeSlotId) {
+    const liveState: SpineSlotSavedState = {
+      speed:               animationStore.speed,
+      selectedAnimation:   animationStore.selectedAnimation,
+      currentTrack:        animationStore.currentTrack,
+      loop:                animationStore.loop,
+      trackEnabled:        { ...animationStore.trackEnabled },
+      trackPlaylists:      JSON.parse(JSON.stringify(animationStore.trackPlaylists)),
+      wasPlaying:          animationStore.isPlaying,
+      selectedSkins:       [...skeletonStore.activeSkins],
+      showPlaceholders:    viewerStore.showPlaceholders,
+      disabledPlaceholders: [...viewerStore.disabledPlaceholders],
+      syncEnabled:         src.syncEnabled ?? true,
+      indPosX:             src.indPosX ?? 0,
+      indPosY:             src.indPosY ?? 0,
+      indZoom:             src.indZoom ?? 1,
+    }
+    loaderStore.saveSlotState(id, liveState)
   }
-  loaderStore.saveSlotState(id, liveState)
 
   const newSlot = loaderStore.cloneSlot(id)
   if (!newSlot) return
@@ -405,9 +403,6 @@ function isModified(slot: SpineSlot): boolean {
   return (
     Object.keys(s.trackPlaylists).length > 0 ||
     s.speed !== 1 ||
-    s.zoom !== 1 ||
-    s.posX !== 0 ||
-    s.posY !== 0 ||
     (s.syncEnabled === false) ||
     (s.indPosX ?? 0) !== 0 ||
     (s.indPosY ?? 0) !== 0 ||
@@ -421,18 +416,6 @@ function modifiedHint(slot: SpineSlot): string {
   const playlists = slot.id === loaderStore.activeSlotId
     ? animationStore.trackPlaylists
     : slot.savedState?.trackPlaylists ?? {}
-
-  const zoom = slot.id === loaderStore.activeSlotId
-    ? viewerStore.zoom
-    : (slot.savedState?.zoom ?? 1)
-
-  const posX = slot.id === loaderStore.activeSlotId
-    ? viewerStore.posX
-    : (slot.savedState?.posX ?? 0)
-
-  const posY = slot.id === loaderStore.activeSlotId
-    ? viewerStore.posY
-    : (slot.savedState?.posY ?? 0)
 
   const speed = slot.id === loaderStore.activeSlotId
     ? animationStore.speed
@@ -458,8 +441,6 @@ function modifiedHint(slot: SpineSlot): string {
     const names = Object.values(playlists).flat().map(e => e.animationName)
     parts.push(`Anim: ${[...new Set(names)].join(', ')}`)
   }
-  if (zoom !== 1) parts.push(`Zoom: ${zoom.toFixed(2)}×`)
-  if (posX !== 0 || posY !== 0) parts.push(`Pan: (${Math.round(posX)}, ${Math.round(posY)})`)
   if (speed !== 1) parts.push(`Speed: ${speed}×`)
   if (!syncEnabled) {
     const hints: string[] = ['Desynced']
@@ -650,13 +631,8 @@ function modifiedHint(slot: SpineSlot): string {
   cursor: pointer;
   padding: 2px 3px;
   border-radius: 3px;
-  opacity: 0;
-  transition: opacity 0.12s, color 0.12s;
-}
-
-.spine-item:hover .spine-sync-btn,
-.spine-sync-btn--desynced {
   opacity: 1;
+  transition: opacity 0.12s, color 0.12s;
 }
 
 .spine-sync-btn--desynced {
@@ -683,12 +659,8 @@ function modifiedHint(slot: SpineSlot): string {
   cursor: pointer;
   padding: 2px 3px;
   border-radius: 3px;
-  opacity: 0;
-  transition: opacity 0.12s, color 0.12s;
-}
-
-.spine-item:hover .spine-clone-btn {
   opacity: 1;
+  transition: opacity 0.12s, color 0.12s;
 }
 
 .spine-clone-btn:hover {
@@ -712,13 +684,8 @@ function modifiedHint(slot: SpineSlot): string {
   cursor: pointer;
   padding: 2px 3px;
   border-radius: 3px;
-  opacity: 0;
-  transition: opacity 0.12s, color 0.12s;
-}
-
-.spine-item:hover .spine-pin-btn,
-.spine-pin-btn--pinned {
   opacity: 1;
+  transition: opacity 0.12s, color 0.12s;
 }
 
 .spine-pin-btn--pinned {

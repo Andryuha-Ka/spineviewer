@@ -189,14 +189,14 @@
           ref="fileInputRef"
           type="file"
           multiple
-          style="display:none"
+          class="hidden-input"
           accept=".json,.skel,.atlas,.png,.jpg,.jpeg,.webp,.avif"
           @change="onFileInput"
         />
         <input
           ref="folderInputRef"
           type="file"
-          style="display:none"
+          class="hidden-input"
           webkitdirectory
           @change="onFileInput"
         />
@@ -452,7 +452,9 @@ async function onDrop(e: DragEvent) {
   // browsers clear DataTransfer.items after the first event-loop tick.
   const handlePromises: Promise<FileSystemHandle | null>[] = isFileSystemAccessSupported()
     ? Array.from(e.dataTransfer.items).map(
-        item => ((item as any).getAsFileSystemHandle?.() ?? Promise.resolve(null)) as Promise<FileSystemHandle | null>,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // TODO: remove cast when File System Access API types are stable in TypeScript lib
+        item => (((item as any).getAsFileSystemHandle?.() ?? Promise.resolve(null)) as Promise<FileSystemHandle | null>),
       )
     : []
 
@@ -466,6 +468,8 @@ async function onDrop(e: DragEvent) {
       if (handle?.kind === 'file') {
         handles.push(handle as FileSystemFileHandle)
       } else if (handle?.kind === 'directory') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // TODO: remove cast when File System Access API types are stable in TypeScript lib
         for await (const entry of (handle as any).values()) {
           if (entry.kind === 'file') handles.push(entry as FileSystemFileHandle)
         }
@@ -1193,4 +1197,6 @@ kbd {
   padding: 2px 4px;
 }
 .reload-hint-close:hover { color: var(--c-text-muted); }
+
+.hidden-input { display: none; }
 </style>

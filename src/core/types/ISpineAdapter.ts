@@ -52,6 +52,15 @@ export interface BoneTransform {
   scaleY: number
 }
 
+/** Local-space transform without the bone name — used for get/set operations */
+export interface BoneLocalTransform {
+  x: number
+  y: number
+  rotation: number
+  scaleX: number
+  scaleY: number
+}
+
 export interface AttachmentInfo {
   slotName: string
   attachmentName: string
@@ -139,9 +148,9 @@ export interface ISpineAdapter {
   // Returns names of bones that have no keyframes in any animation (candidates for programmatic control)
   getFreeBones(): string[]
   // Set local-space transform on a live bone (does not require updateWorldTransform — runtime handles it)
-  setBoneLocalTransform(boneName: string, transform: Partial<{ x: number; y: number; rotation: number; scaleX: number; scaleY: number }>): void
+  setBoneLocalTransform(boneName: string, transform: Partial<BoneLocalTransform>): void
   // Returns the setup pose local transform for a bone (use for reset)
-  getBoneSetupTransform(boneName: string): { x: number; y: number; rotation: number; scaleX: number; scaleY: number } | null
+  getBoneSetupTransform(boneName: string): BoneLocalTransform | null
 
   // Placeholder labels (pixi7: PIXI.Text; pixi8: PIXI.Sprite with canvas-generated texture)
   setPlaceholderLabels(items: Array<{ name: string; kind: 'bone' | 'slot' | 'attachment' }>): void

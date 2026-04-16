@@ -90,6 +90,26 @@ export class Pixi7App implements IPixiApp {
     return sprite
   }
 
+  setSortableChildren(enabled: boolean): void {
+    // PIXI 7 Container does not declare sortableChildren in TS types — cast required
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(this._app.stage as PIXI.Container & { sortableChildren?: boolean }).sortableChildren = enabled
+  }
+
+  addToStage(child: unknown): void {
+    this._app.stage.addChild(child as PIXI.DisplayObject)
+  }
+
+  removeFromStage(child: unknown): void {
+    if (this._app.stage.children.includes(child as PIXI.DisplayObject)) {
+      this._app.stage.removeChild(child as PIXI.DisplayObject)
+    }
+  }
+
+  getLastStageChild(): unknown {
+    return this._app.stage.children.at(-1) ?? null
+  }
+
   destroy(): void {
     // false = do not remove canvas — Vue controls the DOM element
     this._app.destroy(false, { children: true })

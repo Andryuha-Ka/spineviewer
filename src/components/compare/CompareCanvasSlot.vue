@@ -184,8 +184,13 @@ const canvasRef    = ref<HTMLCanvasElement | null>(null)
 
 // ── Internal state (non-reactive for perf) ────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let spineObj: any   = null
+/** Minimal positional interface for the spine Pixi container held by this component */
+interface PixiDisplayObject {
+  x: number
+  y: number
+  scale: { set(v: number): void }
+}
+let spineObj: PixiDisplayObject | null = null
 let pixiAppInst: IPixiApp | null = null
 let adapterInst: ISpineAdapter | null = null
 let tickerFn: (() => void) | null = null
@@ -371,8 +376,7 @@ async function loadFileSet(fileSet: FileSet) {
     adapter.value = newAdapter
 
     // Grab spine container reference
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    spineObj = (pixiAppInst.stage as any).children?.at(-1) ?? null
+    spineObj = pixiAppInst.getLastStageChild() as PixiDisplayObject | null
 
     // Center viewport
     const { width, height } = containerRef.value!.getBoundingClientRect()

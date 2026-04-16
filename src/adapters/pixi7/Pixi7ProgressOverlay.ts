@@ -76,6 +76,8 @@ export class Pixi7ProgressOverlay implements IProgressOverlay {
     this._stageH = h
 
     this._container = new PIXI.Container()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // TODO: PIXI 7 Container does not declare zIndex in TS types — cast required
     ;(this._container as any).zIndex = 10000
 
     this._gfx = new PIXI.Graphics()

@@ -3,7 +3,7 @@
 .claude/
 node_modules/
 dist/
-docs/
+kb/
 errors/
 example/
 anotherProject/
@@ -17,7 +17,7 @@ src/components.d.ts
 # AI workflow artifacts
 .ai-work/
 
-# Local dev docs
+# Local dev kb
 CLAUDE.md
 PLAN.md
 COMPARE_PLAN.md

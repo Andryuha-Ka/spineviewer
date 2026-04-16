@@ -42,14 +42,14 @@
         ref="fileInputRef"
         type="file"
         multiple
-        style="display:none"
+        class="hidden-input"
         accept=".json,.skel,.atlas,.png,.jpg,.jpeg,.webp,.avif"
         @change="onFileInput"
       />
       <input
         ref="folderInputRef"
         type="file"
-        style="display:none"
+        class="hidden-input"
         webkitdirectory
         @change="onFileInput"
       />
@@ -318,4 +318,6 @@ function formatSize(bytes: number): string {
   margin-top: auto;
   padding-top: 4px;
 }
+
+.hidden-input { display: none; }
 </style>

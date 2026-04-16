@@ -92,6 +92,24 @@ export class Pixi8App implements IPixiApp {
     return sprite
   }
 
+  setSortableChildren(_enabled: boolean): void {
+    // Pixi8 Container does not have sortableChildren — no-op (children are z-ordered by addChild order)
+  }
+
+  addToStage(child: unknown): void {
+    this._app.stage.addChild(child as PIXI.Container)
+  }
+
+  removeFromStage(child: unknown): void {
+    if (this._app.stage.children.includes(child as PIXI.Container)) {
+      this._app.stage.removeChild(child as PIXI.Container)
+    }
+  }
+
+  getLastStageChild(): unknown {
+    return this._app.stage.children.at(-1) ?? null
+  }
+
   destroy(): void {
     // false = do not remove canvas — Vue controls the DOM element
     this._app.destroy(false)

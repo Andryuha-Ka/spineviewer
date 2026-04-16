@@ -35,4 +35,12 @@ export interface IPixiApp {
   extractFrame(): Promise<HTMLCanvasElement>
   /** Create a PIXI.Sprite from a data URL; anchor is set to (0.5, 0.5). Returns unknown to avoid version coupling. */
   createSprite(dataUrl: string): unknown
+  /** Enable/disable sortable children on the stage root */
+  setSortableChildren(enabled: boolean): void
+  /** Append a child object to the stage root */
+  addToStage(child: unknown): void
+  /** Remove a child object from the stage root (safe if not present) */
+  removeFromStage(child: unknown): void
+  /** Return the last direct child of the stage root, or null if empty */
+  getLastStageChild(): unknown
 }

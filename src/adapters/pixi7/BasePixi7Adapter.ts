@@ -10,12 +10,13 @@ import * as PIXI from 'pixi.js'
 import { buildImageResolver, waitForPixi7Textures } from '@/core/utils/buildImageResolver'
 import type {
   ISpineAdapter, BoneInfo, SlotInfo, EventInfo,
-  TrackState, TrackQueueEntry, BoneTransform, AttachmentInfo, SpineEvent,
+  TrackState, TrackQueueEntry, BoneTransform, BoneLocalTransform, AttachmentInfo, SpineEvent,
   AnimationEventMarker, SlotBounds,
 } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// TODO: replace with @pixi-spine typed module when available
 type AnySpineModule = Record<string, any>
 
 /**
@@ -421,7 +422,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     return this.bones.filter(b => !animated.has(b.name)).map(b => b.name)
   }
 
-  setBoneLocalTransform(boneName: string, transform: Partial<{ x: number; y: number; rotation: number; scaleX: number; scaleY: number }>): void {
+  setBoneLocalTransform(boneName: string, transform: Partial<BoneLocalTransform>): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bone: any = this._spine?.skeleton.findBone(boneName)
     if (!bone) return
@@ -432,7 +433,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     if (transform.scaleY   !== undefined) bone.scaleY   = transform.scaleY
   }
 
-  getBoneSetupTransform(boneName: string): { x: number; y: number; rotation: number; scaleX: number; scaleY: number } | null {
+  getBoneSetupTransform(boneName: string): BoneLocalTransform | null {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bd = (this._skeletonData?.bones as any[])?.find((b: any) => b.name === boneName)
     if (!bd) return null

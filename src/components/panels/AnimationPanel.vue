@@ -22,7 +22,7 @@
         :show-path="true"
         check-strategy="child"
         clearable
-        style="width: 100%"
+        class="full-width"
         :render-label="renderCascaderLabel"
         @update:value="onCascaderSelect"
       />
@@ -58,6 +58,7 @@
       </div>
     </section>
 
+    <!-- NaiveUI Divider has no margin prop — style attribute is the only way -->
     <n-divider style="margin: 6px 0" />
 
     <!-- ── Playback controls ──────────────────────────────── -->
@@ -67,7 +68,7 @@
           size="small"
           :type="animationStore.isPlaying ? 'default' : 'primary'"
           :disabled="!skeletonStore.isLoaded || animationStore.tracks.length === 0"
-          style="min-width: 72px"
+          class="track-header-cell"
           @click="animationStore.isPlaying ? animationStore.pause() : animationStore.play()"
         >{{ animationStore.isPlaying ? '⏸ Pause' : (animationStore.isPaused ? '▶ Resume' : '▶ Play') }}</n-button>
 
@@ -111,6 +112,7 @@
       />
     </section>
 
+    <!-- NaiveUI Divider has no margin prop — style attribute is the only way -->
     <n-divider style="margin: 6px 0" />
 
     <!-- ── Skins ─────────────────────────────────────────── -->
@@ -161,6 +163,7 @@
       </div>
     </section>
 
+    <!-- NaiveUI Divider has no margin prop — style attribute is the only way -->
     <n-divider style="margin: 6px 0" />
 
     <!-- ── Active tracks ──────────────────────────────────── -->
@@ -236,13 +239,14 @@
           </button>
           <n-button
             size="tiny"
-            style="flex-shrink: 0"
+            class="no-shrink"
             @click="emit('removeQueueEntry', track.trackIndex, i)"
           >✕</n-button>
         </div>
       </div>
     </section>
 
+    <!-- NaiveUI Divider has no margin prop — style attribute is the only way -->
     <n-divider style="margin: 6px 0" />
 
     <!-- ── Events ────────────────────────────────────────── -->
@@ -836,4 +840,9 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
   color: var(--c-text-ghost);
   padding: 4px 0;
 }
+
+/* ── Utility helpers ─────────────────────── */
+.full-width { width: 100%; }
+.track-header-cell { min-width: 72px; }
+.no-shrink { flex-shrink: 0; }
 </style>

@@ -132,6 +132,15 @@ const NON_REGION_TYPES = new Set([
   'clipping', 'point', 'boundingbox', 'path', 'linkedmesh',
 ])
 
+/** Minimal shape of a Spine JSON skeleton file — used for static validation only */
+interface SpineJsonSkeleton {
+  skeleton?: { spine?: string }
+  skins?: Array<{ attachments?: Array<{ type?: string; path?: string; name?: string }> }> | Record<string, unknown>
+  animations?: Record<string, unknown>
+  bones?: Array<{ name: string }>
+  slots?: Array<{ name: string; bone?: string }>
+}
+
 /**
  * Extracts all atlas region names referenced by a Spine JSON skeleton.
  * Handles both Spine 3.8 (skins as object) and 4.0+ (skins as array) formats.
@@ -139,15 +148,14 @@ const NON_REGION_TYPES = new Set([
  */
 function extractSkeletonRegions(skeletonText: string): Set<string> | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = JSON.parse(skeletonText)
+    const data = JSON.parse(skeletonText) as SpineJsonSkeleton
     const referenced = new Set<string>()
 
     if (Array.isArray(data.skins)) {
       // Spine 4.0+ array format
       for (const skin of data.skins) {
         for (const att of (skin.attachments ?? [])) {
-          if (NON_REGION_TYPES.has(att.type)) continue
+          if (att.type && NON_REGION_TYPES.has(att.type)) continue
           const region: string | undefined = att.path ?? att.name
           if (region) referenced.add(region)
         }
@@ -157,10 +165,9 @@ function extractSkeletonRegions(skeletonText: string): Set<string> | null {
       for (const slotMap of Object.values(data.skins as Record<string, Record<string, Record<string, unknown>>>)) {
         for (const attachments of Object.values(slotMap)) {
           for (const [attName, attData] of Object.entries(attachments)) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const d = attData as any
-            if (NON_REGION_TYPES.has(d?.type)) continue
-            const region: string = d?.path ?? attName
+            const d = attData as Record<string, unknown>
+            if (d?.type && NON_REGION_TYPES.has(d.type as string)) continue
+            const region: string = (d?.path ?? attName) as string
             if (region) referenced.add(region)
           }
         }
@@ -235,10 +242,9 @@ export function validateSpineFileSet(fileSet: FileSet): string[] {
   // 4. JSON skeleton checks
   if (fileSet.skeleton.type === 'skeleton-json') {
     const text = fileSet.skeleton.fileBody as string
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let data: any
+    let data: SpineJsonSkeleton
     try {
-      data = JSON.parse(text)
+      data = JSON.parse(text) as SpineJsonSkeleton
     } catch {
       errors.push('Skeleton JSON parse error')
       return errors

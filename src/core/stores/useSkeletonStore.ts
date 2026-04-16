@@ -7,7 +7,16 @@
  */
 
 import { defineStore } from 'pinia'
-import type { BoneInfo, SlotInfo, EventInfo, ISpineAdapter } from '@/core/types/ISpineAdapter'
+import type { BoneInfo, SlotInfo, EventInfo, ISpineAdapter, BoneLocalTransform } from '@/core/types/ISpineAdapter'
+
+export interface SkeletonPopulateData {
+  animations: string[]
+  skins: string[]
+  bones: BoneInfo[]
+  slots: SlotInfo[]
+  events: EventInfo[]
+  freeBones?: string[]
+}
 
 export const useSkeletonStore = defineStore('skeleton', () => {
   const animations   = ref<string[]>([])
@@ -38,22 +47,15 @@ export const useSkeletonStore = defineStore('skeleton', () => {
   function attachAdapter(a: ISpineAdapter): void { _adapter = a }
   function detachAdapter(): void { _adapter = null }
 
-  function setBoneTransform(boneName: string, transform: Partial<{ x: number; y: number; rotation: number; scaleX: number; scaleY: number }>): void {
+  function setBoneTransform(boneName: string, transform: Partial<BoneLocalTransform>): void {
     _adapter?.setBoneLocalTransform(boneName, transform)
   }
 
-  function getBoneSetupTransform(boneName: string): { x: number; y: number; rotation: number; scaleX: number; scaleY: number } | null {
+  function getBoneSetupTransform(boneName: string): BoneLocalTransform | null {
     return _adapter?.getBoneSetupTransform(boneName) ?? null
   }
 
-  function populate(data: {
-    animations: string[]
-    skins: string[]
-    bones: BoneInfo[]
-    slots: SlotInfo[]
-    events: EventInfo[]
-    freeBones?: string[]
-  }) {
+  function populate(data: SkeletonPopulateData) {
     animations.value = data.animations
     skins.value      = data.skins
     bones.value      = data.bones

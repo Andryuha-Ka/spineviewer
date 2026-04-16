@@ -47,7 +47,7 @@
           :tabs-padding="8"
           class="side-tabs"
         >
-          <n-tab-pane v-if="loaderStore.spineSlots.length > 1 || backgroundStore.isLoaded" name="spines" tab="Spines" class="tab-pane">
+          <n-tab-pane name="spines" tab="Spines" class="tab-pane">
             <SpinesPanel />
           </n-tab-pane>
           <n-tab-pane name="animation" tab="Anim" class="tab-pane">
@@ -140,14 +140,6 @@ const exportStore      = useExportStore()
 const backgroundStore  = useBackgroundStore()
 const stageRef         = ref<InstanceType<typeof PreviewStage> | null>(null)
 const activeTab        = ref<'spines' | 'animation' | 'inspector' | 'bones' | 'atlas' | 'perf' | 'compl' | 'export'>('animation')
-
-// Auto-switch away from Spines tab when only 1 spine remains and no background
-watch(
-  () => loaderStore.spineSlots.length,
-  (count) => {
-    if (count <= 1 && !backgroundStore.isLoaded && activeTab.value === 'spines') activeTab.value = 'animation'
-  },
-)
 
 // Auto-switch to Spines tab when background is first loaded
 watch(
@@ -401,8 +393,14 @@ async function onCaptureGif(opts: { track: number; fps: number; quality: number 
     const frameCount = Math.max(2, Math.round(entry.duration * opts.fps))
     const frameDelay = Math.round(1000 / opts.fps)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    type GIFInstance = { addFrame: any; on: any; render: any; abort: any }
+    interface GIFInstance {
+      addFrame(canvas: HTMLCanvasElement, options?: { delay?: number; copy?: boolean }): void
+      on(event: 'finished', cb: (blob: Blob) => void): void
+      on(event: 'progress', cb: (pct: number) => void): void
+      on(event: 'abort', cb: () => void): void
+      render(): void
+      abort(): void
+    }
     const GIF = (await import('gif.js')).default
 
     // Size is unknown until first frame — create GIF lazily

@@ -63,7 +63,7 @@
   </div>
 
   <!-- ── Full-screen modal ─────────────────────────────────── -->
-  <n-modal v-model:show="modalOpen" :mask-closable="true" style="width:90vw;height:85vh">
+  <n-modal v-model:show="modalOpen" :mask-closable="true" :style="{ width: '90vw', height: '85vh' }">
     <div class="atlas-modal">
 
       <!-- Header -->
