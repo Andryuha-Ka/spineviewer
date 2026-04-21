@@ -201,6 +201,9 @@ When you drop multiple Spine skeletons, all are loaded into slots. The **Spines*
 
 ## Changelog
 
+### v1.3.2
+- **Pixi Inspector** — spine slot containers now named after their attachment; each slot is identifiable by name in the Pixi Inspector scene tree
+
 ### v1.3.1
 - **Viewport sync model fix** — global pan/zoom (`posX/posY/zoom`) shared across all spines; desynced spines carry personal scene-space offsets (`indPosX/Y/indZoom`) composed on top via a single unified rendering formula; no coordinate conversion on sync toggle (eliminates position jump on toggle)
 - **Spines panel** — Pin, Sync, and Clone buttons now always visible regardless of skeleton count
@@ -309,6 +312,8 @@ The app exposes the active Pixi application instance for the [Pixi DevTools](htt
 ```js
 globalThis.__PIXI_APP__ = app
 ```
+
+Spine slot containers are named after their attachment (`container.name = attachment.name`), so each slot appears with a human-readable label in the Pixi Inspector scene tree.
 
 **Known limitation:** After a hard page reload (`Ctrl+R` / `F5`) with DevTools already open, the Pixi Inspector panel may show `uniqueContextId not found`. This is a bug in the extension — it caches the old execution context ID and doesn't re-register after navigation.
 

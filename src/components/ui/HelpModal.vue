@@ -159,7 +159,7 @@
         <p class="help-p">
           The app exposes <code>globalThis.__PIXI_APP__</code> for the
           <a class="about-link" href="https://chromewebstore.google.com/detail/pixi-inspector/aamddddknhcagpehecnhphigffljadon" target="_blank" rel="noopener">Pixi Inspector</a>
-          browser extension.
+          browser extension. Spine slot containers are named after their attachment — visible in the Inspector's scene tree.
         </p>
         <p class="help-p help-p--warn">
           After a hard page reload (Ctrl+R) with DevTools already open, the panel may lose its execution context.
@@ -178,6 +178,12 @@
       <section class="help-section">
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.2</span>
+            <ul class="help-list">
+              <li><b>Pixi Inspector</b> — spine slot containers are now named after their attachment; each slot is identifiable by name in the Pixi Inspector scene tree</li>
+            </ul>
+          </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.3.1</span>
             <ul class="help-list">
