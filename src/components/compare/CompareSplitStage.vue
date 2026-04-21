@@ -216,13 +216,14 @@ const splitRatio = ref(0.5)
 
 function onResizeStart(e: MouseEvent) {
   const startX = e.clientX
+  const startRatio = splitRatio.value
   const container = (e.target as HTMLElement).closest('.split-stage') as HTMLElement | null
   if (!container) return
   const totalW = container.clientWidth
 
   const onMove = (ev: MouseEvent) => {
     const delta = ev.clientX - startX
-    const newRatio = Math.min(0.85, Math.max(0.15, splitRatio.value + delta / totalW))
+    const newRatio = Math.min(0.85, Math.max(0.15, startRatio + delta / totalW))
     splitRatio.value = newRatio
     container.style.setProperty('--split-ratio', String(newRatio))
   }
