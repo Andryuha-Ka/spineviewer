@@ -166,6 +166,12 @@ let spineAdapter: ISpineAdapter | null = null
 const mountedAdapters = new Map<string, ISpineAdapter>()
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mountedSpineObjects = new Map<string, any>()
+// Suppresses the isPlaying watcher during slot transitions to prevent restarting/stopping
+// live pinned adapters when animationStore state is written from saved snapshots.
+let _suppressAnimPlay = false
+// Seek positions to apply after isPlaying watch reconstructs animation queues via setAnimation.
+// Set before play() so the watcher can seekTo after setAnimation resets track time to 0.
+let _pendingSeekTimes: Record<number, number> | null = null
 
 /** Reactive list of placeholder items in the currently loaded spine */
 const phItems = ref<Array<{ name: string; kind: 'bone' | 'slot' | 'attachment' }>>([])
@@ -756,6 +762,7 @@ onMounted(async () => {
     watch(
       () => animationStore.isPlaying,
       (playing) => {
+        if (_suppressAnimPlay) return
         if (!spineAdapter) return
         if (playing) {
           if (!animationStore.isPaused) {
@@ -773,6 +780,13 @@ onMounted(async () => {
               for (let i = 1; i < playlist.length; i++) {
                 spineAdapter.addAnimation(trackIndex, playlist[i].animationName, playlist[i].loop)
               }
+            }
+            // Apply pending seek times after setAnimation (which resets trackTime to 0).
+            if (_pendingSeekTimes) {
+              for (const [idxStr, time] of Object.entries(_pendingSeekTimes)) {
+                spineAdapter.seekTo(Number(idxStr), time)
+              }
+              _pendingSeekTimes = null
             }
           }
           animationStore.isPaused = false
@@ -812,6 +826,9 @@ onMounted(async () => {
         // 1. Save full state of the slot we're leaving
         if (oldId) {
           const leavingSlot = loaderStore.spineSlots.find(s => s.id === oldId)
+          const leavingTrackStates = spineAdapter?.getTrackStates() ?? []
+          const trackTimes: Record<number, number> = {}
+          for (const ts of leavingTrackStates) trackTimes[ts.trackIndex] = ts.time
           loaderStore.saveSlotState(oldId, {
             speed:              animationStore.speed,
             selectedAnimation:  animationStore.selectedAnimation,
@@ -820,6 +837,7 @@ onMounted(async () => {
             trackEnabled:       { ...animationStore.trackEnabled },
             trackPlaylists:       JSON.parse(JSON.stringify(animationStore.trackPlaylists)),
             wasPlaying:           animationStore.isPlaying,
+            trackTimes,
             selectedSkins:        [...skeletonStore.activeSkins],
             showPlaceholders:     viewerStore.showPlaceholders,
             disabledPlaceholders: [...viewerStore.disabledPlaceholders],
@@ -885,8 +903,18 @@ onMounted(async () => {
             }
           }
           if (s.wasPlaying) {
+            // Set pending seek times before play() so the isPlaying watch can seekTo
+            // after its setAnimation calls (which reset trackTime to 0).
+            if (s.trackTimes && Object.keys(s.trackTimes).length > 0) {
+              _pendingSeekTimes = { ...s.trackTimes }
+            }
             animationStore.isPaused = false
             animationStore.play()
+          } else if (s.trackTimes) {
+            // wasPlaying=false: isPlaying watch won't fire setAnimation, seek immediately.
+            for (const [idxStr, time] of Object.entries(s.trackTimes)) {
+              spineAdapter?.seekTo(Number(idxStr), time)
+            }
           }
           // Restore selected skins — must be set before Vue flushes so AnimationPanel
           // watch(skins) picks them up instead of falling back to firstNonDefault
@@ -943,7 +971,50 @@ onMounted(async () => {
                 .filter(b => PH_RE_5A.test(b.name) && !phSlots5A.has(b.name))
                 .map(b => ({ name: b.name, kind: 'bone' as const })),
             ]
-            restoreState(slot.savedState)
+            // Pinned adapter is already live — sync stores from current state without touching it.
+            // Do NOT call restoreState(): it calls setAnimation/play() which would restart the animation.
+            {
+              const liveStates = spineAdapter.getTrackStates()
+              const livePlaylists: Record<number, Array<{ animationName: string; loop: boolean }>> = {}
+              for (const ts of liveStates) {
+                livePlaylists[ts.trackIndex] = [
+                  { animationName: ts.animationName, loop: ts.loop },
+                  ...ts.queue,
+                ]
+              }
+              const ss = slot.savedState
+              animationStore.speed             = ss?.speed ?? 1
+              animationStore.selectedAnimation = ss?.selectedAnimation ?? null
+              animationStore.currentTrack      = ss?.currentTrack ?? 0
+              animationStore.loop              = ss?.loop ?? false
+              animationStore.trackEnabled      = ss?.trackEnabled ? { ...ss.trackEnabled } : {}
+              for (const [idxStr, playlist] of Object.entries(livePlaylists)) {
+                animationStore.setTrackPlaylist(Number(idxStr), playlist)
+              }
+              // Suppress isPlaying watch for the entire microtask flush.
+              // animationStore.reset() in step 3 deferred isPlaying=false; our isPlaying assignment
+              // here also defers. Both watches fire AFTER this sync block and see spineAdapter already
+              // pointing to the pinned adapter — without suppression they would setTimeScale(0) or
+              // call setAnimation and restart the live adapter.
+              _suppressAnimPlay = true
+              animationStore.isPaused = false
+              animationStore.isPlaying = ss?.wasPlaying ?? true
+              if (ss?.selectedSkins?.length) skeletonStore.activeSkins = [...ss.selectedSkins]
+              if (ss?.showPlaceholders !== undefined) viewerStore.showPlaceholders = ss.showPlaceholders
+              if (ss?.disabledPlaceholders?.length) viewerStore.disabledPlaceholders = new Set(ss.disabledPlaceholders)
+              const pinnedSlot = slot
+              if (pinnedSlot) {
+                pinnedSlot.syncEnabled = ss?.syncEnabled ?? true
+                pinnedSlot.indPosX     = ss?.indPosX ?? 0
+                pinnedSlot.indPosY     = ss?.indPosY ?? 0
+                pinnedSlot.indZoom     = ss?.indZoom ?? 1
+              }
+              applyViewport()
+              // Flush all deferred watches while suppressed, then set timeScale directly.
+              await nextTick()
+              _suppressAnimPlay = false
+              spineAdapter?.setTimeScale((ss?.wasPlaying ?? true) ? (ss?.speed ?? 1) : 0)
+            }
             applySkins()
             applyPlaceholderLabels()
           } catch (e) {

@@ -33,6 +33,8 @@ export interface SpineSlotSavedState {
   /** Full playlists per track — same shape as TrackQueueEntry[] */
   trackPlaylists: Record<number, Array<{ animationName: string; loop: boolean }>>
   wasPlaying: boolean
+  /** Per-track playback position in seconds at the moment the slot was saved */
+  trackTimes?: Record<number, number>
   // Skin
   selectedSkins: string[]
   // Placeholders
