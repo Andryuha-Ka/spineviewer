@@ -129,6 +129,20 @@ export default class Spine42Adapter implements ISpineAdapter {
     const stage = container as any
     this._container = stage
     stage.addChild(this._spine)
+    this._nameSlotContainers()
+  }
+
+  private _nameSlotContainers(): void {
+    if (!this._spine) return
+    const slots = this._spine.skeleton.slots
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const containers = (this._spine as any).slotContainers as any[] | undefined
+    if (!Array.isArray(containers)) return
+    for (let i = 0; i < slots.length; i++) {
+      if (!containers[i]) continue
+      const att = slots[i].attachment
+      containers[i].name = att?.name ?? ''
+    }
   }
 
   // ── Destroy ────────────────────────────────────────────────────────────────

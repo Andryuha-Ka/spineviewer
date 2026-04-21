@@ -117,6 +117,22 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     const stage = container as PIXI.Container
     this._container = stage
     stage.addChild(this._spine)
+    this._nameSlotContainers()
+  }
+
+  private _nameSlotContainers(): void {
+    if (!this._spine) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const slots = this._spine.skeleton.slots as any[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const containers = (this._spine as any).slotContainers as any[] | undefined
+    if (!Array.isArray(containers)) return
+    for (let i = 0; i < slots.length; i++) {
+      if (!containers[i]) continue
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const att = (slots[i] as any).attachment
+      containers[i].name = att?.name ?? ''
+    }
   }
 
   // ── Destroy ─────────────────────────────────────────────────────────────────
