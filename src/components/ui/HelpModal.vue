@@ -59,6 +59,7 @@
           <li>Toggle <b>origin crosshair</b> in settings (⚙)</li>
           <li>Change <b>background color</b> via the color picker in the bottom-right corner of the canvas</li>
           <li><b>Placeholder labels</b> — toggle the <code>ph</code> checkbox to show/hide named placeholder overlays; expand the list below to enable/disable individual placeholders; toggle state and per-item visibility saved per skeleton</li>
+          <li><b>Placeholder images</b> — expand a skeleton in the Spines tab to see its placeholder slots; drag &amp; drop any image (PNG/JPG/WebP) onto a placeholder drop zone to attach it as a child sprite; multiple images per placeholder are supported; each can be removed individually; state saved per skeleton</li>
           <li><b>Independent pan/zoom</b> — disable the sync toggle (🔗) on a skeleton or background image in the Spines tab; drag and scroll then affect only that item; hold <kbd>Shift</kbd> to pan/zoom the global scene instead</li>
         </ul>
       </section>
@@ -71,7 +72,7 @@
         <div class="tab-grid">
           <div class="tab-item">
             <span class="tab-badge">Spines</span>
-            <span>Appears when 2+ skeletons or a background image is loaded — click to switch the active skeleton; <b>drag</b> the 6-dot handle to reorder (top = highest z-index on stage); <b>pin</b> (📌) to keep a skeleton visible while browsing others. Viewport, animation, skin, and placeholder state saved per skeleton. <b>Sync toggle</b> (🔗) — disable to move/zoom the active item independently (Shift+drag moves the scene). <b>Clone</b> button duplicates the active skeleton with its full state. <b>Drop zone</b> at the bottom — drop an image to set a background, or drop spine files to add new skeletons</span>
+            <span>Appears when 2+ skeletons or a background image is loaded — click to switch the active skeleton; <b>drag</b> the 6-dot handle to reorder (top = highest z-index on stage); <b>pin</b> (📌) to keep a skeleton visible while browsing others. Viewport, animation, skin, and placeholder state saved per skeleton. <b>Sync toggle</b> (🔗) — disable to move/zoom the active item independently (Shift+drag moves the scene). <b>Clone</b> button duplicates the active skeleton with its full state. <b>Expand</b> a skeleton row (▶) to reveal its placeholder slots — drop images onto them to attach child sprites. <b>Drop zone</b> at the bottom — drop an image to set a background, or drop spine files to add new skeletons</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Anim</span>
@@ -178,6 +179,12 @@
       <section class="help-section">
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.3</span>
+            <ul class="help-list">
+              <li><b>Placeholder images</b> — expand any skeleton in the Spines tab to see its placeholder slots; drop PNG/JPG/WebP images onto a slot to attach them as child sprites at the placeholder's origin; multiple images per placeholder; removable individually; state saved per skeleton</li>
+            </ul>
+          </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.3.2</span>
             <ul class="help-list">

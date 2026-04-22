@@ -117,6 +117,7 @@ import { useProfilerStore }   from '@/core/stores/useProfilerStore'
 import { useComplexityStore } from '@/core/stores/useComplexityStore'
 import { useLoaderStore }    from '@/core/stores/useLoaderStore'
 import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
+import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import type { IPixiApp } from '@/core/types/IPixiApp'
 import type { IProgressOverlay } from '@/core/types/IProgressOverlay'
 import type { TrackDisplayState, MarkerDisplay } from '@/core/types/IProgressOverlay'
@@ -133,8 +134,9 @@ const eventsStore    = useEventsStore()
 const atlasStore      = useAtlasStore()
 const profilerStore   = useProfilerStore()
 const complexityStore = useComplexityStore()
-const loaderStore       = useLoaderStore()
-const backgroundStore   = useBackgroundStore()
+const loaderStore             = useLoaderStore()
+const backgroundStore         = useBackgroundStore()
+const placeholderImagesStore  = usePlaceholderImagesStore()
 
 /** Minimal positional interface for the background Pixi sprite held by this component */
 interface PixiSpriteObject {
@@ -192,6 +194,22 @@ function applyPlaceholderLabels() {
 
 watch(() => viewerStore.showPlaceholders, applyPlaceholderLabels)
 watch(() => viewerStore.disabledPlaceholders, applyPlaceholderLabels)
+
+watch(
+  () => placeholderImagesStore.hasPendingActions,
+  (has) => {
+    if (!has || !spineAdapter) return
+    const actions = placeholderImagesStore.drainActions()
+    for (const action of actions) {
+      if (action.slotId !== loaderStore.activeSlotId) continue
+      if (action.type === 'add') {
+        spineAdapter.addImageToPlaceholder(action.phName, action.dataURL!, action.imageId)
+      } else {
+        spineAdapter.removeImageFromPlaceholder(action.phName, action.imageId)
+      }
+    }
+  },
+)
 
 // ── Viewport ──────────────────────────────────────────────────────────────────
 let spineObj: unknown = null   // reference to the mounted spine PIXI.Container
@@ -845,6 +863,7 @@ onMounted(async () => {
             indPosX:              leavingSlot?.indPosX ?? 0,
             indPosY:              leavingSlot?.indPosY ?? 0,
             indZoom:              leavingSlot?.indZoom ?? 1,
+            placeholderImages:    placeholderImagesStore.getSlotImages(oldId),
           })
         }
 
@@ -938,6 +957,17 @@ onMounted(async () => {
             target.indZoom     = s.indZoom ?? 1
           }
           applyViewport()
+          // Restore placeholder images
+          if (s.placeholderImages) {
+            placeholderImagesStore.setSlotImages(slot.id, s.placeholderImages)
+            for (const [phName, entries] of Object.entries(s.placeholderImages)) {
+              for (const entry of entries) {
+                spineAdapter?.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
+              }
+            }
+          } else {
+            placeholderImagesStore.clearSlotImages(slot.id)
+          }
         }
 
         // 5a. New slot is already mounted (was pinned on scene) → reuse adapter
@@ -971,6 +1001,12 @@ onMounted(async () => {
                 .filter(b => PH_RE_5A.test(b.name) && !phSlots5A.has(b.name))
                 .map(b => ({ name: b.name, kind: 'bone' as const })),
             ]
+            loaderStore.setSlotPlaceholders(
+              slot.id,
+              phItems.value
+                .filter(p => p.kind !== 'attachment')
+                .map(p => ({ name: p.name, kind: p.kind as 'bone' | 'slot' })),
+            )
             // Pinned adapter is already live — sync stores from current state without touching it.
             // Do NOT call restoreState(): it calls setAnimation/play() which would restart the animation.
             {
@@ -1017,6 +1053,15 @@ onMounted(async () => {
             }
             applySkins()
             applyPlaceholderLabels()
+            const ss5a = slot.savedState
+            if (ss5a?.placeholderImages) {
+              placeholderImagesStore.setSlotImages(newId, ss5a.placeholderImages)
+              for (const [phName, entries] of Object.entries(ss5a.placeholderImages)) {
+                for (const entry of entries) {
+                  spineAdapter?.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
+                }
+              }
+            }
           } catch (e) {
             spineError.value = e instanceof Error ? e.message : 'Failed to restore spine'
             console.error('[PreviewStage] restore pinned error:', e)
@@ -1231,6 +1276,14 @@ async function loadSpine(fileSet: FileSet, slotId?: string, resetViewport = true
         .filter(b => PH_RE.test(b.name) && !phSlotNames.has(b.name))
         .map(b => ({ name: b.name, kind: 'bone' as const })),
     ]
+    if (slotId) {
+      loaderStore.setSlotPlaceholders(
+        slotId,
+        phItems.value
+          .filter(p => p.kind !== 'attachment')
+          .map(p => ({ name: p.name, kind: p.kind as 'bone' | 'slot' })),
+      )
+    }
     if (phItems.value.length > 0 && viewerStore.showPlaceholders) {
       spineAdapter.setPlaceholderLabels(phItems.value)
     }

@@ -52,4 +52,6 @@ export default class StubAdapter implements ISpineAdapter {
   getFreeBones(): string[] { return [] }
   setBoneLocalTransform(_boneName: string, _transform: Partial<{ x: number; y: number; rotation: number; scaleX: number; scaleY: number }>): void { /* no-op */ }
   getBoneSetupTransform(_boneName: string): { x: number; y: number; rotation: number; scaleX: number; scaleY: number } | null { return null }
+  addImageToPlaceholder(_placeholderName: string, _dataURL: string, _imageId: string): void { /* no-op */ }
+  removeImageFromPlaceholder(_placeholderName: string, _imageId: string): void { /* no-op */ }
 }

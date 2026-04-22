@@ -51,6 +51,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     slotRoot: any | null // slotContainers[idx] — root of the slot hierarchy for re-parenting
     needsTick: boolean
   }> = []
+  private _phImages: Map<string, PIXI.Sprite> = new Map() // imageId → Sprite
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
@@ -140,6 +141,10 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
   destroy(): void {
     this._eventUnsubscribers.forEach(fn => fn())
     this._eventUnsubscribers = []
+    for (const sprite of this._phImages.values()) {
+      sprite.destroy({ texture: true, baseTexture: true })
+    }
+    this._phImages.clear()
     this.clearPlaceholderLabels()
     if (this._container && this._spine) {
       this._container.removeChild(this._spine)
@@ -540,6 +545,31 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
         }
       }
     }
+  }
+
+  addImageToPlaceholder(placeholderName: string, dataURL: string, imageId: string): void {
+    if (!this._spine) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const slotIdx = (this._spine.skeleton.slots as any[]).findIndex((s: any) => s.data.name === placeholderName)
+    if (slotIdx === -1) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const container = (this._spine as any).slotContainers?.[slotIdx]
+    if (!container) return
+    const texture = PIXI.Texture.from(dataURL)
+    const sprite = new PIXI.Sprite(texture)
+    sprite.anchor.set(0.5, 0.5)
+    sprite.x = 0
+    sprite.y = 0
+    findDeepestTarget(container).addChild(sprite)
+    this._phImages.set(imageId, sprite)
+  }
+
+  removeImageFromPlaceholder(_placeholderName: string, imageId: string): void {
+    const sprite = this._phImages.get(imageId)
+    if (!sprite) return
+    sprite.parent?.removeChild(sprite)
+    sprite.destroy({ texture: true, baseTexture: true })
+    this._phImages.delete(imageId)
   }
 
   onEvent(cb: (e: SpineEvent) => void): () => void {

@@ -47,6 +47,8 @@ export default class Spine42Adapter implements ISpineAdapter {
   }> = []
   /** Per-label-name texture cache — reused across setPlaceholderLabels calls. */
   private _phTextures = new Map<string, PIXI.Texture>()
+  private _phImageSprites: Map<string, PIXI.Sprite> = new Map() // imageId → Sprite
+  private _phSlotContainers: Map<string, PIXI.Container> = new Map() // phName → Container
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -150,6 +152,11 @@ export default class Spine42Adapter implements ISpineAdapter {
   destroy(): void {
     this._eventUnsubscribers.forEach(fn => fn())
     this._eventUnsubscribers = []
+    for (const sprite of this._phImageSprites.values()) {
+      sprite.destroy({ texture: true })
+    }
+    this._phImageSprites.clear()
+    this._phSlotContainers.clear()
     this.clearPlaceholderLabels()
     for (const tex of this._phTextures.values()) tex.destroy(true)
     this._phTextures.clear()
@@ -527,6 +534,50 @@ export default class Spine42Adapter implements ISpineAdapter {
     const tex = PIXI.Texture.from(canvas)
     this._phTextures.set(name, tex)
     return tex
+  }
+
+  addImageToPlaceholder(placeholderName: string, dataURL: string, imageId: string): void {
+    if (!this._spine) return
+    // Verify the slot exists in this skeleton
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const slotExists = (this._spine.skeleton.slots as any[]).some((s: any) => s.data.name === placeholderName)
+    if (!slotExists) return
+
+    // spine-pixi-v8 has no slotContainers array. Use addSlotObject() to attach a
+    // Container that automatically follows the slot bone transform each frame.
+    let phContainer = this._phSlotContainers.get(placeholderName)
+    if (!phContainer) {
+      phContainer = new PIXI.Container()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(this._spine as any).addSlotObject(placeholderName, phContainer)
+      this._phSlotContainers.set(placeholderName, phContainer)
+    }
+
+    // Register sprite immediately so removeImageFromPlaceholder can find it.
+    // Texture.from(dataURL) in Pixi8 loads asynchronously — assign texture via
+    // HTMLImageElement.onload to guarantee it is visible on the first render frame.
+    const sprite = new PIXI.Sprite()
+    sprite.anchor.set(0.5, 0.5)
+    sprite.x = 0
+    sprite.y = 0
+    phContainer.addChild(sprite)
+    this._phImageSprites.set(imageId, sprite)
+
+    const img = new Image()
+    img.onload = () => {
+      if (this._phImageSprites.has(imageId)) {
+        sprite.texture = PIXI.Texture.from(img)
+      }
+    }
+    img.src = dataURL
+  }
+
+  removeImageFromPlaceholder(_placeholderName: string, imageId: string): void {
+    const sprite = this._phImageSprites.get(imageId)
+    if (!sprite) return
+    sprite.parent?.removeChild(sprite)
+    sprite.destroy({ texture: true })
+    this._phImageSprites.delete(imageId)
   }
 
   onEvent(cb: (e: SpineEvent) => void): () => void {

@@ -9,99 +9,154 @@
 <template>
   <div class="spines-panel">
     <div class="spines-list">
-      <div
-        v-for="(slot, index) in loaderStore.spineSlots"
-        :key="slot.id"
-        class="spine-item"
-        :class="{
-          'spine-item--active':       slot.id === loaderStore.activeSlotId,
-          'spine-item--pinned':       loaderStore.isPinned(slot.id) && slot.id !== loaderStore.activeSlotId,
-          'spine-item--error':        isSlotError(slot),
-          'spine-item--modified':     isModified(slot),
-          'spine-item--dragging':     dragSrcIndex === index,
-          'spine-item--drop-top':     dragOverIndex === index && dropPosition === 'top',
-          'spine-item--drop-bottom':  dragOverIndex === index && dropPosition === 'bottom',
-        }"
-        :title="slot.error ?? (slot.validationErrors?.length ? slot.validationErrors[0] : slot.name)"
-        :draggable="!isSlotError(slot)"
-        @click="!isSlotError(slot) && (loaderStore.setActiveSlot(slot.id), backgroundStore.setActive(false))"
-        @dragstart="onDragStart($event, index)"
-        @dragover="onDragOver($event, index)"
-        @dragleave="onDragLeave"
-        @drop="onDrop($event, index)"
-        @dragend="onDragEnd"
-      >
-        <span
-          v-if="!isSlotError(slot)"
-          class="spine-drag-handle"
-          title="Drag to reorder (top = higher z-index)"
+      <template v-for="(slot, index) in loaderStore.spineSlots" :key="slot.id">
+        <div
+          class="spine-item"
+          :class="{
+            'spine-item--active':       slot.id === loaderStore.activeSlotId,
+            'spine-item--pinned':       loaderStore.isPinned(slot.id) && slot.id !== loaderStore.activeSlotId,
+            'spine-item--error':        isSlotError(slot),
+            'spine-item--modified':     isModified(slot),
+            'spine-item--dragging':     dragSrcIndex === index,
+            'spine-item--drop-top':     dragOverIndex === index && dropPosition === 'top',
+            'spine-item--drop-bottom':  dragOverIndex === index && dropPosition === 'bottom',
+          }"
+          :title="slot.error ?? (slot.validationErrors?.length ? slot.validationErrors[0] : slot.name)"
+          :draggable="!isSlotError(slot)"
+          @click="!isSlotError(slot) && (loaderStore.setActiveSlot(slot.id), backgroundStore.setActive(false))"
+          @dragstart="onDragStart($event, index)"
+          @dragover="onDragOver($event, index)"
+          @dragleave="onDragLeave"
+          @drop="onDrop($event, index)"
+          @dragend="onDragEnd"
         >
-          <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor">
-            <circle cx="2" cy="2"  r="1.2"/>
-            <circle cx="6" cy="2"  r="1.2"/>
-            <circle cx="2" cy="6"  r="1.2"/>
-            <circle cx="6" cy="6"  r="1.2"/>
-            <circle cx="2" cy="10" r="1.2"/>
-            <circle cx="6" cy="10" r="1.2"/>
-          </svg>
-        </span>
-        <span v-else class="spine-drag-handle spine-drag-handle--placeholder" />
-        <span class="spine-dot" />
-        <span class="spine-name">{{ slot.name }}</span>
-        <span
-          v-if="isModified(slot) && !isSlotError(slot)"
-          class="spine-modified-dot"
-          :title="modifiedHint(slot)"
-        />
-        <span
-          v-if="slot.error"
-          class="spine-err-badge"
-          :title="slot.error"
-        >!</span>
-        <span
-          v-else-if="slot.validationErrors?.length"
-          class="spine-err-badge spine-err-badge--validation"
-          :title="slot.validationErrors.join('\n')"
-        >!</span>
-        <!-- Sync toggle -->
-        <button
-          v-if="!isSlotError(slot)"
-          class="spine-sync-btn"
-          :class="{ 'spine-sync-btn--desynced': slot.syncEnabled === false }"
-          title="Sync with global viewport"
-          @click.stop="loaderStore.setSyncEnabled(slot.id, slot.syncEnabled !== false ? false : true)"
+          <span
+            v-if="!isSlotError(slot)"
+            class="spine-drag-handle"
+            title="Drag to reorder (top = higher z-index)"
+          >
+            <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor">
+              <circle cx="2" cy="2"  r="1.2"/>
+              <circle cx="6" cy="2"  r="1.2"/>
+              <circle cx="2" cy="6"  r="1.2"/>
+              <circle cx="6" cy="6"  r="1.2"/>
+              <circle cx="2" cy="10" r="1.2"/>
+              <circle cx="6" cy="10" r="1.2"/>
+            </svg>
+          </span>
+          <span v-else class="spine-drag-handle spine-drag-handle--placeholder" />
+          <span class="spine-dot" />
+          <span class="spine-name">{{ slot.name }}</span>
+          <span
+            v-if="isModified(slot) && !isSlotError(slot)"
+            class="spine-modified-dot"
+            :title="modifiedHint(slot)"
+          />
+          <span
+            v-if="slot.error"
+            class="spine-err-badge"
+            :title="slot.error"
+          >!</span>
+          <span
+            v-else-if="slot.validationErrors?.length"
+            class="spine-err-badge spine-err-badge--validation"
+            :title="slot.validationErrors.join('\n')"
+          >!</span>
+          <!-- Expand placeholders chevron -->
+          <button
+            v-if="!isSlotError(slot) && slot.placeholders?.some(p => p.kind === 'slot')"
+            class="spine-expand-btn"
+            :class="{ 'spine-expand-btn--open': expandedSlots.has(slot.id) }"
+            :title="expandedSlots.has(slot.id) ? 'Collapse placeholders' : 'Expand placeholders'"
+            @click.stop="onExpandBtnClick(slot.id)"
+          >
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <path d="M1 2.5L4 5.5L7 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <!-- Sync toggle -->
+          <button
+            v-if="!isSlotError(slot)"
+            class="spine-sync-btn"
+            :class="{ 'spine-sync-btn--desynced': slot.syncEnabled === false }"
+            title="Sync with global viewport"
+            @click.stop="loaderStore.setSyncEnabled(slot.id, slot.syncEnabled !== false ? false : true)"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7a5 5 0 0 1 0-10h2"/>
+              <line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+          </button>
+          <!-- Clone button -->
+          <button
+            v-if="!isSlotError(slot)"
+            class="spine-clone-btn"
+            :disabled="loaderStore.spineSlots.length >= SPINE_SLOTS_LIMIT"
+            title="Clone this spine slot"
+            @click.stop="onClone(slot.id)"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+          <!-- Pin button -->
+          <button
+            v-if="!isSlotError(slot)"
+            class="spine-pin-btn"
+            :class="{ 'spine-pin-btn--pinned': loaderStore.isPinned(slot.id) }"
+            title="Keep on scene when switching"
+            @click.stop="loaderStore.setPinned(slot.id, !loaderStore.isPinned(slot.id))"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <path d="M17 4h-1V3a1 1 0 0 0-2 0v1H10V3a1 1 0 0 0-2 0v1H7a3 3 0 0 0-2.12 5.12L6 17v.5a.5.5 0 0 0 .5.5H11v2.5a1 1 0 0 0 2 0V18h4.5a.5.5 0 0 0 .5-.5V17l1.12-7.88A3 3 0 0 0 17 4z"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Placeholder tree -->
+        <div
+          v-if="!isSlotError(slot) && expandedSlots.has(slot.id) && slot.placeholders?.some(p => p.kind === 'slot')"
+          class="ph-tree"
         >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7a5 5 0 0 1 0-10h2"/>
-            <line x1="8" y1="12" x2="16" y2="12"/>
-          </svg>
-        </button>
-        <!-- Clone button -->
-        <button
-          v-if="!isSlotError(slot)"
-          class="spine-clone-btn"
-          :disabled="loaderStore.spineSlots.length >= SPINE_SLOTS_LIMIT"
-          title="Clone this spine slot"
-          @click.stop="onClone(slot.id)"
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2"/>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-          </svg>
-        </button>
-        <!-- Pin button -->
-        <button
-          v-if="!isSlotError(slot)"
-          class="spine-pin-btn"
-          :class="{ 'spine-pin-btn--pinned': loaderStore.isPinned(slot.id) }"
-          title="Keep on scene when switching"
-          @click.stop="loaderStore.setPinned(slot.id, !loaderStore.isPinned(slot.id))"
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-            <path d="M17 4h-1V3a1 1 0 0 0-2 0v1H10V3a1 1 0 0 0-2 0v1H7a3 3 0 0 0-2.12 5.12L6 17v.5a.5.5 0 0 0 .5.5H11v2.5a1 1 0 0 0 2 0V18h4.5a.5.5 0 0 0 .5-.5V17l1.12-7.88A3 3 0 0 0 17 4z"/>
-          </svg>
-        </button>
-      </div>
+          <div
+            v-if="slot.placeholders!.every(p => p.name === PH_PENDING_SENTINEL)"
+            class="ph-pending-hint"
+          >Activate spine to load placeholders</div>
+          <div
+            v-for="ph in slot.placeholders!.filter(p => p.kind === 'slot' && p.name !== PH_PENDING_SENTINEL)"
+            :key="ph.name"
+            class="ph-tree-item"
+          >
+            <div
+              class="ph-drop-zone"
+              :class="{ 'ph-drop-zone--over': isPhDragOver(slot.id, ph.name) }"
+              @dragenter.prevent.stop="setPhDragOver(slot.id, ph.name, true)"
+              @dragover.prevent.stop="setPhDragOver(slot.id, ph.name, true)"
+              @dragleave.stop="setPhDragOver(slot.id, ph.name, false)"
+              @drop.prevent.stop="onPhDrop($event, slot.id, ph.name)"
+            >
+              <span class="ph-drop-name">{{ ph.name }}</span>
+              <span class="ph-drop-hint">drop image here</span>
+            </div>
+            <div class="ph-images-list">
+              <div
+                v-for="entry in phImagesStore.getPlaceholderImages(slot.id, ph.name)"
+                :key="entry.imageId"
+                class="ph-image-entry"
+              >
+                <img :src="entry.dataURL" class="ph-image-thumb" alt="" />
+                <span class="ph-image-name">{{ entry.fileName }}</span>
+                <button
+                  class="ph-image-remove"
+                  title="Remove image"
+                  @click.stop="phImagesStore.removeImage(slot.id, ph.name, entry.imageId)"
+                >×</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
 
       <!-- Background image item (special: no pin, sync only) -->
       <div
@@ -170,11 +225,12 @@
 </template>
 
 <script setup lang="ts">
-import { useLoaderStore, SPINE_SLOTS_LIMIT } from '@/core/stores/useLoaderStore'
+import { useLoaderStore, SPINE_SLOTS_LIMIT, PH_PENDING_SENTINEL } from '@/core/stores/useLoaderStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useViewerStore } from '@/core/stores/useViewerStore'
 import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
+import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import { groupSpineFiles, readFileAsDataURL } from '@/core/utils/fileLoader'
 import { validateSpineFileSet } from '@/core/utils/spineValidator'
 import type { SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
@@ -184,6 +240,49 @@ const animationStore  = useAnimationStore()
 const viewerStore     = useViewerStore()
 const backgroundStore = useBackgroundStore()
 const skeletonStore   = useSkeletonStore()
+const phImagesStore   = usePlaceholderImagesStore()
+
+// ── Placeholder tree expand/collapse ────────────────────────────────────────
+const expandedSlots = ref<Set<string>>(new Set())
+
+function toggleExpand(id: string): void {
+  const s = new Set(expandedSlots.value)
+  if (s.has(id)) s.delete(id)
+  else s.add(id)
+  expandedSlots.value = s
+}
+
+function onExpandBtnClick(id: string): void {
+  if (id !== loaderStore.activeSlotId) {
+    loaderStore.setActiveSlot(id)
+    backgroundStore.setActive(false)
+    const s = new Set(expandedSlots.value)
+    s.add(id)
+    expandedSlots.value = s
+  } else {
+    toggleExpand(id)
+  }
+}
+
+// ── Placeholder drop zone drag state ────────────────────────────────────────
+const phDragOverKey = ref<string | null>(null)
+
+function isPhDragOver(slotId: string, phName: string): boolean {
+  return phDragOverKey.value === `${slotId}:${phName}`
+}
+
+function setPhDragOver(slotId: string, phName: string, active: boolean): void {
+  phDragOverKey.value = active ? `${slotId}:${phName}` : null
+}
+
+async function onPhDrop(e: DragEvent, slotId: string, phName: string): Promise<void> {
+  phDragOverKey.value = null
+  const files = Array.from(e.dataTransfer?.files ?? [])
+  const imageFiles = files.filter(f => f.type.startsWith('image/'))
+  for (const file of imageFiles) {
+    await phImagesStore.addImage(slotId, phName, file)
+  }
+}
 
 /** True for both classification errors (slot.error) and content validation errors (slot.validationErrors). */
 function isSlotError(slot: SpineSlot): boolean {
@@ -728,5 +827,136 @@ function modifiedHint(slot: SpineSlot): string {
   color: var(--c-text-ghost);
   border-top: 1px solid var(--c-border);
   flex-shrink: 0;
+}
+
+/* Expand chevron button */
+.spine-expand-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #fbbf24;
+  cursor: pointer;
+  padding: 2px 3px;
+  border-radius: 3px;
+  transition: color 0.12s, transform 0.15s;
+}
+
+.spine-expand-btn:hover {
+  background: var(--c-raised);
+  color: #fcd34d;
+}
+
+.spine-expand-btn--open {
+  transform: rotate(180deg);
+  color: #fbbf24;
+}
+
+/* Placeholder tree */
+.ph-tree {
+  margin: 0 8px 4px 28px;
+  border-left: 1px solid var(--c-border);
+  padding-left: 8px;
+}
+
+.ph-tree-item {
+  margin-bottom: 6px;
+}
+
+.ph-pending-hint {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  color: var(--c-text-ghost);
+  font-style: italic;
+}
+
+.ph-drop-zone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 18px;
+  border: 1px dashed var(--c-border);
+  border-radius: 5px;
+  cursor: default;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.ph-drop-zone--over {
+  border-color: #9d8fff;
+  background: rgba(157, 143, 255, 0.08);
+}
+
+.ph-drop-name {
+  font-size: 0.75rem;
+  color: var(--c-text-dim);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ph-drop-hint {
+  font-size: 0.65rem;
+  color: var(--c-text-ghost);
+  white-space: nowrap;
+}
+
+.ph-images-list {
+  margin-top: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ph-image-entry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ph-image-thumb {
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 2px;
+  flex-shrink: 0;
+  border: 1px solid var(--c-border);
+}
+
+.ph-image-name {
+  flex: 1;
+  font-size: 0.7rem;
+  color: var(--c-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ph-image-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background: none;
+  border: none;
+  color: var(--c-text-ghost);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  border-radius: 2px;
+  padding: 0;
+  transition: color 0.12s, background 0.12s;
+}
+
+.ph-image-remove:hover {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
 }
 </style>

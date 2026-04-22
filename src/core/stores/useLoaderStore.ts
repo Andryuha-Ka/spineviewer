@@ -34,6 +34,40 @@ export interface PendingFileInfo {
 /** Hard limit on simultaneously loaded spine slots */
 export const SPINE_SLOTS_LIMIT = 30
 
+const PH_SCAN_RE = /placeholder/i
+
+/** Sentinel name used for binary-scanned placeholders before full load. */
+export const PH_PENDING_SENTINEL = '__pending__'
+
+/** Quick scan of a JSON skeleton to find placeholder-named slots (no full Spine load needed). */
+function scanPlaceholderSlots(fileSet: FileSet | undefined): Array<{ name: string; kind: 'bone' | 'slot' }> {
+  if (!fileSet?.skeleton) return []
+
+  if (fileSet.skeleton.type === 'skeleton-json') {
+    try {
+      const json = JSON.parse(fileSet.skeleton.fileBody as string)
+      return (json.slots ?? [])
+        .filter((s: { name?: string }) => typeof s.name === 'string' && PH_SCAN_RE.test(s.name))
+        .map((s: { name: string }) => ({ name: s.name, kind: 'slot' as const }))
+    } catch {
+      return []
+    }
+  }
+
+  if (fileSet.skeleton.type === 'skeleton-skel') {
+    try {
+      const text = new TextDecoder('utf-8', { fatal: false }).decode(fileSet.skeleton.fileBody as ArrayBuffer)
+      if (PH_SCAN_RE.test(text)) {
+        return [{ name: PH_PENDING_SENTINEL, kind: 'slot' }]
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return []
+}
+
 export const useLoaderStore = defineStore('loader', () => {
   /** Raw File objects shown in the file list (not yet read into memory) */
   const pendingFiles = ref<File[]>([])
@@ -91,6 +125,7 @@ export const useLoaderStore = defineStore('loader', () => {
     if (slot.indPosX === undefined) slot.indPosX = 0
     if (slot.indPosY === undefined) slot.indPosY = 0
     if (slot.indZoom === undefined) slot.indZoom = 1
+    if (slot.placeholders === undefined) slot.placeholders = scanPlaceholderSlots(slot.fileSet)
   }
 
   /** Replace all slots; activates the first fully-valid slot. */
@@ -136,6 +171,13 @@ export const useLoaderStore = defineStore('loader', () => {
     spineSlots.value = arr
   }
 
+  /** Update placeholders on a slot — triggers reactive array update so SpinesPanel re-renders. */
+  function setSlotPlaceholders(id: string, placeholders: NonNullable<SpineSlot['placeholders']>): void {
+    spineSlots.value = spineSlots.value.map(s =>
+      s.id === id ? { ...s, placeholders } : s,
+    )
+  }
+
   /** Add a single slot respecting SPINE_SLOTS_LIMIT; initialises ind* defaults. */
   function addSlot(slot: SpineSlot): void {
     if (spineSlots.value.length >= SPINE_SLOTS_LIMIT) return
@@ -172,6 +214,7 @@ export const useLoaderStore = defineStore('loader', () => {
       indPosX: src.indPosX ?? 0,
       indPosY: src.indPosY ?? 0,
       indZoom: src.indZoom ?? 1,
+      placeholders: src.placeholders ? [...src.placeholders] : [],
     }
 
     spineSlots.value = [...spineSlots.value, newSlot]
@@ -216,5 +259,6 @@ export const useLoaderStore = defineStore('loader', () => {
     addSlot,
     cloneSlot,
     setSyncEnabled,
+    setSlotPlaceholders,
   }
 })

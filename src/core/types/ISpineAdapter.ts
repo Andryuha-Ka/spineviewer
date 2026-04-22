@@ -157,4 +157,8 @@ export interface ISpineAdapter {
   clearPlaceholderLabels(): void
   /** Called each ticker frame to update marker positions with animated bones */
   tickPlaceholderLabels(): void
+
+  // Placeholder images — add/remove PIXI.Sprite children on slot containers
+  addImageToPlaceholder(placeholderName: string, dataURL: string, imageId: string): void
+  removeImageFromPlaceholder(placeholderName: string, imageId: string): void
 }
