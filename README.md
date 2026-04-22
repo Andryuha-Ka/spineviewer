@@ -51,7 +51,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - Each skeleton's viewport position, animation, skin, placeholder toggle, and playback state is preserved independently
 - **Sync toggle** (🔗) per skeleton — when disabled, the active skeleton moves and scales independently from the global scene; drag moves only it, scroll wheel scales only it; hold **Shift** to move the global scene while sync is off
 - **Clone button** — duplicate the active skeleton with its full current state (animation, skin, position, sync); the clone is fully independent of the original
-- **Placeholder images** — expand a skeleton row (▶) to reveal its placeholder slots; drop PNG/JPG/WebP images onto a slot to attach them as child sprites at the placeholder's origin; multiple images per slot; each removable individually; state saved per skeleton
+- **Placeholder images** — expand a skeleton row (▶) to reveal its placeholder slots; drop PNG/JPG/WebP images onto a slot to attach them as child sprites at the placeholder's origin; multiple images per slot; each removable individually; click a thumbnail to **activate** it; disable the sync toggle (🔗) on an image to move it by dragging or scale it with the scroll wheel independently; transform saved per skeleton
 - **Drop zone** at the bottom of the Spines tab — drop image files (PNG / JPG / WebP / AVIF) to add a background image, or drop spine file sets to add new skeletons with automatic version detection and validation
 
 ### Background Image
@@ -201,6 +201,9 @@ When you drop multiple Spine skeletons, all are loaded into slots. The **Spines*
 ---
 
 ## Changelog
+
+### v1.3.4
+- **Placeholder image transform** — click a thumbnail in the Spines tab to activate it; disable the sync toggle (🔗) on an image to drag-reposition or scroll-scale it independently inside the slot container; transform persisted per skeleton
 
 ### v1.3.3
 - **Placeholder images** — drop PNG/JPG/WebP onto a placeholder slot in the Spines tab to attach it as a child sprite; multiple images per placeholder, individually removable; state saved per skeleton

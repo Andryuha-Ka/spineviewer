@@ -549,17 +549,26 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
 
   addImageToPlaceholder(placeholderName: string, dataURL: string, imageId: string): void {
     if (!this._spine) return
+    if (this._phImages.has(imageId)) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const slotIdx = (this._spine.skeleton.slots as any[]).findIndex((s: any) => s.data.name === placeholderName)
     if (slotIdx === -1) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const container = (this._spine as any).slotContainers?.[slotIdx]
     if (!container) return
-    const texture = PIXI.Texture.from(dataURL)
+    // Create a non-cached texture so destroying one sprite's texture
+    // cannot affect sprites in other (e.g. pinned) adapters that use the same dataURL.
+    const img = new Image()
+    img.src = dataURL
+    const baseTexture = new PIXI.BaseTexture(img)
+    const texture = new PIXI.Texture(baseTexture)
     const sprite = new PIXI.Sprite(texture)
     sprite.anchor.set(0.5, 0.5)
     sprite.x = 0
     sprite.y = 0
+    // Mark as a user-added image so findDeepestTarget skips traversal into it
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(sprite as any).__phImage = true
     findDeepestTarget(container).addChild(sprite)
     this._phImages.set(imageId, sprite)
   }
@@ -570,6 +579,21 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     sprite.parent?.removeChild(sprite)
     sprite.destroy({ texture: true, baseTexture: true })
     this._phImages.delete(imageId)
+  }
+
+  setImageTransform(imageId: string, posX: number, posY: number, scale: number): void {
+    const sprite = this._phImages.get(imageId)
+    if (!sprite) return
+    sprite.x = posX
+    sprite.y = posY
+    sprite.scale.set(scale)
+  }
+
+  getImageContainerWorldTransform(imageId: string): { a: number; b: number; c: number; d: number; tx: number; ty: number } | null {
+    const sprite = this._phImages.get(imageId)
+    if (!sprite?.parent) return null
+    const m = sprite.parent.worldTransform
+    return { a: m.a, b: m.b, c: m.c, d: m.d, tx: m.tx, ty: m.ty }
   }
 
   onEvent(cb: (e: SpineEvent) => void): () => void {
@@ -596,15 +620,16 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
 
 /**
  * Traverse the display tree from `node` and return the deepest child
- * that has no further Container/Sprite children (leaf node).
- * Skips PIXI.Text instances so already-added labels are not traversed into.
+ * that has no further eligible Container children (leaf node).
+ * Skips PIXI.Text and nodes marked __phImage (user-added image sprites)
+ * so labels and subsequent images are not traversed into already-added sprites.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function findDeepestTarget(node: any): any {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const eligible: any[] = (node.children ?? []).filter(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (c: any) => Array.isArray(c.children) && !(c instanceof PIXI.Text) && c.visible !== false,
+    (c: any) => Array.isArray(c.children) && !(c instanceof PIXI.Text) && !c.__phImage && c.visible !== false,
   )
   if (eligible.length === 0) return node
   return findDeepestTarget(eligible[0])

@@ -24,6 +24,7 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
   /** slotId → phName → entries[] */
   const images = ref<Record<string, Record<string, PHImageEntry[]>>>({})
   const _pendingActions = ref<PHImageAction[]>([])
+  const activeImageId = ref<string | null>(null)
 
   const hasPendingActions = computed(() => _pendingActions.value.length > 0)
 
@@ -33,7 +34,10 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
 
     if (!images.value[slotId]) images.value[slotId] = {}
     if (!images.value[slotId][phName]) images.value[slotId][phName] = []
-    images.value[slotId][phName].push({ imageId, fileName: file.name, dataURL })
+    images.value[slotId][phName].push({
+      imageId, fileName: file.name, dataURL,
+      syncEnabled: true, posX: 0, posY: 0, scale: 1,
+    })
 
     _pendingActions.value.push({ type: 'add', slotId, phName, imageId, dataURL })
   }
@@ -44,7 +48,30 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
       const idx = entries.findIndex(e => e.imageId === imageId)
       if (idx !== -1) entries.splice(idx, 1)
     }
+    if (activeImageId.value === imageId) activeImageId.value = null
     _pendingActions.value.push({ type: 'remove', slotId, phName, imageId })
+  }
+
+  function setActiveImage(id: string | null): void { activeImageId.value = id }
+
+  function updateImageTransform(slotId: string, phName: string, imageId: string, posX: number, posY: number, scale: number): void {
+    const entry = images.value[slotId]?.[phName]?.find(e => e.imageId === imageId)
+    if (entry) { entry.posX = posX; entry.posY = posY; entry.scale = scale }
+  }
+
+  function toggleImageSync(slotId: string, phName: string, imageId: string): void {
+    const entry = images.value[slotId]?.[phName]?.find(e => e.imageId === imageId)
+    if (entry) entry.syncEnabled = !entry.syncEnabled
+  }
+
+  function getImageContext(imageId: string): { slotId: string; phName: string; entry: PHImageEntry } | null {
+    for (const [slotId, phMap] of Object.entries(images.value)) {
+      for (const [phName, entries] of Object.entries(phMap)) {
+        const entry = entries.find(e => e.imageId === imageId)
+        if (entry) return { slotId, phName, entry }
+      }
+    }
+    return null
   }
 
   function drainActions(): PHImageAction[] {
@@ -71,9 +98,14 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
 
   return {
     images,
+    activeImageId,
     hasPendingActions,
     addImage,
     removeImage,
+    setActiveImage,
+    updateImageTransform,
+    toggleImageSync,
+    getImageContext,
     drainActions,
     clearSlotImages,
     setSlotImages,

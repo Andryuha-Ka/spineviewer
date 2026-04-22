@@ -276,8 +276,12 @@ const loopStates = new Map<number, ReturnType<typeof makeLoopState>>()
 // ── Overlay hover state ────────────────────────────────────────────────────────
 let _overlayHoverTrackIndex = -1
 const isPanning = ref(false)
-let panStart = { x: 0, y: 0, px: 0, py: 0 }
-type PanTarget = 'global' | 'background' | 'slot'
+let panStart = {
+  x: 0, y: 0, px: 0, py: 0,
+  imageId: '',
+  imageMatrix: null as { a: number; b: number; c: number; d: number; tx: number; ty: number } | null,
+}
+type PanTarget = 'global' | 'background' | 'slot' | 'image'
 let panTarget: PanTarget = 'global'
 // ── Seek drag state ────────────────────────────────────────────────────────────
 let _seekDragActive = false
@@ -395,6 +399,39 @@ function onWheel(e: WheelEvent) {
       my - baseY.value - spineY * newZoom,
       newZoom,
     )
+  } else if ((() => {
+    const aid = placeholderImagesStore.activeImageId
+    if (!aid) return false
+    const ctx = placeholderImagesStore.getImageContext(aid)
+    return !!(ctx && !ctx.entry.syncEnabled && ctx.slotId === loaderStore.activeSlotId)
+  })()) {
+    // Zoom active desynced image, anchored to cursor
+    const aid = placeholderImagesStore.activeImageId!
+    const ctx = placeholderImagesStore.getImageContext(aid)!
+    const curScale = ctx.entry.scale
+    const curPosX  = ctx.entry.posX
+    const curPosY  = ctx.entry.posY
+    const newScale = Math.min(20, Math.max(0.05, curScale * dz))
+    if (newScale === curScale) return
+    const m = spineAdapter?.getImageContainerWorldTransform(aid)
+    if (!m) {
+      // Fallback: scale around sprite origin when matrix is unavailable
+      placeholderImagesStore.updateImageTransform(ctx.slotId, ctx.phName, aid, curPosX, curPosY, newScale)
+      spineAdapter?.setImageTransform(aid, curPosX, curPosY, newScale)
+      return
+    }
+    const det = m.a * m.d - m.b * m.c
+    if (Math.abs(det) < 1e-10) return
+    // Cursor position in container-local space
+    const cursorLocalX = (m.d * (mx - m.tx) - m.c * (my - m.ty)) / det
+    const cursorLocalY = (-m.b * (mx - m.tx) + m.a * (my - m.ty)) / det
+    // Cursor position in sprite-local space (before sprite's own position/scale)
+    const spriteLocalX = curScale !== 0 ? (cursorLocalX - curPosX) / curScale : 0
+    const spriteLocalY = curScale !== 0 ? (cursorLocalY - curPosY) / curScale : 0
+    const newPosX = cursorLocalX - spriteLocalX * newScale
+    const newPosY = cursorLocalY - spriteLocalY * newScale
+    placeholderImagesStore.updateImageTransform(ctx.slotId, ctx.phName, aid, newPosX, newPosY, newScale)
+    spineAdapter?.setImageTransform(aid, newPosX, newPosY, newScale)
   } else if (activeSlot && activeSlot.syncEnabled === false) {
     // Zoom active spine independently, anchored to cursor
     const curZoom = activeSlot.indZoom ?? 1
@@ -453,16 +490,29 @@ function onPanStart(e: MouseEvent) {
   const activeSlot = loaderStore.activeSlot
   if (e.shiftKey) {
     panTarget = 'global'
-    panStart = { x: e.clientX, y: e.clientY, px: viewerStore.posX, py: viewerStore.posY }
+    panStart = { x: e.clientX, y: e.clientY, px: viewerStore.posX, py: viewerStore.posY, imageId: '', imageMatrix: null }
   } else if (backgroundStore.isActive && !backgroundStore.syncEnabled) {
     panTarget = 'background'
-    panStart = { x: e.clientX, y: e.clientY, px: backgroundStore.posX, py: backgroundStore.posY }
-  } else if (activeSlot && activeSlot.syncEnabled === false) {
-    panTarget = 'slot'
-    panStart = { x: e.clientX, y: e.clientY, px: activeSlot.indPosX ?? 0, py: activeSlot.indPosY ?? 0 }
+    panStart = { x: e.clientX, y: e.clientY, px: backgroundStore.posX, py: backgroundStore.posY, imageId: '', imageMatrix: null }
   } else {
-    panTarget = 'global'
-    panStart = { x: e.clientX, y: e.clientY, px: viewerStore.posX, py: viewerStore.posY }
+    // Check for active desynced image before checking slot
+    const aid = placeholderImagesStore.activeImageId
+    const imgCtx = aid ? placeholderImagesStore.getImageContext(aid) : null
+    if (imgCtx && !imgCtx.entry.syncEnabled && imgCtx.slotId === loaderStore.activeSlotId) {
+      panTarget = 'image'
+      panStart = {
+        x: e.clientX, y: e.clientY,
+        px: imgCtx.entry.posX, py: imgCtx.entry.posY,
+        imageId: aid!,
+        imageMatrix: spineAdapter?.getImageContainerWorldTransform(aid!) ?? null,
+      }
+    } else if (activeSlot && activeSlot.syncEnabled === false) {
+      panTarget = 'slot'
+      panStart = { x: e.clientX, y: e.clientY, px: activeSlot.indPosX ?? 0, py: activeSlot.indPosY ?? 0, imageId: '', imageMatrix: null }
+    } else {
+      panTarget = 'global'
+      panStart = { x: e.clientX, y: e.clientY, px: viewerStore.posX, py: viewerStore.posY, imageId: '', imageMatrix: null }
+    }
   }
 }
 
@@ -491,6 +541,19 @@ function onPanMove(e: MouseEvent) {
 
   if (panTarget === 'background') {
     backgroundStore.setTransform(panStart.px + dx, panStart.py + dy, backgroundStore.zoom)
+  } else if (panTarget === 'image') {
+    const m = panStart.imageMatrix
+    if (!m) return
+    const det = m.a * m.d - m.b * m.c
+    if (Math.abs(det) < 1e-10) return
+    const localDX = (m.d * dx - m.c * dy) / det
+    const localDY = (-m.b * dx + m.a * dy) / det
+    const newPosX = panStart.px + localDX
+    const newPosY = panStart.py + localDY
+    const ctx = placeholderImagesStore.getImageContext(panStart.imageId)
+    if (!ctx) return
+    placeholderImagesStore.updateImageTransform(ctx.slotId, ctx.phName, panStart.imageId, newPosX, newPosY, ctx.entry.scale)
+    spineAdapter?.setImageTransform(panStart.imageId, newPosX, newPosY, ctx.entry.scale)
   } else if (panTarget === 'slot') {
     const slot = loaderStore.activeSlot
     if (slot) {
@@ -891,6 +954,7 @@ onMounted(async () => {
         atlasStore.clear()
         profilerStore.clear()
         complexityStore.clear()
+        placeholderImagesStore.setActiveImage(null)
         phItems.value = []
         viewerStore.showPlaceholders = localStorage.getItem('svp:viewer:showPlaceholders') !== 'false'
         viewerStore.clearDisabledPlaceholders()
@@ -963,6 +1027,7 @@ onMounted(async () => {
             for (const [phName, entries] of Object.entries(s.placeholderImages)) {
               for (const entry of entries) {
                 spineAdapter?.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
+                spineAdapter?.setImageTransform(entry.imageId, entry.posX ?? 0, entry.posY ?? 0, entry.scale ?? 1)
               }
             }
           } else {
@@ -1059,6 +1124,7 @@ onMounted(async () => {
               for (const [phName, entries] of Object.entries(ss5a.placeholderImages)) {
                 for (const entry of entries) {
                   spineAdapter?.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
+                  spineAdapter?.setImageTransform(entry.imageId, entry.posX ?? 0, entry.posY ?? 0, entry.scale ?? 1)
                 }
               }
             }

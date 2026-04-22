@@ -26,6 +26,10 @@ export interface PHImageEntry {
   imageId: string
   fileName: string
   dataURL: string
+  syncEnabled: boolean
+  posX: number
+  posY: number
+  scale: number
 }
 
 export interface SpineSlotSavedState {

@@ -538,6 +538,7 @@ export default class Spine42Adapter implements ISpineAdapter {
 
   addImageToPlaceholder(placeholderName: string, dataURL: string, imageId: string): void {
     if (!this._spine) return
+    if (this._phImageSprites.has(imageId)) return
     // Verify the slot exists in this skeleton
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const slotExists = (this._spine.skeleton.slots as any[]).some((s: any) => s.data.name === placeholderName)
@@ -578,6 +579,21 @@ export default class Spine42Adapter implements ISpineAdapter {
     sprite.parent?.removeChild(sprite)
     sprite.destroy({ texture: true })
     this._phImageSprites.delete(imageId)
+  }
+
+  setImageTransform(imageId: string, posX: number, posY: number, scale: number): void {
+    const sprite = this._phImageSprites.get(imageId)
+    if (!sprite) return
+    sprite.x = posX
+    sprite.y = posY
+    sprite.scale.set(scale)
+  }
+
+  getImageContainerWorldTransform(imageId: string): { a: number; b: number; c: number; d: number; tx: number; ty: number } | null {
+    const sprite = this._phImageSprites.get(imageId)
+    if (!sprite?.parent) return null
+    const m = sprite.parent.worldTransform
+    return { a: m.a, b: m.b, c: m.c, d: m.d, tx: m.tx, ty: m.ty }
   }
 
   onEvent(cb: (e: SpineEvent) => void): () => void {

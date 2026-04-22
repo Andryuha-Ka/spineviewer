@@ -144,9 +144,26 @@
                 v-for="entry in phImagesStore.getPlaceholderImages(slot.id, ph.name)"
                 :key="entry.imageId"
                 class="ph-image-entry"
+                :class="{ 'ph-image-entry--active': entry.imageId === phImagesStore.activeImageId }"
+                @click.stop="onImageThumbClick(slot.id, ph.name, entry.imageId)"
               >
-                <img :src="entry.dataURL" class="ph-image-thumb" alt="" />
+                <img
+                  :src="entry.dataURL"
+                  class="ph-image-thumb"
+                  alt=""
+                />
                 <span class="ph-image-name">{{ entry.fileName }}</span>
+                <button
+                  class="ph-image-sync-btn"
+                  :class="{ 'ph-image-sync-btn--desynced': !entry.syncEnabled }"
+                  title="Sync image with slot viewport"
+                  @click.stop="phImagesStore.toggleImageSync(slot.id, ph.name, entry.imageId)"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7a5 5 0 0 1 0-10h2"/>
+                    <line x1="8" y1="12" x2="16" y2="12"/>
+                  </svg>
+                </button>
                 <button
                   class="ph-image-remove"
                   title="Remove image"
@@ -241,6 +258,30 @@ const viewerStore     = useViewerStore()
 const backgroundStore = useBackgroundStore()
 const skeletonStore   = useSkeletonStore()
 const phImagesStore   = usePlaceholderImagesStore()
+
+// ── Placeholder image activation ────────────────────────────────────────────
+const pendingImageToActivate = ref<string | null>(null)
+
+function onImageThumbClick(slotId: string, _phName: string, imageId: string): void {
+  if (slotId !== loaderStore.activeSlotId) {
+    pendingImageToActivate.value = imageId
+    loaderStore.setActiveSlot(slotId)
+    backgroundStore.setActive(false)
+    const s = new Set(expandedSlots.value)
+    s.add(slotId)
+    expandedSlots.value = s
+  } else {
+    phImagesStore.setActiveImage(imageId)
+  }
+}
+
+watch(() => loaderStore.activeSlotId, (newId) => {
+  if (!pendingImageToActivate.value || !newId) return
+  const slotImages = phImagesStore.getSlotImages(newId)
+  const exists = Object.values(slotImages).flat().some(e => e.imageId === pendingImageToActivate.value)
+  if (exists) phImagesStore.setActiveImage(pendingImageToActivate.value!)
+  pendingImageToActivate.value = null
+})
 
 // ── Placeholder tree expand/collapse ────────────────────────────────────────
 const expandedSlots = ref<Set<string>>(new Set())
@@ -917,6 +958,7 @@ function modifiedHint(slot: SpineSlot): string {
   padding: 2px 6px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
 }
 
 .ph-image-thumb {
@@ -926,6 +968,39 @@ function modifiedHint(slot: SpineSlot): string {
   border-radius: 2px;
   flex-shrink: 0;
   border: 1px solid var(--c-border);
+}
+
+.ph-image-entry--active {
+  background: rgba(157, 143, 255, 0.08);
+}
+
+.ph-image-entry--active .ph-image-thumb {
+  outline: 1.5px solid #9d8fff;
+  border-radius: 2px;
+}
+
+.ph-image-sync-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background: none;
+  border: none;
+  color: #4ade80;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 3px;
+  transition: color 0.12s, background 0.12s;
+}
+
+.ph-image-sync-btn--desynced {
+  color: #f59e0b;
+}
+
+.ph-image-sync-btn:hover {
+  background: var(--c-raised);
 }
 
 .ph-image-name {

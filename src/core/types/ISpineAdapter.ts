@@ -161,4 +161,8 @@ export interface ISpineAdapter {
   // Placeholder images — add/remove PIXI.Sprite children on slot containers
   addImageToPlaceholder(placeholderName: string, dataURL: string, imageId: string): void
   removeImageFromPlaceholder(placeholderName: string, imageId: string): void
+  // Apply posX/posY/scale to the PIXI.Sprite managed by this adapter for the given imageId
+  setImageTransform(imageId: string, posX: number, posY: number, scale: number): void
+  // Returns the 2D affine matrix of the sprite's parent container in Pixi world (canvas) space. Null if imageId not found.
+  getImageContainerWorldTransform(imageId: string): { a: number; b: number; c: number; d: number; tx: number; ty: number } | null
 }
