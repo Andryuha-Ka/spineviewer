@@ -59,7 +59,7 @@
           <li>Toggle <b>origin crosshair</b> in settings (⚙)</li>
           <li>Change <b>background color</b> via the color picker in the bottom-right corner of the canvas</li>
           <li><b>Placeholder labels</b> — toggle the <code>ph</code> checkbox to show/hide named placeholder overlays; expand the list below to enable/disable individual placeholders; toggle state and per-item visibility saved per skeleton</li>
-          <li><b>Placeholder images</b> — expand a skeleton in the Spines tab to see its placeholder slots; drag &amp; drop any image (PNG/JPG/WebP) onto a placeholder drop zone to attach it as a child sprite; multiple images per placeholder are supported; each can be removed individually; click a thumbnail to <b>activate</b> it; disable the sync toggle (🔗) on an image to reposition it by dragging or scale it with the scroll wheel independently; state saved per skeleton</li>
+          <li><b>Placeholder images</b> — expand a skeleton in the Spines tab to see its placeholder slots; drag &amp; drop any image (PNG/JPG/WebP) onto a placeholder drop zone to attach it as a child sprite; multiple images per placeholder are supported; each can be removed individually; click a thumbnail to <b>activate</b> it (or click directly on the sprite on canvas when desynced); disable the sync toggle (🔗) on an image to reposition it by dragging or scale it with the scroll wheel independently; overlapping images are sorted by z-index (last added = on top); state saved per skeleton</li>
           <li><b>Independent pan/zoom</b> — disable the sync toggle (🔗) on a skeleton or background image in the Spines tab; drag and scroll then affect only that item; hold <kbd>Shift</kbd> to pan/zoom the global scene instead</li>
         </ul>
       </section>
@@ -184,6 +184,7 @@
             <ul class="help-list">
               <li><b>Placeholder image transform</b> — click a thumbnail in the Spines tab to activate it; disable its sync toggle (🔗) to drag it or scroll-scale it independently inside the slot container; transform saved and restored per skeleton</li>
               <li><b>Clone placeholder image</b> — copy button on each placeholder image entry duplicates it into the same slot at position (0, 0) with the original scale; clone is fully independent</li>
+              <li><b>Canvas activation</b> — click directly on a desynced placeholder image sprite on canvas to activate it (topmost image wins when sprites overlap); drag starts immediately</li>
             </ul>
           </div>
           <div class="cl-entry">

@@ -205,6 +205,7 @@ When you drop multiple Spine skeletons, all are loaded into slots. The **Spines*
 ### v1.3.4
 - **Placeholder image transform** — click a thumbnail in the Spines tab to activate it; disable the sync toggle (🔗) on an image to drag-reposition or scroll-scale it independently inside the slot container; transform persisted per skeleton
 - **Clone placeholder image** — copy button per image duplicates it into the same placeholder at position (0, 0) with the original scale; clone is fully independent
+- **Canvas click activation** — click a desynced placeholder image sprite directly on canvas to activate it; topmost sprite wins when images overlap (z-index ordering)
 
 ### v1.3.3
 - **Placeholder images** — drop PNG/JPG/WebP onto a placeholder slot in the Spines tab to attach it as a child sprite; multiple images per placeholder, individually removable; state saved per skeleton

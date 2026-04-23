@@ -569,7 +569,10 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     // Mark as a user-added image so findDeepestTarget skips traversal into it
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(sprite as any).__phImage = true
-    findDeepestTarget(container).addChild(sprite)
+    const target = findDeepestTarget(container)
+    target.sortableChildren = true
+    sprite.zIndex = target.children.length
+    target.addChild(sprite)
     this._phImages.set(imageId, sprite)
   }
 
@@ -594,6 +597,19 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     if (!sprite?.parent) return null
     const m = sprite.parent.worldTransform
     return { a: m.a, b: m.b, c: m.c, d: m.d, tx: m.tx, ty: m.ty }
+  }
+
+  getImageAtCanvasPoint(x: number, y: number): string | null {
+    const point = new PIXI.Point(x, y)
+    let topId: string | null = null
+    let topZ = -Infinity
+    for (const [imageId, sprite] of this._phImages) {
+      if (sprite.containsPoint(point) && sprite.zIndex > topZ) {
+        topId = imageId
+        topZ = sprite.zIndex
+      }
+    }
+    return topId
   }
 
   onEvent(cb: (e: SpineEvent) => void): () => void {

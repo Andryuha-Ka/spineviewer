@@ -557,10 +557,12 @@ export default class Spine42Adapter implements ISpineAdapter {
     // Register sprite immediately so removeImageFromPlaceholder can find it.
     // Texture.from(dataURL) in Pixi8 loads asynchronously — assign texture via
     // HTMLImageElement.onload to guarantee it is visible on the first render frame.
+    phContainer.sortableChildren = true
     const sprite = new PIXI.Sprite()
     sprite.anchor.set(0.5, 0.5)
     sprite.x = 0
     sprite.y = 0
+    sprite.zIndex = phContainer.children.length
     phContainer.addChild(sprite)
     this._phImageSprites.set(imageId, sprite)
 
@@ -594,6 +596,19 @@ export default class Spine42Adapter implements ISpineAdapter {
     if (!sprite?.parent) return null
     const m = sprite.parent.worldTransform
     return { a: m.a, b: m.b, c: m.c, d: m.d, tx: m.tx, ty: m.ty }
+  }
+
+  getImageAtCanvasPoint(x: number, y: number): string | null {
+    const point = new PIXI.Point(x, y)
+    let topId: string | null = null
+    let topZ = -Infinity
+    for (const [imageId, sprite] of this._phImageSprites) {
+      if (sprite.containsPoint(point) && sprite.zIndex > topZ) {
+        topId = imageId
+        topZ = sprite.zIndex
+      }
+    }
+    return topId
   }
 
   onEvent(cb: (e: SpineEvent) => void): () => void {

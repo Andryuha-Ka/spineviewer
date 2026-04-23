@@ -490,6 +490,18 @@ function onPanStart(e: MouseEvent) {
 
   isPanning.value = true
 
+  // Canvas hit-test: activate a desynced image on click before resolving pan target
+  if (!e.shiftKey && containerRef.value && spineAdapter) {
+    const rect = (containerRef.value as HTMLElement).getBoundingClientRect()
+    const hitId = spineAdapter.getImageAtCanvasPoint(e.clientX - rect.left, e.clientY - rect.top)
+    if (hitId) {
+      const hitCtx = placeholderImagesStore.getImageContext(hitId)
+      if (hitCtx && !hitCtx.entry.syncEnabled && hitCtx.slotId === loaderStore.activeSlotId) {
+        placeholderImagesStore.setActiveImage(hitId)
+      }
+    }
+  }
+
   // Determine pan target at drag start
   const activeSlot = loaderStore.activeSlot
   if (e.shiftKey) {

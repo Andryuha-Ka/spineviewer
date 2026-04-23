@@ -165,4 +165,6 @@ export interface ISpineAdapter {
   setImageTransform(imageId: string, posX: number, posY: number, scale: number): void
   // Returns the 2D affine matrix of the sprite's parent container in Pixi world (canvas) space. Null if imageId not found.
   getImageContainerWorldTransform(imageId: string): { a: number; b: number; c: number; d: number; tx: number; ty: number } | null
+  // Returns the imageId of the first placeholder image sprite whose bounds contain the canvas-space point (x, y). Null if none.
+  getImageAtCanvasPoint(x: number, y: number): string | null
 }
