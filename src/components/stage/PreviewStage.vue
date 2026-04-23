@@ -1186,6 +1186,15 @@ onMounted(async () => {
                 }
               }
               adapter.setTimeScale(ss.wasPlaying ? ss.speed : 0)
+              if (ss.placeholderImages) {
+                placeholderImagesStore.setSlotImages(slotId, ss.placeholderImages)
+                for (const [phName, entries] of Object.entries(ss.placeholderImages)) {
+                  for (const entry of entries) {
+                    adapter.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
+                    adapter.setImageTransform(entry.imageId, entry.posX ?? 0, entry.posY ?? 0, entry.scale ?? 1)
+                  }
+                }
+              }
             }
             const obj = pixiApp.getLastStageChild()
             mountedAdapters.set(slotId, adapter)
