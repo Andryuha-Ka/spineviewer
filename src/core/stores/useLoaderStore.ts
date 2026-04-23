@@ -171,6 +171,13 @@ export const useLoaderStore = defineStore('loader', () => {
     spineSlots.value = arr
   }
 
+  /** Patch placeholderImages in savedState for a non-active slot (e.g. after drag-reparent). No-op if slot has no savedState yet. */
+  function patchSlotPlaceholderImages(slotId: string, placeholderImages: Record<string, import('@/core/types/FileSet').PHImageEntry[]>): void {
+    const slot = spineSlots.value.find(s => s.id === slotId)
+    if (!slot?.savedState) return
+    slot.savedState = { ...slot.savedState, placeholderImages: JSON.parse(JSON.stringify(placeholderImages)) }
+  }
+
   /** Update placeholders on a slot — triggers reactive array update so SpinesPanel re-renders. */
   function setSlotPlaceholders(id: string, placeholders: NonNullable<SpineSlot['placeholders']>): void {
     spineSlots.value = spineSlots.value.map(s =>
@@ -260,5 +267,6 @@ export const useLoaderStore = defineStore('loader', () => {
     cloneSlot,
     setSyncEnabled,
     setSlotPlaceholders,
+    patchSlotPlaceholderImages,
   }
 })

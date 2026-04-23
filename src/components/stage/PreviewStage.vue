@@ -195,24 +195,46 @@ function applyPlaceholderLabels() {
 watch(() => viewerStore.showPlaceholders, applyPlaceholderLabels)
 watch(() => viewerStore.disabledPlaceholders, applyPlaceholderLabels)
 
-watch(
-  () => placeholderImagesStore.hasPendingActions,
-  (has) => {
-    if (!has || !spineAdapter) return
-    const actions = placeholderImagesStore.drainActions()
-    for (const action of actions) {
+function drainPlaceholderActions() {
+  if (!spineAdapter) return
+  const actions = placeholderImagesStore.drainActions()
+  for (const action of actions) {
+    if (action.type === 'reorder') {
+      const adapter = action.slotId === loaderStore.activeSlotId ? spineAdapter : mountedAdapters.get(action.slotId)
+      if (adapter && action.orderedIds) {
+        action.orderedIds.forEach((id, idx) => adapter.setImageZIndex(id, idx))
+      }
+    } else if (action.type === 'move') {
+      const srcAdapter = action.slotId === loaderStore.activeSlotId ? spineAdapter : mountedAdapters.get(action.slotId)
+      srcAdapter?.removeImageFromPlaceholder(action.phName, action.imageId!)
+      if (action.dstSlotId && action.dstPhName) {
+        const dstAdapter = action.dstSlotId === loaderStore.activeSlotId ? spineAdapter : mountedAdapters.get(action.dstSlotId)
+        if (dstAdapter && action.dataURL && action.imageId) {
+          dstAdapter.addImageToPlaceholder(action.dstPhName, action.dataURL, action.imageId)
+          dstAdapter.setImageTransform(action.imageId, 0, 0, action.scale ?? 1)
+          const dstEntries = placeholderImagesStore.getPlaceholderImages(action.dstSlotId, action.dstPhName)
+          const zIdx = dstEntries.findIndex(e => e.imageId === action.imageId)
+          if (zIdx !== -1) dstAdapter.setImageZIndex(action.imageId, zIdx)
+        }
+      }
+    } else {
       if (action.slotId !== loaderStore.activeSlotId) continue
       if (action.type === 'add') {
-        spineAdapter.addImageToPlaceholder(action.phName, action.dataURL!, action.imageId)
-        const ctx = placeholderImagesStore.getImageContext(action.imageId)
+        spineAdapter.addImageToPlaceholder(action.phName, action.dataURL!, action.imageId!)
+        const ctx = placeholderImagesStore.getImageContext(action.imageId!)
         if (ctx && (ctx.entry.posX !== 0 || ctx.entry.posY !== 0 || ctx.entry.scale !== 1)) {
-          spineAdapter.setImageTransform(action.imageId, ctx.entry.posX, ctx.entry.posY, ctx.entry.scale)
+          spineAdapter.setImageTransform(action.imageId!, ctx.entry.posX, ctx.entry.posY, ctx.entry.scale)
         }
       } else {
-        spineAdapter.removeImageFromPlaceholder(action.phName, action.imageId)
+        spineAdapter.removeImageFromPlaceholder(action.phName, action.imageId!)
       }
     }
-  },
+  }
+}
+
+watch(
+  () => placeholderImagesStore.hasPendingActions,
+  (has) => { if (has) drainPlaceholderActions() },
 )
 
 // ── Viewport ──────────────────────────────────────────────────────────────────
@@ -947,6 +969,16 @@ onMounted(async () => {
         }
 
         // 2. Handle old active adapter: park (if pinned) or destroy
+        // Pre-remove sprites for pending move actions from this slot before park/destroy.
+        // The drain watcher may fire after activeSlotId changes but before the adapter is
+        // added to mountedAdapters, causing it to miss the remove. We handle it here first.
+        if (oldId && spineAdapter) {
+          for (const action of placeholderImagesStore.peekActions()) {
+            if (action.type === 'move' && action.slotId === oldId && action.imageId) {
+              spineAdapter.removeImageFromPlaceholder(action.phName, action.imageId)
+            }
+          }
+        }
         if (oldId && spineAdapter) {
           if (loaderStore.isPinned(oldId)) {
             // Park: keep on stage at current timeScale — adapter is already running correctly
@@ -1144,6 +1176,7 @@ onMounted(async () => {
                 }
               }
             }
+            drainPlaceholderActions()
           } catch (e) {
             spineError.value = e instanceof Error ? e.message : 'Failed to restore spine'
             console.error('[PreviewStage] restore pinned error:', e)
@@ -1154,8 +1187,19 @@ onMounted(async () => {
           // 5b. Load fresh — preserve current global viewport (resetViewport=false)
           await loadSpine(slot.fileSet, newId, false)
           restoreState(slot.savedState)
+          // Fallback: create sprites for images moved here before this slot had savedState
+          if (!slot.savedState) {
+            const liveImages = placeholderImagesStore.getSlotImages(newId)
+            for (const [phName, entries] of Object.entries(liveImages)) {
+              for (const entry of entries) {
+                spineAdapter?.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
+                spineAdapter?.setImageTransform(entry.imageId, entry.posX ?? 0, entry.posY ?? 0, entry.scale ?? 1)
+              }
+            }
+          }
           applySkins()
           applyPlaceholderLabels()
+          drainPlaceholderActions()
         }
       },
     )

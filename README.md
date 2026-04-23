@@ -202,6 +202,10 @@ When you drop multiple Spine skeletons, all are loaded into slots. The **Spines*
 
 ## Changelog
 
+### v1.3.5
+- **Drag & drop reorder placeholder images** — grab the handle on an image entry and drag onto another entry in the same placeholder to reorder; z-index updates live
+- **Move image to another placeholder** — drag an image entry onto any placeholder drop zone (same or different spine) to reparent it; target spine activates automatically if needed
+
 ### v1.3.4
 - **Placeholder image transform** — click a thumbnail in the Spines tab to activate it; disable the sync toggle (🔗) on an image to drag-reposition or scroll-scale it independently inside the slot container; transform persisted per skeleton
 - **Clone placeholder image** — copy button per image duplicates it into the same placeholder at position (0, 0) with the original scale; clone is fully independent

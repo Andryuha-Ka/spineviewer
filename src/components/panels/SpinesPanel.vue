@@ -144,9 +144,32 @@
                 v-for="entry in phImagesStore.getPlaceholderImages(slot.id, ph.name)"
                 :key="entry.imageId"
                 class="ph-image-entry"
-                :class="{ 'ph-image-entry--active': entry.imageId === phImagesStore.activeImageId }"
+                :class="{
+                  'ph-image-entry--active':   entry.imageId === phImagesStore.activeImageId,
+                  'ph-image-entry--dragging': entry.imageId === draggingPhImageId,
+                  'ph-image-entry--drag-over': entry.imageId === dragOverPhImageId && entry.imageId !== draggingPhImageId,
+                }"
                 @click.stop="onImageThumbClick(slot.id, ph.name, entry.imageId)"
+                @dragover.prevent.stop="dragOverPhImageId = entry.imageId"
+                @dragleave.stop="dragOverPhImageId = null"
+                @drop.prevent.stop="onPhImageEntryDrop($event, slot.id, ph.name, entry.imageId)"
               >
+                <span
+                  class="ph-image-drag-handle"
+                  draggable="true"
+                  title="Drag to reorder or move to another placeholder"
+                  @dragstart.stop="onPhImageDragStart($event, entry.imageId, slot.id, ph.name)"
+                  @dragend.stop="onPhImageDragEnd"
+                >
+                  <svg width="6" height="10" viewBox="0 0 6 10" fill="currentColor">
+                    <circle cx="1.5" cy="1.5" r="1.2"/>
+                    <circle cx="4.5" cy="1.5" r="1.2"/>
+                    <circle cx="1.5" cy="5"   r="1.2"/>
+                    <circle cx="4.5" cy="5"   r="1.2"/>
+                    <circle cx="1.5" cy="8.5" r="1.2"/>
+                    <circle cx="4.5" cy="8.5" r="1.2"/>
+                  </svg>
+                </span>
                 <img
                   :src="entry.dataURL"
                   class="ph-image-thumb"
@@ -328,10 +351,66 @@ function setPhDragOver(slotId: string, phName: string, active: boolean): void {
 
 async function onPhDrop(e: DragEvent, slotId: string, phName: string): Promise<void> {
   phDragOverKey.value = null
+  // ph-image reparent takes priority over file drop
+  const phData = e.dataTransfer?.getData('application/x-ph-image')
+  if (phData) {
+    const { imageId, srcSlotId, srcPhName } = JSON.parse(phData) as { imageId: string; srcSlotId: string; srcPhName: string }
+    if (srcSlotId !== slotId || srcPhName !== phName) {
+      phImagesStore.moveImage(srcSlotId, srcPhName, imageId, slotId, phName)
+      loaderStore.patchSlotPlaceholderImages(srcSlotId, phImagesStore.getSlotImages(srcSlotId))
+      if (slotId !== loaderStore.activeSlotId && !loaderStore.isPinned(slotId)) {
+        loaderStore.patchSlotPlaceholderImages(slotId, phImagesStore.getSlotImages(slotId))
+        loaderStore.setActiveSlot(slotId)
+      }
+    }
+    return
+  }
   const files = Array.from(e.dataTransfer?.files ?? [])
   const imageFiles = files.filter(f => f.type.startsWith('image/'))
   for (const file of imageFiles) {
     await phImagesStore.addImage(slotId, phName, file)
+  }
+}
+
+// ── Placeholder image drag & drop ────────────────────────────────────────────
+const draggingPhImageId   = ref<string | null>(null)
+const dragOverPhImageId   = ref<string | null>(null)
+
+function onPhImageDragStart(e: DragEvent, imageId: string, slotId: string, phName: string): void {
+  draggingPhImageId.value = imageId
+  e.dataTransfer!.effectAllowed = 'move'
+  e.dataTransfer!.setData('application/x-ph-image', JSON.stringify({ imageId, srcSlotId: slotId, srcPhName: phName }))
+}
+
+function onPhImageDragEnd(): void {
+  draggingPhImageId.value = null
+  dragOverPhImageId.value = null
+}
+
+function onPhImageEntryDrop(e: DragEvent, dstSlotId: string, dstPhName: string, dstImageId: string): void {
+  dragOverPhImageId.value = null
+  const phData = e.dataTransfer?.getData('application/x-ph-image')
+  if (!phData) return
+  const { imageId: srcImageId, srcSlotId, srcPhName } = JSON.parse(phData) as { imageId: string; srcSlotId: string; srcPhName: string }
+  if (srcImageId === dstImageId) return
+
+  if (srcSlotId === dstSlotId && srcPhName === dstPhName) {
+    // Same placeholder → reorder: move srcImageId before dstImageId
+    const entries = phImagesStore.getPlaceholderImages(srcSlotId, srcPhName).map(en => en.imageId)
+    const srcIdx = entries.indexOf(srcImageId)
+    const dstIdx = entries.indexOf(dstImageId)
+    if (srcIdx === -1 || dstIdx === -1 || srcIdx === dstIdx) return
+    entries.splice(srcIdx, 1)
+    entries.splice(dstIdx, 0, srcImageId)
+    phImagesStore.reorderImages(srcSlotId, srcPhName, entries)
+  } else {
+    // Different placeholder → reparent
+    phImagesStore.moveImage(srcSlotId, srcPhName, srcImageId, dstSlotId, dstPhName)
+    loaderStore.patchSlotPlaceholderImages(srcSlotId, phImagesStore.getSlotImages(srcSlotId))
+    if (dstSlotId !== loaderStore.activeSlotId && !loaderStore.isPinned(dstSlotId)) {
+      loaderStore.patchSlotPlaceholderImages(dstSlotId, phImagesStore.getSlotImages(dstSlotId))
+      loaderStore.setActiveSlot(dstSlotId)
+    }
   }
 }
 
@@ -961,6 +1040,27 @@ function modifiedHint(slot: SpineSlot): string {
   gap: 2px;
 }
 
+.ph-image-drag-handle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  color: var(--c-text-ghost);
+  cursor: grab;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.ph-image-entry:hover .ph-image-drag-handle {
+  opacity: 1;
+}
+
+.ph-image-drag-handle:active {
+  cursor: grabbing;
+}
+
 .ph-image-entry {
   display: flex;
   align-items: center;
@@ -987,6 +1087,15 @@ function modifiedHint(slot: SpineSlot): string {
 .ph-image-entry--active .ph-image-thumb {
   outline: 1.5px solid #9d8fff;
   border-radius: 2px;
+}
+
+.ph-image-entry--dragging {
+  opacity: 0.4;
+}
+
+.ph-image-entry--drag-over {
+  outline: 1px dashed var(--c-text-ghost);
+  border-radius: 3px;
 }
 
 .ph-image-sync-btn {

@@ -13,11 +13,15 @@ import { readFileAsDataURL } from '@/core/utils/fileLoader'
 export type { PHImageEntry }
 
 interface PHImageAction {
-  type: 'add' | 'remove'
-  slotId: string
-  phName: string
-  imageId: string
+  type: 'add' | 'remove' | 'reorder' | 'move'
+  slotId: string         // srcSlotId for 'move'
+  phName: string         // srcPhName for 'move'
+  imageId?: string
   dataURL?: string
+  orderedIds?: string[]  // for 'reorder'
+  dstSlotId?: string     // for 'move'
+  dstPhName?: string     // for 'move'
+  scale?: number         // for 'move'
 }
 
 export const usePlaceholderImagesStore = defineStore('placeholder-images', () => {
@@ -64,6 +68,27 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     if (entry) entry.syncEnabled = !entry.syncEnabled
   }
 
+  function reorderImages(slotId: string, phName: string, orderedIds: string[]): void {
+    const entries = images.value[slotId]?.[phName]
+    if (!entries) return
+    const map = new Map(entries.map(e => [e.imageId, e]))
+    images.value[slotId][phName] = orderedIds.map(id => map.get(id)!).filter(Boolean)
+    _pendingActions.value.push({ type: 'reorder', slotId, phName, orderedIds })
+  }
+
+  function moveImage(srcSlotId: string, srcPhName: string, imageId: string, dstSlotId: string, dstPhName: string): void {
+    const srcEntries = images.value[srcSlotId]?.[srcPhName]
+    if (!srcEntries) return
+    const idx = srcEntries.findIndex(e => e.imageId === imageId)
+    if (idx === -1) return
+    const [entry] = srcEntries.splice(idx, 1)
+    if (activeImageId.value === imageId) activeImageId.value = null
+    if (!images.value[dstSlotId]) images.value[dstSlotId] = {}
+    if (!images.value[dstSlotId][dstPhName]) images.value[dstSlotId][dstPhName] = []
+    images.value[dstSlotId][dstPhName].push({ ...entry, posX: 0, posY: 0 })
+    _pendingActions.value.push({ type: 'move', slotId: srcSlotId, phName: srcPhName, imageId, dataURL: entry.dataURL, dstSlotId, dstPhName, scale: entry.scale })
+  }
+
   function cloneImage(slotId: string, phName: string, imageId: string): void {
     const entry = images.value[slotId]?.[phName]?.find(e => e.imageId === imageId)
     if (!entry) return
@@ -97,6 +122,11 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     return copy
   }
 
+  /** Returns pending actions without removing them — for pre-processing before adapter park/destroy. */
+  function peekActions(): readonly PHImageAction[] {
+    return _pendingActions.value
+  }
+
   function clearSlotImages(slotId: string): void {
     delete images.value[slotId]
   }
@@ -122,9 +152,12 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     setActiveImage,
     updateImageTransform,
     toggleImageSync,
+    reorderImages,
+    moveImage,
     cloneImage,
     getImageContext,
     drainActions,
+    peekActions,
     clearSlotImages,
     setSlotImages,
     getSlotImages,

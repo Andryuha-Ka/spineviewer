@@ -598,6 +598,11 @@ export default class Spine42Adapter implements ISpineAdapter {
     return { a: m.a, b: m.b, c: m.c, d: m.d, tx: m.tx, ty: m.ty }
   }
 
+  setImageZIndex(imageId: string, zIndex: number): void {
+    const sprite = this._phImageSprites.get(imageId)
+    if (sprite) sprite.zIndex = zIndex
+  }
+
   getImageAtCanvasPoint(x: number, y: number): string | null {
     const point = new PIXI.Point(x, y)
     let topId: string | null = null

@@ -167,4 +167,6 @@ export interface ISpineAdapter {
   getImageContainerWorldTransform(imageId: string): { a: number; b: number; c: number; d: number; tx: number; ty: number } | null
   // Returns the imageId of the first placeholder image sprite whose bounds contain the canvas-space point (x, y). Null if none.
   getImageAtCanvasPoint(x: number, y: number): string | null
+  // Sets the zIndex of the PIXI.Sprite for the given imageId (requires sortableChildren on parent).
+  setImageZIndex(imageId: string, zIndex: number): void
 }
