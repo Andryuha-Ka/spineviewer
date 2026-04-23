@@ -64,6 +64,23 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     if (entry) entry.syncEnabled = !entry.syncEnabled
   }
 
+  function cloneImage(slotId: string, phName: string, imageId: string): void {
+    const entry = images.value[slotId]?.[phName]?.find(e => e.imageId === imageId)
+    if (!entry) return
+    const newId = crypto.randomUUID()
+    const clone: PHImageEntry = {
+      imageId: newId,
+      fileName: entry.fileName,
+      dataURL: entry.dataURL,
+      syncEnabled: entry.syncEnabled,
+      posX: 0,
+      posY: 0,
+      scale: entry.scale,
+    }
+    images.value[slotId][phName].push(clone)
+    _pendingActions.value.push({ type: 'add', slotId, phName, imageId: newId, dataURL: entry.dataURL })
+  }
+
   function getImageContext(imageId: string): { slotId: string; phName: string; entry: PHImageEntry } | null {
     for (const [slotId, phMap] of Object.entries(images.value)) {
       for (const [phName, entries] of Object.entries(phMap)) {
@@ -105,6 +122,7 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     setActiveImage,
     updateImageTransform,
     toggleImageSync,
+    cloneImage,
     getImageContext,
     drainActions,
     clearSlotImages,

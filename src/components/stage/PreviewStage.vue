@@ -204,6 +204,10 @@ watch(
       if (action.slotId !== loaderStore.activeSlotId) continue
       if (action.type === 'add') {
         spineAdapter.addImageToPlaceholder(action.phName, action.dataURL!, action.imageId)
+        const ctx = placeholderImagesStore.getImageContext(action.imageId)
+        if (ctx && (ctx.entry.posX !== 0 || ctx.entry.posY !== 0 || ctx.entry.scale !== 1)) {
+          spineAdapter.setImageTransform(action.imageId, ctx.entry.posX, ctx.entry.posY, ctx.entry.scale)
+        }
       } else {
         spineAdapter.removeImageFromPlaceholder(action.phName, action.imageId)
       }

@@ -72,7 +72,7 @@
         <div class="tab-grid">
           <div class="tab-item">
             <span class="tab-badge">Spines</span>
-            <span>Appears when 2+ skeletons or a background image is loaded — click to switch the active skeleton; <b>drag</b> the 6-dot handle to reorder (top = highest z-index on stage); <b>pin</b> (📌) to keep a skeleton visible while browsing others. Viewport, animation, skin, and placeholder state saved per skeleton. <b>Sync toggle</b> (🔗) — disable to move/zoom the active item independently (Shift+drag moves the scene). <b>Clone</b> button duplicates the active skeleton with its full state. <b>Expand</b> a skeleton row (▶) to reveal its placeholder slots — drop images onto them to attach child sprites; click a thumbnail to activate it; each image has its own <b>sync toggle</b> (🔗) — disable to drag/scroll-scale that image independently. <b>Drop zone</b> at the bottom — drop an image to set a background, or drop spine files to add new skeletons</span>
+            <span>Appears when 2+ skeletons or a background image is loaded — click to switch the active skeleton; <b>drag</b> the 6-dot handle to reorder (top = highest z-index on stage); <b>pin</b> (📌) to keep a skeleton visible while browsing others. Viewport, animation, skin, and placeholder state saved per skeleton. <b>Sync toggle</b> (🔗) — disable to move/zoom the active item independently (Shift+drag moves the scene). <b>Clone</b> button duplicates the active skeleton with its full state. <b>Expand</b> a skeleton row (▶) to reveal its placeholder slots — drop images onto them to attach child sprites; click a thumbnail to activate it; each image has its own <b>sync toggle</b> (🔗) — disable to drag/scroll-scale that image independently; <b>clone button</b> duplicates the image into the same placeholder at (0, 0) with the original scale. <b>Drop zone</b> at the bottom — drop an image to set a background, or drop spine files to add new skeletons</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Anim</span>
@@ -183,6 +183,7 @@
             <span class="cl-ver">v1.3.4</span>
             <ul class="help-list">
               <li><b>Placeholder image transform</b> — click a thumbnail in the Spines tab to activate it; disable its sync toggle (🔗) to drag it or scroll-scale it independently inside the slot container; transform saved and restored per skeleton</li>
+              <li><b>Clone placeholder image</b> — copy button on each placeholder image entry duplicates it into the same slot at position (0, 0) with the original scale; clone is fully independent</li>
             </ul>
           </div>
           <div class="cl-entry">

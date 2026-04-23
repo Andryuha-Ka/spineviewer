@@ -165,6 +165,16 @@
                   </svg>
                 </button>
                 <button
+                  class="ph-image-clone-btn"
+                  title="Clone image"
+                  @click.stop="phImagesStore.cloneImage(slot.id, ph.name, entry.imageId)"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                </button>
+                <button
                   class="ph-image-remove"
                   title="Remove image"
                   @click.stop="phImagesStore.removeImage(slot.id, ph.name, entry.imageId)"
@@ -1010,6 +1020,27 @@ function modifiedHint(slot: SpineSlot): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ph-image-clone-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background: none;
+  border: none;
+  color: var(--c-text-ghost);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 3px;
+  transition: color 0.12s, background 0.12s;
+}
+
+.ph-image-clone-btn:hover {
+  background: var(--c-raised);
+  color: var(--c-text-muted);
 }
 
 .ph-image-remove {
