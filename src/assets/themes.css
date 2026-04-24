@@ -53,6 +53,35 @@ html.font-sm { font-size: 16px; }
 html.font-md { font-size: 19px; }
 html.font-lg { font-size: 22px; }
 
+/* ── Global scrollbar ──────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-scroll) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--c-scroll);
+  border-radius: 2px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--c-scroll-hov);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* ── Naive UI overrides ────────────────────────────────────── */
 
 /* Cascader columns: content-based height, max 80vh */

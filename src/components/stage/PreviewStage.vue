@@ -414,7 +414,16 @@ function onWheel(e: WheelEvent) {
 
   const activeSlot = loaderStore.activeSlot
 
-  if (backgroundStore.isActive && !backgroundStore.syncEnabled) {
+  if (e.shiftKey) {
+    // Shift held — always global zoom regardless of sync state
+    const newZoom = Math.min(20, Math.max(0.05, viewerStore.zoom * dz))
+    if (newZoom === viewerStore.zoom) return
+    const spineX = (mx - baseX.value - viewerStore.posX) / viewerStore.zoom
+    const spineY = (my - baseY.value - viewerStore.posY) / viewerStore.zoom
+    viewerStore.posX = mx - baseX.value - spineX * newZoom
+    viewerStore.posY = my - baseY.value - spineY * newZoom
+    viewerStore.zoom = newZoom
+  } else if (backgroundStore.isActive && !backgroundStore.syncEnabled) {
     // Zoom background independently, anchored to cursor
     const newZoom = Math.min(20, Math.max(0.05, backgroundStore.zoom * dz))
     if (newZoom === backgroundStore.zoom) return
@@ -512,14 +521,73 @@ function onPanStart(e: MouseEvent) {
 
   isPanning.value = true
 
-  // Canvas hit-test: activate a desynced image on click before resolving pan target
-  if (!e.shiftKey && containerRef.value && spineAdapter) {
-    const rect = (containerRef.value as HTMLElement).getBoundingClientRect()
-    const hitId = spineAdapter.getImageAtCanvasPoint(e.clientX - rect.left, e.clientY - rect.top)
-    if (hitId) {
+  const _hitRect = containerRef.value ? (containerRef.value as HTMLElement).getBoundingClientRect() : null
+  const _hitCx   = _hitRect ? e.clientX - _hitRect.left : 0
+  const _hitCy   = _hitRect ? e.clientY - _hitRect.top  : 0
+
+  // Tracks whether THIS click landed on a desynced image sprite of the active slot.
+  // Used in the pan-target block below to guard panTarget='image'.
+  let _imageHitOnActiveSlot = false
+
+  if (!e.shiftKey && _hitRect) {
+    // Priority 1 — desynced image on the ACTIVE slot: activate image, fall through to pan-target block.
+    if (spineAdapter) {
+      const hitId = spineAdapter.getImageAtCanvasPoint(_hitCx, _hitCy)
+      if (hitId) {
+        const hitCtx = placeholderImagesStore.getImageContext(hitId)
+        if (hitCtx && !hitCtx.entry.syncEnabled && hitCtx.slotId === loaderStore.activeSlotId) {
+          placeholderImagesStore.setActiveImage(hitId)
+          _imageHitOnActiveSlot = true
+        }
+      }
+    }
+
+    // Priority 2 — desynced image on a NON-ACTIVE mounted slot:
+    // activate slot + image and start image drag immediately.
+    // Transform is captured from the non-active adapter before the async slot-switch watcher runs.
+    for (const [slotId, adapter] of mountedAdapters) {
+      if (slotId === loaderStore.activeSlotId) continue
+      const slotData = loaderStore.spineSlots.find(s => s.id === slotId)
+      const hasTracks = slotData?.savedState?.selectedAnimation ||
+        Object.values(slotData?.savedState?.trackPlaylists ?? {}).some(pl => pl.length > 0)
+      if (!hasTracks) continue
+      const hitId = adapter.getImageAtCanvasPoint(_hitCx, _hitCy)
+      if (!hitId) continue
       const hitCtx = placeholderImagesStore.getImageContext(hitId)
-      if (hitCtx && !hitCtx.entry.syncEnabled && hitCtx.slotId === loaderStore.activeSlotId) {
-        placeholderImagesStore.setActiveImage(hitId)
+      if (!hitCtx || hitCtx.entry.syncEnabled) continue
+      const matrix = adapter.getImageContainerWorldTransform(hitId)
+      loaderStore.setActiveSlot(slotId)
+      placeholderImagesStore.setActiveImage(hitId)
+      panTarget = 'image'
+      panStart = { x: e.clientX, y: e.clientY, px: hitCtx.entry.posX, py: hitCtx.entry.posY, imageId: hitId, imageMatrix: matrix }
+      return
+    }
+
+    // Priority 3 — spine bounds of a NON-ACTIVE slot: activate slot, clear active image.
+    if (mountedSpineObjects.size > 1) {
+      for (const [slotId, obj] of mountedSpineObjects) {
+        if (slotId === loaderStore.activeSlotId) continue
+        const slotData = loaderStore.spineSlots.find(s => s.id === slotId)
+        const hasTracks = slotData?.savedState?.selectedAnimation ||
+          Object.values(slotData?.savedState?.trackPlaylists ?? {}).some(pl => pl.length > 0)
+        if (!hasTracks) continue
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const b = (obj as any)?.getBounds?.()
+        if (b && b.width > 0 && b.height > 0 && _hitCx >= b.x && _hitCx <= b.x + b.width && _hitCy >= b.y && _hitCy <= b.y + b.height) {
+          placeholderImagesStore.setActiveImage(null)
+          loaderStore.setActiveSlot(slotId)
+          // setActiveSlot is sync — activeSlot computed immediately resolves to the new slot.
+          // spineAdapter swap happens in the async watcher, but 'slot' pan doesn't need it.
+          const hitSlot = loaderStore.activeSlot
+          if (hitSlot && hitSlot.syncEnabled === false) {
+            panTarget = 'slot'
+            panStart = { x: e.clientX, y: e.clientY, px: hitSlot.indPosX ?? 0, py: hitSlot.indPosY ?? 0, imageId: '', imageMatrix: null }
+          } else {
+            panTarget = 'global'
+            panStart = { x: e.clientX, y: e.clientY, px: viewerStore.posX, py: viewerStore.posY, imageId: '', imageMatrix: null }
+          }
+          return
+        }
       }
     }
   }
@@ -533,10 +601,10 @@ function onPanStart(e: MouseEvent) {
     panTarget = 'background'
     panStart = { x: e.clientX, y: e.clientY, px: backgroundStore.posX, py: backgroundStore.posY, imageId: '', imageMatrix: null }
   } else {
-    // Check for active desynced image before checking slot
+    // Use 'image' pan only when THIS click actually hit the sprite — not just because an image is active
     const aid = placeholderImagesStore.activeImageId
     const imgCtx = aid ? placeholderImagesStore.getImageContext(aid) : null
-    if (imgCtx && !imgCtx.entry.syncEnabled && imgCtx.slotId === loaderStore.activeSlotId) {
+    if (_imageHitOnActiveSlot && imgCtx && !imgCtx.entry.syncEnabled && imgCtx.slotId === loaderStore.activeSlotId) {
       panTarget = 'image'
       panStart = {
         x: e.clientX, y: e.clientY,

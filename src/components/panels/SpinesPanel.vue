@@ -8,6 +8,42 @@
 
 <template>
   <div class="spines-panel">
+    <!-- Global actions toolbar -->
+    <div class="spines-toolbar">
+      <span class="spines-toolbar-label">All spines</span>
+      <button
+        class="spine-expand-btn"
+        :class="{ 'spine-expand-btn--open': globalExpandEnabled }"
+        :disabled="!hasAnyPlaceholders"
+        :title="globalExpandEnabled ? 'Collapse all placeholders' : 'Expand all placeholders'"
+        @click="toggleAllExpand"
+      >
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+          <path d="M1 2.5L4 5.5L7 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button
+        class="spine-sync-btn"
+        :class="{ 'spine-sync-btn--desynced': !globalSyncEnabled }"
+        :title="globalSyncEnabled ? 'Desync all spines from global viewport' : 'Sync all spines to global viewport'"
+        @click="toggleAllSync"
+      >
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7a5 5 0 0 1 0-10h2"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+      </button>
+      <button
+        class="spine-pin-btn"
+        :class="{ 'spine-pin-btn--pinned': globalPinEnabled }"
+        :title="globalPinEnabled ? 'Unpin all spines' : 'Pin all spines on scene'"
+        @click="toggleAllPin"
+      >
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <path d="M17 4h-1V3a1 1 0 0 0-2 0v1H10V3a1 1 0 0 0-2 0v1H7a3 3 0 0 0-2.12 5.12L6 17v.5a.5.5 0 0 0 .5.5H11v2.5a1 1 0 0 0 2 0V18h4.5a.5.5 0 0 0 .5-.5V17l1.12-7.88A3 3 0 0 0 17 4z"/>
+        </svg>
+      </button>
+    </div>
     <div class="spines-list">
       <template v-for="(slot, index) in loaderStore.spineSlots" :key="slot.id">
         <div
@@ -104,7 +140,10 @@
           <button
             v-if="!isSlotError(slot)"
             class="spine-pin-btn"
-            :class="{ 'spine-pin-btn--pinned': loaderStore.isPinned(slot.id) }"
+            :class="{
+              'spine-pin-btn--pinned':  loaderStore.isPinned(slot.id),
+              'spine-pin-btn--pending': globalPinEnabled && !slotHasTracks(slot),
+            }"
             title="Keep on scene when switching"
             @click.stop="loaderStore.setPinned(slot.id, !loaderStore.isPinned(slot.id))"
           >
@@ -149,17 +188,17 @@
                   'ph-image-entry--dragging': entry.imageId === draggingPhImageId,
                   'ph-image-entry--drag-over': entry.imageId === dragOverPhImageId && entry.imageId !== draggingPhImageId,
                 }"
+                draggable="true"
                 @click.stop="onImageThumbClick(slot.id, ph.name, entry.imageId)"
+                @dragstart.stop="onPhImageDragStart($event, entry.imageId, slot.id, ph.name)"
+                @dragend.stop="onPhImageDragEnd"
                 @dragover.prevent.stop="dragOverPhImageId = entry.imageId"
                 @dragleave.stop="dragOverPhImageId = null"
                 @drop.prevent.stop="onPhImageEntryDrop($event, slot.id, ph.name, entry.imageId)"
               >
                 <span
                   class="ph-image-drag-handle"
-                  draggable="true"
                   title="Drag to reorder or move to another placeholder"
-                  @dragstart.stop="onPhImageDragStart($event, entry.imageId, slot.id, ph.name)"
-                  @dragend.stop="onPhImageDragEnd"
                 >
                   <svg width="6" height="10" viewBox="0 0 6 10" fill="currentColor">
                     <circle cx="1.5" cy="1.5" r="1.2"/>
@@ -315,6 +354,52 @@ watch(() => loaderStore.activeSlotId, (newId) => {
   if (exists) phImagesStore.setActiveImage(pendingImageToActivate.value!)
   pendingImageToActivate.value = null
 })
+
+// ── Global toolbar ───────────────────────────────────────────────────────────
+const validSlots = computed(() =>
+  loaderStore.spineSlots.filter(s => !s.error && !(s.validationErrors?.length)),
+)
+
+const { globalSyncEnabled, globalPinEnabled, globalExpandEnabled } = storeToRefs(loaderStore)
+
+function slotHasTracks(slot: SpineSlot): boolean {
+  if (slot.id === loaderStore.activeSlotId) return animationStore.tracks.length > 0
+  const s = slot.savedState
+  if (!s) return false
+  if (s.selectedAnimation) return true
+  return Object.values(s.trackPlaylists).some(pl => pl.length > 0)
+}
+
+const slotsWithTracks = computed(() => validSlots.value.filter(s => slotHasTracks(s)))
+
+const hasAnyPlaceholders = computed(() =>
+  validSlots.value.some(s => s.placeholders?.some(p => p.kind === 'slot')),
+)
+
+
+function toggleAllSync(): void {
+  globalSyncEnabled.value = !globalSyncEnabled.value
+  for (const slot of validSlots.value) loaderStore.setSyncEnabled(slot.id, globalSyncEnabled.value)
+  phImagesStore.setAllImagesSync(globalSyncEnabled.value)
+}
+
+function toggleAllPin(): void {
+  globalPinEnabled.value = !globalPinEnabled.value
+  for (const slot of slotsWithTracks.value) loaderStore.setPinned(slot.id, globalPinEnabled.value)
+}
+
+function toggleAllExpand(): void {
+  globalExpandEnabled.value = !globalExpandEnabled.value
+  const withPh = validSlots.value.filter(s => s.placeholders?.some(p => p.kind === 'slot'))
+  const s = new Set(expandedSlots.value)
+  if (globalExpandEnabled.value) {
+    for (const slot of withPh) s.add(slot.id)
+  } else {
+    for (const slot of withPh) s.delete(slot.id)
+  }
+  expandedSlots.value = s
+}
+
 
 // ── Placeholder tree expand/collapse ────────────────────────────────────────
 const expandedSlots = ref<Set<string>>(new Set())
@@ -597,12 +682,22 @@ async function handleDroppedFiles(files: File[]): Promise<void> {
       window.alert(result.globalError)
       return
     }
+    const inheritDesync  = !globalSyncEnabled.value
+    const inheritExpand  = globalExpandEnabled.value
     for (const slot of result.slots) {
       if (!slot.error && slot.fileSet) {
         const errs = validateSpineFileSet(slot.fileSet)
         if (errs.length > 0) slot.validationErrors = errs
       }
       loaderStore.addSlot(slot)
+      if (!slot.error) {
+        if (inheritDesync) loaderStore.setSyncEnabled(slot.id, false)
+        if (inheritExpand && slot.placeholders?.some(p => p.kind === 'slot')) {
+          const s = new Set(expandedSlots.value)
+          s.add(slot.id)
+          expandedSlots.value = s
+        }
+      }
     }
   }
 }
@@ -688,6 +783,22 @@ function modifiedHint(slot: SpineSlot): string {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+}
+
+.spines-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--c-border-dim);
+  flex-shrink: 0;
+}
+
+.spines-toolbar-label {
+  flex: 1;
+  font-size: 0.68rem;
+  color: var(--c-text-ghost);
+  user-select: none;
 }
 
 .spines-list {
@@ -921,6 +1032,10 @@ function modifiedHint(slot: SpineSlot): string {
   color: #4ade80;
 }
 
+.spine-pin-btn--pending {
+  color: rgba(74, 222, 128, 0.35);
+}
+
 .spine-pin-btn:not(.spine-pin-btn--pinned):hover {
   background: var(--c-raised);
   color: var(--c-text-muted);
@@ -1047,18 +1162,14 @@ function modifiedHint(slot: SpineSlot): string {
   justify-content: center;
   width: 10px;
   color: var(--c-text-ghost);
-  cursor: grab;
   padding: 0;
   opacity: 0;
   transition: opacity 0.12s;
+  pointer-events: none;
 }
 
 .ph-image-entry:hover .ph-image-drag-handle {
   opacity: 1;
-}
-
-.ph-image-drag-handle:active {
-  cursor: grabbing;
 }
 
 .ph-image-entry {
@@ -1068,7 +1179,11 @@ function modifiedHint(slot: SpineSlot): string {
   padding: 2px 6px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.03);
-  cursor: pointer;
+  cursor: grab;
+}
+
+.ph-image-entry:active {
+  cursor: grabbing;
 }
 
 .ph-image-thumb {

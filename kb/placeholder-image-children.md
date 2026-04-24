@@ -1,5 +1,5 @@
 # Placeholder Image Children — Architecture Reference
-_Added: 2026-04-22 · Updated: 2026-04-24 (Clone, Canvas Activation, Drag Reorder/Move)_
+_Added: 2026-04-22 · Updated: 2026-04-25 (Canvas spine activation, Global toolbar, Multi-slot image hit-test, Drag priority; Global state sync fix)_
 
 ## Overview
 
@@ -10,8 +10,14 @@ Each image carries its own **independent transform** (`posX`, `posY`, `scale`, `
 **Additional operations (added 2026-04-24):**
 - **Clone** — duplicates a `PHImageEntry` in the same placeholder at (0, 0) with the original scale; fully independent
 - **Canvas activation** — clicking a desynced sprite on the canvas activates it; topmost sprite (highest zIndex) wins when sprites overlap
-- **Drag reorder** — drag handle on each entry reorders sprites within the same placeholder (zIndex updated live)
+- **Drag reorder** — drag on entire `ph-image-entry` row reorders sprites within the same placeholder (zIndex updated live)
 - **Drag move** — drag to a different placeholder drop zone (same or different spine) to reparent the sprite; target spine activates automatically if needed
+
+**Additional operations (added 2026-04-25):**
+- **Canvas spine activation** — clicking a pinned non-active spine on the canvas activates it; only spines with animation tracks can be activated this way
+- **Cross-slot image drag** — clicking a desynced image of a pinned non-active spine activates that spine + image and starts image drag in a single mousedown
+- **Global toolbar** — Expand / Sync / Pin buttons above the spine list in SpinesPanel apply to all spines at once; local states sync TO the global intent ref (not inverted)
+- **Shift+scroll** — holding Shift while scrolling always zooms the global scene, even when a desynced spine or image is active
 
 **Scope:** slot-kind placeholders only (no bone-kind). No rotation, keyboard shortcuts, or undo/redo.
 
@@ -177,35 +183,87 @@ peekActions() → readonly PHImageAction[] — read queue without draining (used
 
 `PanTarget` extended to `'global' | 'background' | 'slot' | 'image'`.
 
-**Canvas click activation (added 2026-04-24):**
-In `onPanStart`, before the priority-check block, a hit-test fires:
+**`onPanStart` unified hit-test block (updated 2026-04-25):**
+
+All canvas hit-tests are consolidated under one `if (!e.shiftKey && _hitRect)` block that runs after `isPanning = true`. Canvas coordinates `(_hitCx, _hitCy)` are computed once.
+
+**Priority order inside the block:**
+
+**P1 — desynced image on the ACTIVE slot** (fall-through, no early return):
 ```ts
-if (!e.shiftKey && containerRef.value && spineAdapter) {
-  const rect = containerRef.value.getBoundingClientRect()
-  const hitId = spineAdapter.getImageAtCanvasPoint(e.clientX - rect.left, e.clientY - rect.top)
-  if (hitId) {
-    const hitCtx = placeholderImagesStore.getImageContext(hitId)
-    if (hitCtx && !hitCtx.entry.syncEnabled && hitCtx.slotId === loaderStore.activeSlotId) {
-      placeholderImagesStore.setActiveImage(hitId)
-    }
+let _imageHitOnActiveSlot = false
+const hitId = spineAdapter?.getImageAtCanvasPoint(_hitCx, _hitCy)
+if (hitId) {
+  const hitCtx = placeholderImagesStore.getImageContext(hitId)
+  if (hitCtx && !hitCtx.entry.syncEnabled && hitCtx.slotId === activeSlotId) {
+    placeholderImagesStore.setActiveImage(hitId)
+    _imageHitOnActiveSlot = true   // guards panTarget='image' below
   }
 }
 ```
-Only desynced images in the active slot can be activated this way. `getImageAtCanvasPoint` returns the imageId with the highest `zIndex` among all sprites whose bounds contain the point (`sprite.containsPoint(new PIXI.Point(x, y))`). Activation + drag start happen in the same `mousedown`.
 
-**`onPanStart` priority order:**
-1. `shiftKey` → `'global'`
-2. `backgroundStore.isActive && !syncEnabled` → `'background'`
-3. Hit-test → activate desynced image if found (then fall through to step 4)
-4. Active desynced image in current slot → `'image'` (snapshots `imageMatrix` + `px/py`)
-5. `activeSlot.syncEnabled === false` → `'slot'`
-6. else → `'global'`
+**P2 — desynced image on a NON-ACTIVE mounted slot** (early return):
+```ts
+for (const [slotId, adapter] of mountedAdapters) {
+  if (slotId === activeSlotId) continue
+  if (!slotHasTracks(slotId)) continue            // only slots with animation tracks
+  const hitId = adapter.getImageAtCanvasPoint(_hitCx, _hitCy)
+  if (!hitId) continue
+  const hitCtx = placeholderImagesStore.getImageContext(hitId)
+  if (!hitCtx || hitCtx.entry.syncEnabled) continue
+  const matrix = adapter.getImageContainerWorldTransform(hitId)  // captured BEFORE setActiveSlot
+  loaderStore.setActiveSlot(slotId)
+  placeholderImagesStore.setActiveImage(hitId)
+  panTarget = 'image'
+  panStart = { ..., px: hitCtx.entry.posX, py: hitCtx.entry.posY, imageId: hitId, imageMatrix: matrix }
+  return
+}
+```
+Transform is captured before `setActiveSlot` because the async watcher hasn't swapped `spineAdapter` yet. By the time the first `mousemove` fires, `spineAdapter` is already the new adapter (path 5a reuse) and `setImageTransform` operates correctly.
 
-**`onPanMove` — `'image'` case:** inverse-matrix delta, `updateImageTransform` (store) + `setImageTransform` (adapter) directly — no action queue.
+**P3 — spine bounds of a NON-ACTIVE slot** (early return, clears active image):
+```ts
+for (const [slotId, obj] of mountedSpineObjects) {
+  if (slotId === activeSlotId) continue
+  if (!slotHasTracks(slotId)) continue            // only slots with animation tracks
+  const b = (obj as any).getBounds()
+  if (/* point inside b */) {
+    placeholderImagesStore.setActiveImage(null)   // spine-body click clears active image
+    loaderStore.setActiveSlot(slotId)
+    const hitSlot = loaderStore.activeSlot
+    panTarget = hitSlot?.syncEnabled === false ? 'slot' : 'global'
+    panStart = { ... }
+    return
+  }
+}
+```
 
-**`onWheel` — image zoom block:** anchor-to-cursor zoom, scale clamped to `[0.05, 20]`.
+**Pan-target block** (runs when no early return):
+```
+shiftKey          → 'global'
+background active + desynced → 'background'
+_imageHitOnActiveSlot && image desynced → 'image'   // ONLY if THIS click hit the sprite
+activeSlot desynced → 'slot'
+else              → 'global'
+```
+
+`_imageHitOnActiveSlot` is the key guard: without it, any click on the spine body would drag the previously-active image instead of the slot.
+
+**`onPanMove` — `'image'` case:** inverse-matrix delta using `panStart.imageMatrix`, `updateImageTransform` (store) + `setImageTransform` (adapter) directly — no action queue.
+
+**`onWheel`:**
+- `shiftKey` → always global zoom (added 2026-04-25; mirrors shift+drag → global pan)
+- Background active + desynced → background zoom
+- Active desynced image → anchor-to-cursor image scale `[0.05, 20]`
+- Active slot desynced → anchor-to-cursor slot zoom
+- else → global zoom
 
 **Slot switch watcher:** `placeholderImagesStore.setActiveImage(null)`.
+
+**Canvas spine activation — `slotHasTracks(slotId)` guard:**
+Only pinned non-active spine slots that have at least one animation track set (even paused) can be activated via canvas click. Check:
+- For non-active slots: `savedState.selectedAnimation !== null` OR any `trackPlaylists` entry is non-empty
+Active-slot is excluded from both P2 and P3 (it's already active).
 
 ### Pending Activation (inactive slot)
 
@@ -288,8 +346,8 @@ if (s.placeholderImages) {
 ```
 [drag handle ⠿] [thumbnail] [filename] [sync-btn 🔗] [clone-btn] [remove ×]
 ```
-- **Drag handle** — `draggable="true"` span; `@dragstart` sets `application/x-ph-image` data `{imageId, srcSlotId, srcPhName}`
-- **Row** — `@dragover.prevent` + `@drop` receive ph-image drops for reorder/reparent
+- **Row** — `draggable="true"` on the whole `div.ph-image-entry`; `@dragstart` sets `application/x-ph-image` data `{imageId, srcSlotId, srcPhName}`; `@dragover.prevent` + `@drop` receive ph-image drops for reorder/reparent; `cursor: grab` on the entire row
+- **Drag handle** — visual-only `<span>` (dots icon); `pointer-events: none`, shown on hover; no longer the drag source
 - **`ph-drop-zone`** — receives both file drops and ph-image drops (ph-image checked first via `dataTransfer.getData('application/x-ph-image')`)
 
 **Drag state refs:** `draggingPhImageId`, `dragOverPhImageId` — CSS classes `ph-image-entry--dragging` (opacity 0.4) and `ph-image-entry--drag-over` (dashed outline).
@@ -297,6 +355,85 @@ if (s.placeholderImages) {
 **Drop logic:**
 - Same placeholder: reorder via `reorderImages` (insert src at original dstIdx)
 - Different placeholder (same or different spine): `moveImage` + `patchSlotPlaceholderImages(src)` + conditionally `patchSlotPlaceholderImages(dst)` + `setActiveSlot(dst)` if dst non-active non-pinned
+
+---
+
+## Spines Panel Global Toolbar (added 2026-04-25)
+
+A compact toolbar sits above `.spines-list` in `SpinesPanel.vue` with three global action buttons: **Expand · Sync · Pin**.
+
+### State
+
+```ts
+// Local to SpinesPanel.vue
+const globalPinEnabled    = ref(false)        // explicit pin intent — NOT derived from slot state
+const globalSyncEnabled   = ref(true)         // explicit sync intent — NOT derived from slot state
+const globalExpandEnabled = ref(false)        // explicit expand intent — NOT derived from slot state
+const validSlots          = computed(...)     // spineSlots without error/validationErrors
+const slotsWithTracks     = computed(...)     // validSlots filtered by slotHasTracks()
+const hasAnyPlaceholders  = computed(...)     // any validSlot has kind==='slot' placeholders
+```
+
+### `slotHasTracks(slot)`
+
+```ts
+function slotHasTracks(slot: SpineSlot): boolean {
+  if (slot.id === loaderStore.activeSlotId) return animationStore.tracks.length > 0
+  const s = slot.savedState
+  if (!s) return false
+  if (s.selectedAnimation) return true
+  return Object.values(s.trackPlaylists).some(pl => pl.length > 0)
+}
+```
+
+Active slot → live `animationStore.tracks`; non-active → `savedState`.
+
+### Button Behaviour
+
+| Button | Active state | Click action |
+|--------|-------------|--------------|
+| **Expand** | `globalExpandEnabled` | toggles `globalExpandEnabled`; expands or collapses all slots that have placeholders; disabled if none |
+| **Sync** | `!globalSyncEnabled` (amber) | toggles `globalSyncEnabled`; syncs or desyncs all `validSlots` to match the new value |
+| **Pin** | `globalPinEnabled` (green) | toggles `globalPinEnabled`; pins/unpins only `slotsWithTracks` |
+
+All three buttons carry **explicit intent refs** — local slot states are synchronized TO the global ref value on click, not the other way around. This means returning to the Spines tab after navigating away preserves the global intent; newly added slots inherit it automatically.
+
+**Pin visual states on individual spine rows:**
+- `spine-pin-btn--pinned` (bright green) — slot is actually pinned
+- `spine-pin-btn--pending` (dim green, 35% opacity) — `globalPinEnabled && !slotHasTracks(slot)` — slot will be auto-pinned when it gets its first animation track
+
+### Auto-Pin on First Track
+
+```ts
+watch(() => animationStore.tracks.length, (newLen, oldLen) => {
+  if (oldLen === 0 && newLen > 0 && globalPinEnabled.value) {
+    loaderStore.setPinned(loaderStore.activeSlotId!, true)
+  }
+})
+```
+
+Fires when the active slot transitions from zero tracks to one or more. Slots already with a savedState that has tracks are handled correctly by `slotsWithTracks` when the global pin button is pressed.
+
+### Inheritance on Drop
+
+When new spines are added via the dropzone, global state is captured before the loop and applied after `addSlot`:
+
+```ts
+const inheritDesync = !allSynced.value
+const inheritExpand = allExpanded.value
+for (const slot of result.slots) {
+  loaderStore.addSlot(slot)
+  if (!slot.error) {
+    if (inheritDesync) loaderStore.setSyncEnabled(slot.id, false)
+    if (inheritExpand && slot.placeholders?.some(p => p.kind === 'slot')) {
+      expandedSlots.value = new Set([...expandedSlots.value, slot.id])
+    }
+    // Pin: handled by the auto-pin watch when first animation track is set
+  }
+}
+```
+
+Snapshot before loop prevents the computed values from changing mid-iteration as slots are added.
 
 ---
 
@@ -389,6 +526,34 @@ Drain watcher fires after `activeSlotId` changes but before the slot switch watc
 ### `sortableChildren = true` + incrementing `zIndex`
 Pixi only respects `zIndex` when the parent container has `sortableChildren = true`. Set on `target` at every `addImageToPlaceholder` call (idempotent). zIndex = `target.children.length` before `addChild` → first added = 0, each subsequent = +1. Higher = on top.
 
+### `_imageHitOnActiveSlot` flag guards panTarget='image'
+Without the flag, any canvas click would drag the previously-active image if `activeImageId` is set. The flag is set only when the current `mousedown` actually hits a desynced image sprite of the active slot. The pan-target block checks the flag, not just `activeImageId`, so clicking on the spine body correctly starts slot/global pan even with an active image.
+
+### Canvas spine activation restricted to slots with animation tracks
+Clicking on a pinned non-active spine on the canvas should only activate spines that the user has meaningfully configured (tracks set). Spines without tracks are likely still being set up; activating them on accidental clicks would disrupt workflow. Guard: `slotHasTracks(slotId)` checked before bounds test in P3 and before image hit-test in P2.
+
+### Cross-slot image drag: transform captured before `setActiveSlot`
+P2 calls `adapter.getImageContainerWorldTransform(hitId)` on the non-active adapter before calling `setActiveSlot`. By the time the first `mousemove` fires, the async watcher has completed path 5a and swapped `spineAdapter` to the same adapter. The captured `imageMatrix` in `panStart` remains valid throughout the drag.
+
+### Global toolbar buttons use explicit intent refs, not derived computed state
+All three global toolbar buttons (`globalPinEnabled`, `globalSyncEnabled`, `globalExpandEnabled`) store their intent in a `ref`, NOT in a computed property derived from the current slot states.
+
+**Why not computed?**
+- `allSynced` / `allExpanded` are snapshots of the current slot array. If a user navigates to another panel and returns to Spines, the computed still reflects the live slot state — but the global button value would need to re-agree with it, making the apparent button state non-deterministic and potentially triggering an inversion on click instead of a no-op.
+- A computed-based toggle (click when `allSynced` → desync, click when `!allSynced` → sync) inverts locals based on their aggregate state at click-time. If one slot was manually changed, the aggregate state changed too, and the next click goes the "wrong" direction.
+- `globalPinEnabled` / `globalSyncEnabled` / `globalExpandEnabled` are durable intents: the refs persist in the component instance across tab switches. Local states are set TO the ref value on click, not read FROM the slots to derive the ref.
+
+**Panels return fix:** before this change, switching away from Spines and returning caused local sync/expand states to appear desynced from the global button because the computed flipped to match the (potentially changed) slot state. With explicit refs, the global button retains its state and locals are re-applied on next click if needed.
+
+### Drag on entire `ph-image-entry` row, not just handle
+`draggable="true"` was moved from `<span class="ph-image-drag-handle">` to `<div class="ph-image-entry">`. The handle is now `pointer-events: none` — purely visual. Whole-row drag is more discoverable and matches how users expect list items to behave.
+
+### Global scrollbar in `themes.css`
+All scrollbar styles were consolidated into a single `*::-webkit-scrollbar` / `scrollbar-width: thin` rule in `themes.css` using `--c-scroll` / `--c-scroll-hov` tokens. Per-component scrollbar CSS was removed from 7 panel files (~60 lines total). New scrollable areas (e.g. SpinesPanel) get styled automatically without per-component rules.
+
+### Shift+scroll always zooms global scene
+`onWheel` gained a `shiftKey` early branch that routes directly to global zoom — mirroring the existing `shiftKey` branch in `onPanStart` that routes to global pan. Consistent modifier semantics: Shift = global viewport, always.
+
 ---
 
 ## Dependency Map
@@ -409,8 +574,8 @@ flowchart TD
         Sp41["Spine41Adapter (pixi8)\nno-op stubs"]
     end
     subgraph Components
-        SpinesPanel["SpinesPanel.vue\nph-image-entry: drag handle, dragover, drop\nonPhImageDragStart / onPhImageEntryDrop\nonPhDrop: ph-image reparent + file drop\ncloneImage / reorderImages / moveImage\npatchSlotPlaceholderImages(src+dst)\nsetActiveSlot if dst non-active non-pinned\nph-image-sync-btn · ph-image-clone-btn"]
-        PreviewStage["PreviewStage.vue\ndrainPlaceholderActions() (named fn)\nwatcher hasPendingActions → drain\nslot switch: peekActions() pre-remove\nslot switch end → drainPlaceholderActions()\nPanTarget: 'image'\nonPanStart: hit-test → canvas activation\nonPanMove → inverse matrix delta\nonWheel → anchor-to-cursor zoom\nrestoreState → setImageTransform\nnull-savedState fallback for move targets"]
+        SpinesPanel["SpinesPanel.vue\nph-image-entry: full-row draggable\nonPhImageDragStart / onPhImageEntryDrop\nonPhDrop: ph-image reparent + file drop\ncloneImage / reorderImages / moveImage\npatchSlotPlaceholderImages(src+dst)\nsetActiveSlot if dst non-active non-pinned\nph-image-sync-btn · ph-image-clone-btn\nglobalPinEnabled · globalSyncEnabled · globalExpandEnabled\nslotHasTracks() · slotsWithTracks\nauto-pin watch (animationStore.tracks)\ninheritDesync/inheritExpand on drop"]
+        PreviewStage["PreviewStage.vue\ndrainPlaceholderActions() (named fn)\nwatcher hasPendingActions → drain\nslot switch: peekActions() pre-remove\nslot switch end → drainPlaceholderActions()\nPanTarget: 'image'\nonPanStart: _imageHitOnActiveSlot flag\nP1 active-slot image hit-test\nP2 non-active slot image hit-test + drag\nP3 spine bounds → activate + clear image\nonPanMove → inverse matrix delta\nonWheel: shiftKey→global, else per-target\nrestoreState → setImageTransform\nnull-savedState fallback for move targets"]
     end
 
     FileSet -->|PHImageEntry type| PHStore

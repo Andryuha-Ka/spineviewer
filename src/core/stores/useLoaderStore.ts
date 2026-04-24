@@ -80,6 +80,11 @@ export const useLoaderStore = defineStore('loader', () => {
   /** IDs of slots that are pinned on scene (visible even when not active) */
   const pinnedSlotIds = ref<Set<string>>(new Set())
 
+  /** Global toolbar explicit intent refs — persist across panel switches */
+  const globalSyncEnabled   = ref(true)
+  const globalPinEnabled    = ref(false)
+  const globalExpandEnabled = ref(false)
+
   /** Currently active slot */
   const activeSlot = computed(() =>
     spineSlots.value.find(s => s.id === activeSlotId.value) ?? null,
@@ -268,5 +273,8 @@ export const useLoaderStore = defineStore('loader', () => {
     setSyncEnabled,
     setSlotPlaceholders,
     patchSlotPlaceholderImages,
+    globalSyncEnabled,
+    globalPinEnabled,
+    globalExpandEnabled,
   }
 })

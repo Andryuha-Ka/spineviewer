@@ -282,13 +282,7 @@ function densityClass(density: number): string {
 .kf-table-wrap {
   overflow-y: auto;
   flex: 1;
-  scrollbar-width: thin;
-  scrollbar-color: var(--c-scroll) transparent;
 }
-
-.kf-table-wrap::-webkit-scrollbar { width: 4px; }
-.kf-table-wrap::-webkit-scrollbar-track { background: transparent; }
-.kf-table-wrap::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
 
 .kf-table {
   width: 100%;

@@ -68,6 +68,13 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     if (entry) entry.syncEnabled = !entry.syncEnabled
   }
 
+  function setAllImagesSync(value: boolean): void {
+    for (const slotImages of Object.values(images.value))
+      for (const entries of Object.values(slotImages))
+        for (const entry of entries)
+          entry.syncEnabled = value
+  }
+
   function reorderImages(slotId: string, phName: string, orderedIds: string[]): void {
     const entries = images.value[slotId]?.[phName]
     if (!entries) return
@@ -152,6 +159,7 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     setActiveImage,
     updateImageTransform,
     toggleImageSync,
+    setAllImagesSync,
     reorderImages,
     moveImage,
     cloneImage,

@@ -259,13 +259,7 @@ async function copyName(name: string) {
   overflow-y: auto;
   font-size: 0.75rem;
   color: var(--c-text);
-  scrollbar-width: thin;
-  scrollbar-color: var(--c-scroll) transparent;
 }
-
-.events-panel::-webkit-scrollbar { width: 4px; }
-.events-panel::-webkit-scrollbar-track { background: transparent; }
-.events-panel::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
 
 /* ── Controls ── */
 .controls {
@@ -381,13 +375,7 @@ async function copyName(name: string) {
   overflow-y: auto;
   max-height: 220px;
   flex-shrink: 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--c-scroll) transparent;
 }
-
-.log-wrap::-webkit-scrollbar { width: 4px; }
-.log-wrap::-webkit-scrollbar-track { background: transparent; }
-.log-wrap::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
 
 .log-table { display: flex; flex-direction: column; }
 

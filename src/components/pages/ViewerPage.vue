@@ -147,6 +147,15 @@ watch(
   (loaded) => { if (loaded) activeTab.value = 'spines' },
 )
 
+// Auto-pin active slot when it gets its first animation track and globalPinEnabled is on.
+// Lives here (not SpinesPanel) so it stays active even when Spines tab is not open.
+watch(() => animationStore.tracks.length, (newLen, oldLen) => {
+  if (oldLen === 0 && newLen > 0 && loaderStore.globalPinEnabled) {
+    const id = loaderStore.activeSlotId
+    if (id) loaderStore.setPinned(id, true)
+  }
+})
+
 // ── Resizable side panel ──────────────────────────────────────────────────────
 const PANEL_MIN = 180
 const PANEL_MAX = 520

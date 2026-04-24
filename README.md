@@ -202,9 +202,17 @@ When you drop multiple Spine skeletons, all are loaded into slots. The **Spines*
 
 ## Changelog
 
+### v1.3.6
+- **Global toolbar persistent state** — Expand / Sync / Pin intent stored in `useLoaderStore`; survives panel tab switches
+- **Global Sync applies to placeholder images** — toggling sync all also syncs/desyncs all placeholder image sprites
+- **Auto-pin on first track** — active when Spines tab is not open (watch moved to ViewerPage)
+
 ### v1.3.5
-- **Drag & drop reorder placeholder images** — grab the handle on an image entry and drag onto another entry in the same placeholder to reorder; z-index updates live
+- **Drag & drop reorder placeholder images** — drag anywhere on the image row to reorder within the placeholder or move to another placeholder drop zone (even across spines); z-index updates live
 - **Move image to another placeholder** — drag an image entry onto any placeholder drop zone (same or different spine) to reparent it; target spine activates automatically if needed
+- **Global toolbar (Expand / Sync / Pin)** — three buttons above the spines list apply to all spines at once; Sync also applies to all placeholder images; all three states persist when switching panel tabs
+- **Canvas spine activation** — click a pinned non-active spine directly on canvas to activate it; clicking a desynced placeholder image of a non-active spine activates the spine and starts dragging the image in one click
+- **Shift+scroll** — always zooms the global scene regardless of active sync state (mirrors Shift+drag for global pan)
 
 ### v1.3.4
 - **Placeholder image transform** — click a thumbnail in the Spines tab to activate it; disable the sync toggle (🔗) on an image to drag-reposition or scroll-scale it independently inside the slot container; transform persisted per skeleton

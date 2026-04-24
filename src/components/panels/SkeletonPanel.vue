@@ -435,14 +435,7 @@ function fmtS(n: number): string {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--c-scroll) transparent;
 }
-
-.bone-list::-webkit-scrollbar { width: 4px; }
-.bone-list::-webkit-scrollbar-track { background: transparent; }
-.bone-list::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
-.bone-list::-webkit-scrollbar-thumb:hover { background: var(--c-scroll-hov); }
 
 .bone-row {
   display: flex;
@@ -553,14 +546,7 @@ function fmtS(n: number): string {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--c-scroll) transparent;
 }
-
-.attach-list::-webkit-scrollbar { width: 4px; }
-.attach-list::-webkit-scrollbar-track { background: transparent; }
-.attach-list::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
-.attach-list::-webkit-scrollbar-thumb:hover { background: var(--c-scroll-hov); }
 
 /* Both header and data rows are transparent to grid — cells go directly into columns */
 .attach-hdr-row,

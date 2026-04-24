@@ -776,14 +776,7 @@ onUnmounted(() => {
   overflow-x: auto;
   flex: 1;
   min-width: 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--c-scroll) transparent;
 }
-
-.page-tabs::-webkit-scrollbar { height: 4px; }
-.page-tabs::-webkit-scrollbar-track { background: transparent; }
-.page-tabs::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
-.page-tabs::-webkit-scrollbar-thumb:hover { background: var(--c-scroll-hov); }
 
 .page-tab {
   background: var(--c-raised);
@@ -938,13 +931,7 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 0 4px 8px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--c-scroll) transparent;
 }
-
-.sidebar-list::-webkit-scrollbar { width: 4px; }
-.sidebar-list::-webkit-scrollbar-track { background: transparent; }
-.sidebar-list::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
 
 .region-row {
   display: flex;

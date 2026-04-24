@@ -1047,11 +1047,7 @@ kbd {
   flex: 1;
   overflow-y: auto;
   padding: 6px 0 12px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--c-scroll) transparent;
 }
-.history-list::-webkit-scrollbar { width: 4px; }
-.history-list::-webkit-scrollbar-thumb { background: var(--c-scroll); border-radius: 2px; }
 
 .history-day-sep {
   height: 1px;

@@ -586,25 +586,6 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
   gap: 1px;
   max-height: 160px;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--c-scroll) transparent;
-}
-
-.skin-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.skin-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.skin-list::-webkit-scrollbar-thumb {
-  background: var(--c-scroll);
-  border-radius: 2px;
-}
-
-.skin-list::-webkit-scrollbar-thumb:hover {
-  background: var(--c-scroll-hov);
 }
 
 .skin-row {
