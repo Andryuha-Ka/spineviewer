@@ -44,6 +44,7 @@
           <li>Per-track <b>Loop</b> toggle and animation <b>Queue</b> (chain animations)</li>
           <li><b>Speed</b> control: 0×–3× with fine slider</li>
           <li><b>Frame stepping</b> ±1 frame at 30 fps via keyboard</li>
+          <li><b>Toolbar track controls</b> — pick a track (0–11), set its animation, play/pause (▶) the track, toggle its Loop or clear it (✕) directly in the top toolbar; works for the active skeleton and for a placeholder child spine selected in the Spines tab</li>
         </ul>
       </section>
 
@@ -180,6 +181,12 @@
       <section class="help-section">
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.9</span>
+            <ul class="help-list">
+              <li><b>Toolbar track controls</b> — Track selector, animation picker, per-track play/pause, per-track Loop and clear-track button in the top toolbar; selecting a track shows its current animation and loop state, so placeholder child spines can be previewed without switching to the Anim tab</li>
+            </ul>
+          </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.3.7</span>
             <ul class="help-list">

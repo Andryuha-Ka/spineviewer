@@ -94,6 +94,20 @@ export const useAnimationStore = defineStore('animation', () => {
     isPlaying.value = true
   }
 
+  function isTrackPlaying(trackIndex: number): boolean {
+    return isPlaying.value && isTrackEnabled(trackIndex)
+  }
+
+  /** Per-track play/pause: disables the track, or enables it and starts global playback if stopped. */
+  function toggleTrackPlay(trackIndex: number) {
+    if (isTrackPlaying(trackIndex)) {
+      setTrackEnabled(trackIndex, false)
+    } else {
+      setTrackEnabled(trackIndex, true)
+      if (!isPlaying.value) play()
+    }
+  }
+
   function reset() {
     tracks.value            = []
     speed.value             = 1
@@ -112,6 +126,6 @@ export const useAnimationStore = defineStore('animation', () => {
     isTrackEnabled, setTrackEnabled,
     setTrackPlaylist, appendToTrackPlaylist, removeFromTrackPlaylist,
     clearTrackPlaylist, clearAllTrackPlaylists, updateTrackPlaylistFirstLoop,
-    setTracks, pause, stop, play, reset,
+    setTracks, pause, stop, play, isTrackPlaying, toggleTrackPlay, reset,
   }
 })

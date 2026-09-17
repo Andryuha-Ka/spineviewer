@@ -21,6 +21,11 @@
         {{ slotSelectionStore.activeSlot.fileSet.skeleton.filename }}
       </span>
       <div class="toolbar-spacer" />
+      <ToolbarTrackControls
+        @set-animation="onSetAnimation"
+        @set-track-loop="onSetTrackLoop"
+        @clear-track="onClearTrack"
+      />
       <n-button
         size="small"
         :type="animationStore.isPlaying ? 'default' : 'primary'"
@@ -117,6 +122,7 @@ import ComplexityPanel from '@/components/panels/ComplexityPanel.vue'
 import ExportPanel from '@/components/panels/ExportPanel.vue'
 import SettingsPopover from '@/components/ui/SettingsPopover.vue'
 import HelpModal from '@/components/ui/HelpModal.vue'
+import ToolbarTrackControls from '@/components/ui/ToolbarTrackControls.vue'
 import { usePanelResize } from '@/core/composables/usePanelResize'
 import { useViewerKeyboard } from '@/core/composables/useViewerKeyboard'
 import { useExportHandlers } from '@/core/composables/useExportHandlers'

@@ -24,6 +24,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - **Speed control** 0×–3× with fine slider
 - **Frame stepping** ±1 frame at 30/60 fps
 - Seek to any position
+- **Toolbar track controls** — Track selector (all 12 tracks), animation picker, per-track ▶/⏸, per-track Loop and ✕ clear right in the top toolbar; they drive the active skeleton or the selected placeholder child spine without switching to the Anim tab
 
 ### Animation Dropdown (Anim tab)
 - Animations and folders sorted **alphabetically**
@@ -201,6 +202,9 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 ---
 
 ## Changelog
+
+### v1.3.9
+- **Toolbar track controls** — Track selector, animation picker (folder submenus open level with the hovered folder), per-track play/pause arrow, per-track Loop checkbox and clear-track button added to the top toolbar before Play; selecting a track shows its current animation and loop state; works for placeholder child spines selected in the Spines tab
 
 ### v1.3.7
 - **Spine in placeholder** — drop a spine skeleton file onto any placeholder slot to attach it as a live child spine; renders and animates inside the placeholder container simultaneously with the parent; click on canvas to activate and control animation, skins, and tracks independently; sync toggle (🔗) allows independent drag and scale inside the container

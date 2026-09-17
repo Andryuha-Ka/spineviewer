@@ -1,6 +1,7 @@
 .idea/
 .serena/
 .claude/
+.docs
 node_modules/
 dist/
 kb/
@@ -16,7 +17,7 @@ src/components.d.ts
 
 # AI workflow artifacts
 .ai-work/
-
+*.stackdump
 # Local dev kb
 CLAUDE.md
 PLAN.md
