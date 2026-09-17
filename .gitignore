@@ -6,7 +6,6 @@ dist/
 kb/
 errors/
 example/
-anotherProject/
 .DS_Store
 *.local
 

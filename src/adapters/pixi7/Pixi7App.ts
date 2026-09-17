@@ -25,11 +25,12 @@ export class Pixi7App implements IPixiApp {
       antialias: true,
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
-    })
+    });
 
     // Expose app to Pixi DevTools browser extension
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(globalThis as any).__PIXI_APP__ = this._app
+    (globalThis as any).__PIXI_APP__ = this._app;
+    (globalThis as any).__PIXI_APP_NEW__ = this._app;
 
     // Count WebGL draw calls by wrapping the GL context.
     // Ticker at priority -100 runs after Pixi renders (priority -50), capturing per-frame count.

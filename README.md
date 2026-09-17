@@ -44,7 +44,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 
 ### Multi-Skeleton (Spines tab)
 - Load **up to 30 skeletons** in one session
-- **Spines tab** appears automatically when 2+ skeletons or a background image is loaded
+- **Spines tab** is always available; the viewer switches to it automatically when a background image is loaded
 - Click any entry to switch the active skeleton
 - **Drag to reorder** skeletons — higher in the list = higher z-index on the stage (6-dot drag handle)
 - **Pin button** — keep a skeleton on stage while switching to another
@@ -90,11 +90,10 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - Blending mode breakdown (Normal / Additive / Multiply / Screen)
 - Automatic recommendations for optimization
 
-### Animation Events (Events sub-panel in Anim tab)
-- **Live event log** — newest first, up to 500 entries
-- Filter by event name
-- **Timeline** — colored ticks per event, hover tooltip, click to seek
-- Event statistics (count per event name)
+### Animation Events (Anim tab)
+- **Events table** — every event keyframe in the current animations with its track and time
+- A row flashes when its event fires; copy button copies the event name
+- Event markers are also drawn on the canvas progress bars
 
 ### Export
 | Format | Description |
@@ -140,7 +139,7 @@ Side-by-side visual and structural comparison of two Spine skeletons. Accessible
 | Key | Action |
 |-----|--------|
 | `Space` | Play / Pause |
-| `←` / `→` | Step −1 / +1 frame |
+| `←` / `→` | Pause and step the current track by −1/30 s / +1/30 s |
 | `R` | Reset pose (clear all tracks) |
 | `L` | Toggle loop on current track |
 | `Shift+L` | Toggle loop on all tracks |
@@ -188,10 +187,10 @@ Output goes to `dist/`.
 3. The app auto-detects the Spine version and selects the matching runtime.
 4. Click **Open Viewer**.
 5. Use the **Anim** tab to select animations and control playback.
-6. Explore the other tabs: **Insp**, **Atlas**, **Perf**, **Compl**, **Export**.
+6. Explore the other tabs: **Spines**, **Insp**, **Bones** (when the skeleton has free bones), **Atlas**, **Perf**, **Compl**, **Export**.
 
 ### Multi-Spine Workflow
-When you drop multiple Spine skeletons, all are loaded into slots. The **Spines** tab appears in the viewer — click any entry to switch. Each skeleton's viewport, animation, skin, and placeholder state is saved independently.
+When you drop multiple Spine skeletons, all are loaded into slots. Open the **Spines** tab in the viewer and click any entry to switch. Each skeleton's viewport, animation, skin, and placeholder state is saved independently.
 
 - **Drag** the 6-dot handle to reorder skeletons — position in the list determines z-order (top = front)
 - **Pin** a skeleton (📌 button) to keep it visible on stage while you browse others
@@ -302,16 +301,21 @@ When you drop multiple Spine skeletons, all are loaded into slots. The **Spines*
 ```
 src/
 ├── core/                   # Version-agnostic shared code
-│   ├── types/              # ISpineAdapter, IPixiApp, FileSet
-│   ├── utils/              # fileLoader, versionDetector, atlasTextParser
-│   └── stores/             # Pinia stores (animation, skeleton, profiler, …)
+│   ├── AdapterFactory.ts   # Lazy creation of Pixi app + Spine adapter per version combo
+│   ├── types/              # ISpineAdapter, IPixiApp, IProgressOverlay, FileSet
+│   ├── stores/             # Pinia stores (slots, animation, placeholders, compare, …)
+│   ├── composables/        # Viewer/picker logic; stage/ holds PreviewStage composables
+│   ├── overlay/            # Pure math for the canvas progress overlay
+│   └── utils/              # file loading, version detection, validation, compare diff, export
 ├── adapters/
-│   ├── pixi7/              # Pixi 7 app + Spine 3.8/4.0/4.1 adapters
-│   └── pixi8/              # Pixi 8 app + Spine 4.2 adapter
+│   ├── pixi7/              # Pixi 7 app, progress overlay, Spine 3.8/4.0/4.1 adapters
+│   └── pixi8/              # Pixi 8 app, progress overlay, Spine 4.2 adapter
 └── components/
     ├── pages/              # VersionPickerPage, ViewerPage
-    ├── panels/             # AnimationPanel, SkeletonPanel, AtlasInspector, …
-    └── stage/              # PreviewStage (canvas + overlays)
+    ├── stage/              # PreviewStage (canvas coordinator)
+    ├── panels/             # Side panel tabs (Spines, Anim, Insp, Bones, Atlas, Perf, Compl, Export)
+    ├── compare/            # Compare mode page, canvases, diff panel
+    └── ui/                 # Help modal, settings popover
 ```
 
 ---
@@ -353,4 +357,4 @@ define: { __APP_VERSION__: JSON.stringify(pkg.version) }
 ```
 
 ### Dual Pixi Strategy
-Both Pixi 7 and Pixi 8 are installed simultaneously. Vite aliases (`pixi7` / `pixi8`) and a custom `spinePixi8Redirect` plugin ensure each Spine runtime uses the correct Pixi instance without registry conflicts.
+Both Pixi 7 and Pixi 8 are installed simultaneously. Vite aliases (`pixi7` / `pixi8`) and two custom plugins (`spinePixi7Redirect`, `spinePixi8Redirect`) ensure each Spine runtime uses the correct Pixi instance without registry conflicts.

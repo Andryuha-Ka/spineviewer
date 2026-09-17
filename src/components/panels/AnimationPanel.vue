@@ -12,20 +12,44 @@
     <!-- ── Animation selector ─────────────────────────────── -->
     <section class="section">
       <label class="label">Animation</label>
-      <n-cascader
-        v-model:value="selectedAnimation"
-        :options="cascaderOptions"
-        :disabled="!skeletonStore.isLoaded"
-        placeholder="Select animation…"
+      <n-dropdown
+        trigger="click"
+        placement="bottom-start"
         size="small"
-        expand-trigger="hover"
-        :show-path="true"
-        check-strategy="child"
-        clearable
-        class="full-width"
-        :render-label="renderCascaderLabel"
-        @update:value="onCascaderSelect"
-      />
+        scrollable
+        :show="animMenuOpen"
+        :disabled="!skeletonStore.isLoaded"
+        :options="animDropdownOptions"
+        :value="animationStore.selectedAnimation ?? undefined"
+        :menu-props="animMenuProps"
+        :node-props="animNodeProps"
+        :render-label="renderAnimLabel"
+        @update:show="onAnimMenuUpdateShow"
+        @select="onAnimSelect"
+      >
+        <div
+          ref="animTriggerRef"
+          class="anim-select full-width"
+          :class="{ 'anim-select--open': animMenuOpen, 'anim-select--disabled': !skeletonStore.isLoaded }"
+          role="combobox"
+          tabindex="0"
+          :aria-expanded="animMenuOpen"
+          :aria-disabled="!skeletonStore.isLoaded"
+        >
+          <span v-if="animationStore.selectedAnimation" class="anim-select__value">{{ animationStore.selectedAnimation }}</span>
+          <span v-else class="anim-select__placeholder">Select animation…</span>
+          <button
+            v-if="animationStore.selectedAnimation && skeletonStore.isLoaded"
+            type="button"
+            class="anim-select__clear"
+            title="Clear"
+            @click.stop="onAnimClear"
+          >×</button>
+          <svg class="anim-select__arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+      </n-dropdown>
     </section>
 
     <!-- ── Track selector ─────────────────────────────────── -->
@@ -287,8 +311,8 @@
 </template>
 
 <script setup lang="ts">
-import { h, type VNodeChild } from 'vue'
-import type { CascaderOption } from 'naive-ui'
+import { h, type HTMLAttributes, type VNodeChild } from 'vue'
+import type { CascaderOption, DropdownOption } from 'naive-ui'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useEventsStore } from '@/core/stores/useEventsStore'
@@ -421,17 +445,71 @@ function toggleTrackPlay(trackIndex: number) {
   }
 }
 
-const cascaderOptions = computed<CascaderOption[]>(() =>
-  buildCascaderOptions(skeletonStore.animations),
+// ── Animation selector ─────────────────────────────────────────────────────
+// Flyout dropdown: each folder submenu opens level with its folder row.
+const ANIM_MENU_MARGIN_PX = 8
+const ANIM_MENU_MIN_HEIGHT_PX = 32
+
+const animMenuOpen      = ref(false)
+const animTriggerRef    = ref<HTMLElement | null>(null)
+const rootMenuMaxHeight = ref(0)
+const rootMenuMinWidth  = ref(0)
+// Submenu followers flip when content overflows, so each submenu is capped
+// to the viewport space below its folder row to stay anchored there.
+const submenuMaxHeight  = ref<Record<string, number>>({})
+
+function toDropdownOptions(options: CascaderOption[]): DropdownOption[] {
+  return options.map(o => ({
+    key:   String(o.value),
+    label: String(o.label ?? ''),
+    ...(o.children ? { children: toDropdownOptions(o.children) } : {}),
+  }))
+}
+
+const animDropdownOptions = computed<DropdownOption[]>(() =>
+  toDropdownOptions(buildCascaderOptions(skeletonStore.animations)),
 )
 
-const selectedAnimation = computed<string | null>({
-  get: () => animationStore.selectedAnimation,
-  set: (v) => { animationStore.selectedAnimation = v },
-})
+function spaceBelow(top: number): number {
+  return Math.max(ANIM_MENU_MIN_HEIGHT_PX, window.innerHeight - top - ANIM_MENU_MARGIN_PX)
+}
 
-// Set of option values that are in the currently selected animation's path.
-// Used by renderCascaderLabel to keep the selected path highlighted while navigating.
+function onAnimMenuUpdateShow(show: boolean) {
+  if (show) {
+    if (!skeletonStore.isLoaded) return
+    const rect = animTriggerRef.value?.getBoundingClientRect()
+    if (rect) {
+      rootMenuMinWidth.value  = rect.width
+      rootMenuMaxHeight.value = spaceBelow(rect.bottom)
+    }
+    submenuMaxHeight.value = {}
+  }
+  animMenuOpen.value = show
+}
+
+function animMenuProps(option: DropdownOption | undefined): HTMLAttributes {
+  if (!option) {
+    return {
+      class: 'anim-select-menu',
+      style: { maxHeight: `${rootMenuMaxHeight.value}px`, minWidth: `${rootMenuMinWidth.value}px` },
+    }
+  }
+  const height = submenuMaxHeight.value[String(option.key)] ?? rootMenuMaxHeight.value
+  return { class: 'anim-select-menu', style: { maxHeight: `${height}px` } }
+}
+
+function animNodeProps(option: DropdownOption): HTMLAttributes {
+  if (!option.children) return {}
+  return {
+    onMouseenter: (e: MouseEvent) => {
+      const top = (e.currentTarget as HTMLElement).getBoundingClientRect().top
+      submenuMaxHeight.value = { ...submenuMaxHeight.value, [String(option.key)]: spaceBelow(top) }
+    },
+  }
+}
+
+// Set of option keys that are in the currently selected animation's path.
+// Used by renderAnimLabel to keep the selected path highlighted while navigating.
 const selectedValuePath = computed<Set<string>>(() => {
   const sel = animationStore.selectedAnimation
   if (!sel) return new Set()
@@ -444,8 +522,8 @@ const selectedValuePath = computed<Set<string>>(() => {
   return set
 })
 
-function renderCascaderLabel(option: CascaderOption, _checked: boolean): VNodeChild {
-  const inSelected = selectedValuePath.value.has(String(option.value ?? ''))
+function renderAnimLabel(option: DropdownOption): VNodeChild {
+  const inSelected = selectedValuePath.value.has(String(option.key ?? ''))
   return h('span', {
     style: inSelected ? { color: '#9d8fff', fontWeight: '600' } : undefined,
   }, String(option.label ?? ''))
@@ -461,16 +539,22 @@ function seekAllDelta(delta: number) {
   }
 }
 
-function onCascaderSelect(value: string | number | Array<string | number> | null) {
-  const name = typeof value === 'string' ? value : null
-  if (!name) return
+function onAnimSelect(key: string | number) {
+  const name = String(key)
+  if (name.startsWith('__group__')) return
+  animationStore.selectedAnimation = name
   if (isAddMode.value) {
     emit('addAnimation', animationStore.currentTrack, name, animationStore.loop)
   } else {
     emit('setAnimation', animationStore.currentTrack, name, animationStore.loop)
   }
-  // Blur cascader after selection so Space hotkey (play/pause) is not intercepted by the dropdown.
+  animMenuOpen.value = false
+  // Blur the selector after selection so Space hotkey (play/pause) is not intercepted.
   ;(document.activeElement as HTMLElement | null)?.blur()
+}
+
+function onAnimClear() {
+  animationStore.selectedAnimation = null
 }
 
 </script>
@@ -823,6 +907,59 @@ function onCascaderSelect(value: string | number | Array<string | number> | null
   color: var(--c-text-ghost);
   padding: 4px 0;
 }
+
+/* ── Animation selector ──────────────────── */
+.anim-select {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--c-border);
+  border-radius: 3px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.anim-select:hover,
+.anim-select:focus-visible,
+.anim-select--open { border-color: var(--c-text-ghost); }
+.anim-select--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.anim-select__value,
+.anim-select__placeholder {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.anim-select__placeholder { color: var(--c-text-ghost); }
+.anim-select__clear {
+  display: none;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--c-text-muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.anim-select:hover .anim-select__clear { display: block; }
+.anim-select__clear:hover { color: var(--c-text-dim); }
+.anim-select__arrow {
+  flex-shrink: 0;
+  color: var(--c-text-muted);
+  transition: transform 0.15s;
+}
+.anim-select--open .anim-select__arrow { transform: rotate(180deg); }
 
 /* ── Utility helpers ─────────────────────── */
 .full-width { width: 100%; }

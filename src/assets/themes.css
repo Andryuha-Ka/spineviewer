@@ -84,16 +84,8 @@ html.font-lg { font-size: 22px; }
 
 /* ── Naive UI overrides ────────────────────────────────────── */
 
-/* Cascader columns: content-based height, max 80vh */
-.n-cascader-submenu {
-  height: auto !important;
-  max-height: 80vh !important;
-  overflow-y: auto;
-}
-
-/* Cascader active folder — keep parent highlighted when submenu is open */
-.n-cascader-option--active,
-.n-cascader-option--pending {
+/* Animation selector (AnimationPanel) — keep the hovered folder chain highlighted */
+.anim-select-menu .n-dropdown-option-body--pending::before {
   background-color: rgba(124, 106, 245, 0.14) !important;
-  box-shadow: inset 3px 0 0 #7c6af5 !important;
+  box-shadow: inset 3px 0 0 #7c6af5;
 }
