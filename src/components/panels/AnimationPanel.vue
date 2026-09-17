@@ -311,8 +311,8 @@
 </template>
 
 <script setup lang="ts">
-import { h, type HTMLAttributes, type VNodeChild } from 'vue'
-import type { CascaderOption, DropdownOption } from 'naive-ui'
+import { h, type VNodeChild } from 'vue'
+import type { CascaderOption, DropdownOption, DropdownProps } from 'naive-ui'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useEventsStore } from '@/core/stores/useEventsStore'
@@ -487,25 +487,29 @@ function onAnimMenuUpdateShow(show: boolean) {
   animMenuOpen.value = show
 }
 
-function animMenuProps(option: DropdownOption | undefined): HTMLAttributes {
+type AnimMenuAttrs = ReturnType<NonNullable<DropdownProps['menuProps']>>
+type AnimNodeAttrs = ReturnType<NonNullable<DropdownProps['nodeProps']>>
+
+const animMenuProps: NonNullable<DropdownProps['menuProps']> = (option): AnimMenuAttrs => {
   if (!option) {
     return {
       class: 'anim-select-menu',
-      style: { maxHeight: `${rootMenuMaxHeight.value}px`, minWidth: `${rootMenuMinWidth.value}px` },
+      style: `max-height: ${rootMenuMaxHeight.value}px; min-width: ${rootMenuMinWidth.value}px`,
     }
   }
   const height = submenuMaxHeight.value[String(option.key)] ?? rootMenuMaxHeight.value
-  return { class: 'anim-select-menu', style: { maxHeight: `${height}px` } }
+  return { class: 'anim-select-menu', style: `max-height: ${height}px` }
 }
 
-function animNodeProps(option: DropdownOption): HTMLAttributes {
+const animNodeProps: NonNullable<DropdownProps['nodeProps']> = (option): AnimNodeAttrs => {
   if (!option.children) return {}
+  // Naive types node attrs as string/number values only; event handlers need a cast.
   return {
     onMouseenter: (e: MouseEvent) => {
       const top = (e.currentTarget as HTMLElement).getBoundingClientRect().top
       submenuMaxHeight.value = { ...submenuMaxHeight.value, [String(option.key)]: spaceBelow(top) }
     },
-  }
+  } as unknown as AnimNodeAttrs
 }
 
 // Set of option keys that are in the currently selected animation's path.

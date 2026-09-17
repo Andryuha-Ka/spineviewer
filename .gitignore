@@ -8,6 +8,7 @@ errors/
 example/
 .DS_Store
 *.local
+.env
 
 # TypeScript generated
 src/auto-imports.d.ts
