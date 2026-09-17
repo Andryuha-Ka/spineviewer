@@ -516,12 +516,7 @@ async function onPhDrop(e: DragEvent, slotId: string, phName: string): Promise<v
   if (phSpineData) {
     const { imageId, srcSlotId, srcPhName } = JSON.parse(phSpineData) as { imageId: string; srcSlotId: string; srcPhName: string }
     if (srcSlotId !== slotId || srcPhName !== phName) {
-      phImagesStore.moveChild(srcSlotId, srcPhName, imageId, slotId, phName)
-      fileLoaderStore.patchSlotPlaceholderImages(srcSlotId, phImagesStore.getSlotImages(srcSlotId))
-      if (slotId !== slotSelectionStore.activeSlotId && !slotSelectionStore.isPinned(slotId)) {
-        fileLoaderStore.patchSlotPlaceholderImages(slotId, phImagesStore.getSlotImages(slotId))
-        slotSelectionStore.setActiveSlot(slotId)
-      }
+      await moveSpineChild(srcSlotId, srcPhName, imageId, slotId, phName)
     }
     return
   }
@@ -700,7 +695,35 @@ function onPhSpineDragEnd(): void {
   dragOverPhSpineId.value = null
 }
 
-function onPhSpineEntryDrop(e: DragEvent, dstSlotId: string, dstPhName: string, dstSpineId: string): void {
+async function moveSpineChild(
+  srcSlotId: string,
+  srcPhName: string,
+  entryId: string,
+  dstSlotId: string,
+  dstPhName: string,
+): Promise<void> {
+  const entry = phImagesStore.getPlaceholderSpineEntries(srcSlotId, srcPhName).find(en => en.imageId === entryId)
+  if (!entry) return
+  // Leave the child first so the slot watcher does not treat the reparented adapter as the active one.
+  if (slotSelectionStore.activeSlotId === entry.childSlotId) {
+    slotSelectionStore.setActiveSlot(srcSlotId)
+    await nextTick()
+  }
+  const childSlot = fileLoaderStore.spineSlots.find(s => s.id === entry.childSlotId)
+  if (childSlot) {
+    childSlot.parentSlotId = dstSlotId
+    childSlot.indPosX = 0
+    childSlot.indPosY = 0
+  }
+  phImagesStore.moveChild(srcSlotId, srcPhName, entryId, dstSlotId, dstPhName)
+  fileLoaderStore.patchSlotPlaceholderImages(srcSlotId, phImagesStore.getSlotImages(srcSlotId))
+  if (dstSlotId !== slotSelectionStore.activeSlotId && !slotSelectionStore.isPinned(dstSlotId)) {
+    fileLoaderStore.patchSlotPlaceholderImages(dstSlotId, phImagesStore.getSlotImages(dstSlotId))
+    slotSelectionStore.setActiveSlot(dstSlotId)
+  }
+}
+
+async function onPhSpineEntryDrop(e: DragEvent, dstSlotId: string, dstPhName: string, dstSpineId: string): Promise<void> {
   dragOverPhSpineId.value = null
   const phData = e.dataTransfer?.getData('application/x-ph-spine')
   if (!phData) return
@@ -716,12 +739,7 @@ function onPhSpineEntryDrop(e: DragEvent, dstSlotId: string, dstPhName: string, 
     entries.splice(dstIdx, 0, srcImageId)
     phImagesStore.reorderChildren(srcSlotId, srcPhName, entries)
   } else {
-    phImagesStore.moveChild(srcSlotId, srcPhName, srcImageId, dstSlotId, dstPhName)
-    fileLoaderStore.patchSlotPlaceholderImages(srcSlotId, phImagesStore.getSlotImages(srcSlotId))
-    if (dstSlotId !== slotSelectionStore.activeSlotId && !slotSelectionStore.isPinned(dstSlotId)) {
-      fileLoaderStore.patchSlotPlaceholderImages(dstSlotId, phImagesStore.getSlotImages(dstSlotId))
-      slotSelectionStore.setActiveSlot(dstSlotId)
-    }
+    await moveSpineChild(srcSlotId, srcPhName, srcImageId, dstSlotId, dstPhName)
   }
 }
 

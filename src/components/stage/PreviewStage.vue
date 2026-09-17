@@ -159,6 +159,14 @@ let _redirectedFromSlotId: string | null = null
 let _suppressAnimPlay = false
 let _pendingSeekTimes: Record<number, number> | null = null
 
+// Watchers created after an await in onMounted are not bound to the component — stop them on unmount.
+const stageWatchStops: Array<ReturnType<typeof watch>> = []
+const watchStage = ((...args: Parameters<typeof watch>) => {
+  const stop = (watch as (...a: Parameters<typeof watch>) => ReturnType<typeof watch>)(...args)
+  stageWatchStops.push(stop)
+  return stop
+}) as typeof watch
+
 const containerRef = ref<HTMLDivElement | null>(null)
 const canvasRef    = ref<HTMLCanvasElement | null>(null)
 const fps         = ref(0)
@@ -242,20 +250,34 @@ watch(() => viewerStore.showPlaceholders, applyPlaceholderLabels)
 watch(() => viewerStore.disabledPlaceholders, applyPlaceholderLabels)
 
 // ── Drain placeholder actions ──────────────────────────────────────────────────
+// While a child spine is active, spineAdapter still belongs to its parent slot.
+function adapterForSlot(slotId: string): ISpineAdapter | null {
+  const active = slotSelectionStore.activeSlot
+  if (slotId === active?.id || slotId === active?.parentSlotId) return spineAdapter
+  return mountedAdapters.get(slotId) ?? null
+}
+
+function isChildMounted(childSlotId: string): boolean {
+  for (const meta of children.childAdapterMeta.values()) {
+    if (meta.childSlotId === childSlotId) return true
+  }
+  return false
+}
+
 async function drainPlaceholderActions() {
   if (!spineAdapter) return
   const actions = placeholderImagesStore.drainActions()
   for (const action of actions) {
     if (action.type === 'reorder-child') {
-      const adapter = action.slotId === slotSelectionStore.activeSlotId ? spineAdapter : mountedAdapters.get(action.slotId)
+      const adapter = adapterForSlot(action.slotId)
       if (adapter && action.orderedIds) {
         action.orderedIds.forEach((id, idx) => adapter.setImageZIndex(id, idx))
       }
     } else if (action.type === 'move-child') {
       if (action.kind === 'image') {
-        const srcAdapter = action.slotId === slotSelectionStore.activeSlotId ? spineAdapter : mountedAdapters.get(action.slotId)
+        const srcAdapter = adapterForSlot(action.slotId)
         srcAdapter?.removeImageFromPlaceholder(action.phName, action.imageId)
-        const dstAdapter = action.dstSlotId === slotSelectionStore.activeSlotId ? spineAdapter : mountedAdapters.get(action.dstSlotId)
+        const dstAdapter = adapterForSlot(action.dstSlotId)
         if (dstAdapter && action.dataURL && action.imageId) {
           dstAdapter.addImageToPlaceholder(action.dstPhName, action.dataURL, action.imageId)
           dstAdapter.setImageTransform(action.imageId, 0, 0, action.scale ?? 1)
@@ -263,12 +285,14 @@ async function drainPlaceholderActions() {
           const zIdx = dstEntries.findIndex(e => e.imageId === action.imageId)
           if (zIdx !== -1) dstAdapter.setImageZIndex(action.imageId, zIdx)
         }
+      } else {
+        children.moveChildAdapter(action.imageId, adapterForSlot(action.dstSlotId), action.dstSlotId, action.dstPhName)
       }
     } else if (action.type === 'add-spine') {
       const phEntries = placeholderImagesStore.getPlaceholderImages(action.slotId, action.phName)
       const entry = phEntries.find(e => e.imageId === action.imageId && e.kind === 'spine') as PHSpineEntry | undefined
       if (entry && !children.childAdapters.has(entry.imageId)) {
-        const parentAdapter = action.slotId === slotSelectionStore.activeSlotId ? spineAdapter : mountedAdapters.get(action.slotId)
+        const parentAdapter = adapterForSlot(action.slotId)
         if (parentAdapter) await children.mountChildAdapter(parentAdapter, action.slotId, action.phName, entry)
       }
     } else if (action.type === 'remove-spine') {
@@ -456,13 +480,13 @@ onMounted(async () => {
     }
     pixiApp.ticker.add(tickerFn)
 
-    watch(
+    watchStage(
       () => viewerStore.bgColor,
       (color) => pixiApp?.setBackground(color),
       { immediate: true },
     )
 
-    watch(
+    watchStage(
       () => backgroundStore.image,
       (img) => {
         if (bgSprite) {
@@ -479,7 +503,7 @@ onMounted(async () => {
       },
     )
 
-    watch(
+    watchStage(
       () => backgroundStore.syncEnabled,
       (newSync, oldSync) => {
         if (oldSync !== undefined && newSync !== oldSync) {
@@ -502,23 +526,23 @@ onMounted(async () => {
       },
     )
 
-    watch(
+    watchStage(
       () => [backgroundStore.posX, backgroundStore.posY, backgroundStore.zoom],
       () => { if (bgSprite) applyViewport() },
     )
 
-    watch(
+    watchStage(
       () => backgroundStore.listIndex,
       () => syncZOrder(),
     )
 
-    watch(
+    watchStage(
       () => fileLoaderStore.spineSlots.map(s => ({ id: s.id, sync: s.syncEnabled !== false })),
       () => applyViewport(),
       { deep: false },
     )
 
-    watch(
+    watchStage(
       () => {
         const active = slotSelectionStore.activeSlot
         if (!active?.parentSlotId) return null
@@ -537,13 +561,13 @@ onMounted(async () => {
       { deep: true },
     )
 
-    watch(
+    watchStage(
       () => animationStore.tracks.map(t => `${t.trackIndex}:${t.animationName}`).join(','),
       () => { loopSM.dcRaw.fill(null) },
       { deep: false },
     )
 
-    watch(
+    watchStage(
       () => animationStore.tracks.map(t => `${t.trackIndex}:${t.animationName}`),
       () => {
         if (!spineAdapter) return
@@ -560,14 +584,14 @@ onMounted(async () => {
       { deep: false },
     )
 
-    watch(
+    watchStage(
       () => animationStore.speed,
       (newSpeed) => {
         if (animationStore.isPlaying) _uiAdapter()?.setTimeScale(newSpeed)
       },
     )
 
-    watch(
+    watchStage(
       () => animationStore.trackEnabled,
       (enabledMap) => {
         const uiAd = _uiAdapter()
@@ -580,7 +604,7 @@ onMounted(async () => {
       { deep: true },
     )
 
-    watch(
+    watchStage(
       () => animationStore.isPlaying,
       (playing) => {
         if (_suppressAnimPlay) return
@@ -618,7 +642,7 @@ onMounted(async () => {
       },
     )
 
-    watch(
+    watchStage(
       () => animationStore.loop,
       (newLoop) => {
         const uiAd = _uiAdapter()
@@ -633,7 +657,7 @@ onMounted(async () => {
     )
 
     // ── Active slot watcher ───────────────────────────────────────────────────
-    watch(
+    watchStage(
       () => slotSelectionStore.activeSlotId,
       async (newId, oldId) => {
         if (!newId || newId === oldId || loading.value) return
@@ -984,8 +1008,12 @@ onMounted(async () => {
             if (_pendingChildSlotId) {
               const _pendingId = _pendingChildSlotId
               _pendingChildSlotId = null
-              await nextTick()
-              slotSelectionStore.setActiveSlot(_pendingId)
+              if (isChildMounted(_pendingId)) {
+                await nextTick()
+                slotSelectionStore.setActiveSlot(_pendingId)
+              } else {
+                console.warn('[PreviewStage] child spine could not be mounted, staying on parent:', _pendingId)
+              }
             }
           } catch (e) {
             spineError.value = e instanceof Error ? e.message : 'Failed to restore spine'
@@ -1014,15 +1042,19 @@ onMounted(async () => {
           if (_pendingChildSlotId) {
             const _pendingId = _pendingChildSlotId
             _pendingChildSlotId = null
-            await nextTick()
-            slotSelectionStore.setActiveSlot(_pendingId)
+            if (isChildMounted(_pendingId)) {
+              await nextTick()
+              slotSelectionStore.setActiveSlot(_pendingId)
+            } else {
+              console.warn('[PreviewStage] child spine could not be mounted, staying on parent:', _pendingId)
+            }
           }
         }
       },
     )
 
     // ── Pinned slot watcher ───────────────────────────────────────────────────
-    watch(
+    watchStage(
       () => slotSelectionStore.pinnedSlotIds,
       async (newPinned) => {
         if (!pixiApp) return
@@ -1094,7 +1126,7 @@ onMounted(async () => {
       },
     )
 
-    watch(
+    watchStage(
       () => fileLoaderStore.spineSlots.map(s => s.id),
       () => syncZOrder(),
       { deep: false },
@@ -1113,6 +1145,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  for (const stop of stageWatchStops) stop()
+  stageWatchStops.length = 0
   containerRef.value?.removeEventListener('wheel', onWheel)
   seekDrag.cleanup()
   spineObj = null

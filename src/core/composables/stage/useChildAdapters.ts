@@ -104,12 +104,30 @@ export function useChildAdapters() {
     return null
   }
 
-  async function mountChildAdapter(
+  // In-flight mounts by entry id: the drain and reloadChildAdaptersForSlot can request the same entry concurrently.
+  const mountsInFlight = new Map<string, Promise<void>>()
+
+  function mountChildAdapter(
     parentAdapter: ISpineAdapter,
     parentSlotId: string,
     phName: string,
     entry: PHSpineEntry,
   ): Promise<void> {
+    const inFlight = mountsInFlight.get(entry.imageId)
+    if (inFlight) return inFlight
+    const mount = mountChildAdapterNow(parentAdapter, parentSlotId, phName, entry)
+      .finally(() => mountsInFlight.delete(entry.imageId))
+    mountsInFlight.set(entry.imageId, mount)
+    return mount
+  }
+
+  async function mountChildAdapterNow(
+    parentAdapter: ISpineAdapter,
+    parentSlotId: string,
+    phName: string,
+    entry: PHSpineEntry,
+  ): Promise<void> {
+    if (childAdapters.has(entry.imageId)) return
     const phContainer = parentAdapter.getPlaceholderContainer(phName)
     if (!phContainer) {
       console.warn('[useChildAdapters] getPlaceholderContainer returned null for', phName)
@@ -169,6 +187,39 @@ export function useChildAdapters() {
     }
   }
 
+  /**
+   * Reparents a mounted child spine into another placeholder without reloading it.
+   * Destroys the adapter when the destination parent is not on stage — it is remounted
+   * by reloadChildAdaptersForSlot once that parent loads.
+   */
+  function moveChildAdapter(
+    entryId: string,
+    dstParentAdapter: ISpineAdapter | null,
+    dstParentSlotId: string,
+    dstPhName: string,
+  ): void {
+    const meta = childAdapterMeta.get(entryId)
+    const childAdapter = childAdapters.get(entryId)
+    if (!meta || !childAdapter) return
+    const dstContainer = dstParentAdapter?.getPlaceholderContainer(dstPhName)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const spineObj = childAdapter.getSpineObject() as any
+    if (!dstContainer || !spineObj) {
+      childAdapter.destroy()
+      childAdapters.delete(entryId)
+      childAdapterMeta.delete(entryId)
+      return
+    }
+    const zIndex = [...childAdapterMeta.entries()].filter(
+      ([id, m]) => id !== entryId && m.parentSlotId === dstParentSlotId && m.phName === dstPhName,
+    ).length
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(dstContainer as any).addChild(spineObj)
+    spineObj.zIndex = zIndex
+    childAdapterMeta.set(entryId, { ...meta, parentSlotId: dstParentSlotId, phName: dstPhName, phContainer: dstContainer })
+    applyChildTransform(entryId)
+  }
+
   function destroyAll(): void {
     for (const adapter of childAdapters.values()) adapter.destroy()
     childAdapters.clear()
@@ -184,6 +235,7 @@ export function useChildAdapters() {
     applyChildTransform,
     getActiveChildParentMatrix,
     mountChildAdapter,
+    moveChildAdapter,
     reloadChildAdaptersForSlot,
     destroyAll,
   }
