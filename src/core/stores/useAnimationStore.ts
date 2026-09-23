@@ -9,6 +9,9 @@
 import { defineStore } from 'pinia'
 import type { TrackState, TrackQueueEntry } from '@/core/types/ISpineAdapter'
 
+/** One frame step for the keyboard and the Anim tab buttons. */
+export const FRAME_STEP_SECONDS = 1 / 60
+
 export const useAnimationStore = defineStore('animation', () => {
   // Live state — updated every ticker tick by PreviewStage
   const tracks = ref<TrackState[]>([])
@@ -42,12 +45,13 @@ export const useAnimationStore = defineStore('animation', () => {
 
   function appendToTrackPlaylist(trackIndex: number, animationName: string, loopEntry: boolean) {
     const existing = trackPlaylists.value[trackIndex] ?? []
-    trackPlaylists.value = { ...trackPlaylists.value, [trackIndex]: [...existing, { animationName, loop: loopEntry }] }
+    const loop = existing.length === 0 ? loopEntry : false
+    trackPlaylists.value = { ...trackPlaylists.value, [trackIndex]: [...existing, { animationName, loop }] }
   }
 
-  function removeFromTrackPlaylist(trackIndex: number, entryIndex: number) {
+  function removePlaylistEntry(trackIndex: number, entryIndex: number) {
     const playlist = trackPlaylists.value[trackIndex]
-    if (!playlist) return
+    if (!playlist || entryIndex < 0 || entryIndex >= playlist.length) return
     trackPlaylists.value = {
       ...trackPlaylists.value,
       [trackIndex]: playlist.filter((_, i) => i !== entryIndex),
@@ -64,7 +68,12 @@ export const useAnimationStore = defineStore('animation', () => {
     trackPlaylists.value = {}
   }
 
-  function updateTrackPlaylistFirstLoop(trackIndex: number, loop: boolean) {
+  // the head entry's loop is the track's list-loop flag
+  function isTrackListLoop(trackIndex: number): boolean {
+    return trackPlaylists.value[trackIndex]?.[0]?.loop === true
+  }
+
+  function setTrackListLoop(trackIndex: number, loop: boolean) {
     const playlist = trackPlaylists.value[trackIndex]
     if (!playlist || playlist.length === 0) return
     trackPlaylists.value = {
@@ -124,8 +133,8 @@ export const useAnimationStore = defineStore('animation', () => {
     tracks, speed, loop, currentTrack, isPlaying, isPaused, selectedAnimation,
     trackEnabled, trackPlaylists,
     isTrackEnabled, setTrackEnabled,
-    setTrackPlaylist, appendToTrackPlaylist, removeFromTrackPlaylist,
-    clearTrackPlaylist, clearAllTrackPlaylists, updateTrackPlaylistFirstLoop,
+    setTrackPlaylist, appendToTrackPlaylist, removePlaylistEntry,
+    clearTrackPlaylist, clearAllTrackPlaylists, isTrackListLoop, setTrackListLoop,
     setTracks, pause, stop, play, isTrackPlaying, toggleTrackPlay, reset,
   }
 })

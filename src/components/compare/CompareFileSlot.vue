@@ -25,11 +25,11 @@
       <template v-if="fileLoaderStore.spineSlots.length > 0">
         <div class="dropdown-group-label">Loaded spines</div>
         <button
-          v-for="(slot, i) in fileLoaderStore.spineSlots.filter(s => !s.error)"
+          v-for="{ slot, index } in loadedOptions"
           :key="slot.id"
           class="dropdown-item"
-          :class="{ 'dropdown-item--active': isActiveLoaded(i) }"
-          @click="selectLoaded(i, slot.name)"
+          :class="{ 'dropdown-item--active': isActiveLoaded(index) }"
+          @click="selectLoaded(index, slot.name)"
         >
           <span class="dropdown-item-name">{{ slot.name }}</span>
         </button>
@@ -93,6 +93,13 @@ const currentLabel = computed(() => {
   if (!currentSlot.value) return props.side === 'left' ? 'A: No file…' : 'B: No file…'
   return currentSlot.value.label
 })
+
+// Real session index, so selection survives entries hidden by the error filter
+const loadedOptions = computed(() =>
+  fileLoaderStore.spineSlots
+    .map((slot, index) => ({ slot, index }))
+    .filter(o => !o.slot.error),
+)
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

@@ -132,10 +132,12 @@ export function parseAtlas(text: string): AtlasPage[] {
         currentRegion.origWidth = ow; currentRegion.origHeight = oh
         break
       }
-      case 'rotate':
-        // 3.x: true/false  |  4.x: 0/90/270
-        currentRegion.rotate = val === 'true' || val === '90'
+      case 'rotate': {
+        // 3.x: true/false  |  4.x: degrees (90 / 270 are sideways)
+        const deg = parseInt(val, 10)
+        currentRegion.rotate = val === 'true' || (!Number.isNaN(deg) && deg % 180 !== 0)
         break
+      }
       case 'index':
         currentRegion.index = parseInt(val, 10)
         break

@@ -8,8 +8,20 @@
 
 import { defineStore } from 'pinia'
 import { guessFileType } from '@/core/utils/fileLoader'
-import type { FileSet, SpineFile, SpineFileType, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
+import type { FileSet, PHChildEntry, SpineFile, SpineFileType, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 import { useSlotSelectionStore } from './useSlotSelectionStore'
+import { usePlaceholderImagesStore } from './usePlaceholderImagesStore'
+
+function newSlotId(): string {
+  return `slot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+// placeholderChildren is rebuilt by cloneSlot; it may hold FileSet ArrayBuffers that JSON cannot copy.
+function cloneSavedState(state: SpineSlotSavedState): SpineSlotSavedState {
+  const rest = { ...state }
+  delete rest.placeholderChildren
+  return JSON.parse(JSON.stringify(rest))
+}
 
 /** Deep-clone a FileSet, correctly handling ArrayBuffer (binary .skel) via slice(). */
 function cloneFileSet(fs: FileSet): FileSet {
@@ -80,6 +92,7 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
 
   // Cross-store — called after refs are defined so useSlotSelectionStore can read spineSlots.
   const selectionStore = useSlotSelectionStore()
+  const placeholderStore = usePlaceholderImagesStore()
 
   // ── Computed ─────────────────────────────────────────────────────────────────
   /** Recognised files from pendingFiles (ignores unknown extensions) */
@@ -114,6 +127,7 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
 
   /** Replace all slots; activates the first fully-valid slot. */
   function setSlots(slots: SpineSlot[], version: string | null) {
+    placeholderStore.reset()
     const limited = slots.slice(0, SPINE_SLOTS_LIMIT)
     limited.forEach(initSlotDefaults)
     spineSlots.value      = limited
@@ -131,6 +145,7 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
     const idx = spineSlots.value.findIndex(s => s.id === id)
     if (idx < 0) return
     spineSlots.value.splice(idx, 1)
+    placeholderStore.clearSlotImages(id)
     if (selectionStore.activeSlotId === id) {
       const next = spineSlots.value.find(s => !s.error)
       selectionStore.activeSlotId = next?.id ?? null
@@ -151,16 +166,19 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
     removeSlot(id)
   }
 
+  /** Indices are positions among top-level slots (the Spines list); child slots keep their array positions. */
   function reorderSlots(fromIndex: number, toIndex: number) {
     if (fromIndex === toIndex) return
-    const arr = [...spineSlots.value]
-    const [item] = arr.splice(fromIndex, 1)
-    arr.splice(toIndex, 0, item)
-    spineSlots.value = arr
+    const top = spineSlots.value.filter(s => !s.parentSlotId)
+    const [item] = top.splice(fromIndex, 1)
+    if (!item) return
+    top.splice(toIndex, 0, item)
+    let next = 0
+    spineSlots.value = spineSlots.value.map(s => (s.parentSlotId ? s : top[next++]))
   }
 
   /** Patch placeholderChildren in savedState for a non-active slot (e.g. after drag-reparent). No-op if slot has no savedState yet. */
-  function patchSlotPlaceholderImages(slotId: string, placeholderChildren: Record<string, import('@/core/types/FileSet').PHChildEntry[]>): void {
+  function patchSlotPlaceholderImages(slotId: string, placeholderChildren: Record<string, PHChildEntry[]>): void {
     const slot = spineSlots.value.find(s => s.id === slotId)
     if (!slot?.savedState) return
     slot.savedState = { ...slot.savedState, placeholderChildren: JSON.parse(JSON.stringify(placeholderChildren)) }
@@ -201,10 +219,10 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
     }
 
     const newSlot: SpineSlot = {
-      id: `slot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: newSlotId(),
       name: newName,
       fileSet: src.fileSet ? cloneFileSet(src.fileSet) : undefined,
-      savedState: src.savedState ? JSON.parse(JSON.stringify(src.savedState)) : undefined,
+      savedState: src.savedState ? cloneSavedState(src.savedState) : undefined,
       syncEnabled: src.syncEnabled ?? true,
       indPosX: src.indPosX ?? 0,
       indPosY: src.indPosY ?? 0,
@@ -212,8 +230,52 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
       placeholders: src.placeholders ? [...src.placeholders] : [],
     }
 
-    spineSlots.value = [...spineSlots.value, newSlot]
+    const added = [newSlot]
+    const children = clonePlaceholderChildren(id, newSlot.id, added)
+    if (children) {
+      placeholderStore.setSlotImages(newSlot.id, children)
+      if (newSlot.savedState) newSlot.savedState.placeholderChildren = placeholderStore.getSlotImages(newSlot.id)
+    }
+    spineSlots.value = [...spineSlots.value, ...added]
     return newSlot
+  }
+
+  /**
+   * Copies the placeholder children of a slot for its clone: images get new entry ids,
+   * child spines become independent child slots (appended to `added`) within the slot limit.
+   */
+  function clonePlaceholderChildren(srcId: string, dstId: string, added: SpineSlot[]): Record<string, PHChildEntry[]> | undefined {
+    const src = placeholderStore.hasSlot(srcId)
+      ? placeholderStore.getSlotImages(srcId)
+      : spineSlots.value.find(s => s.id === srcId)?.savedState?.placeholderChildren
+    if (!src) return undefined
+    const result: Record<string, PHChildEntry[]> = {}
+    for (const [phName, entries] of Object.entries(src)) {
+      result[phName] = []
+      for (const entry of entries) {
+        if (entry.kind === 'image') {
+          result[phName].push({ ...entry, imageId: crypto.randomUUID() })
+          continue
+        }
+        const childSrc = spineSlots.value.find(s => s.id === entry.childSlotId)
+        if (!childSrc?.fileSet || spineSlots.value.length + added.length >= SPINE_SLOTS_LIMIT) continue
+        const child: SpineSlot = {
+          id: newSlotId(),
+          name: childSrc.name,
+          fileSet: childSrc.fileSet,
+          parentSlotId: dstId,
+          savedState: childSrc.savedState ? cloneSavedState(childSrc.savedState) : undefined,
+          syncEnabled: childSrc.syncEnabled ?? true,
+          indPosX: childSrc.indPosX ?? 0,
+          indPosY: childSrc.indPosY ?? 0,
+          indZoom: childSrc.indZoom ?? 1,
+          placeholders: childSrc.placeholders ? [...childSrc.placeholders] : [],
+        }
+        added.push(child)
+        result[phName].push({ ...entry, imageId: crypto.randomUUID(), childSlotId: child.id, fileSet: childSrc.fileSet })
+      }
+    }
+    return result
   }
 
   /** Update `syncEnabled` for the slot with the given id. */
@@ -225,6 +287,7 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
   function clear() {
     pendingFiles.value    = []
     spineSlots.value      = []
+    placeholderStore.reset()
     detectedVersion.value = null
     selectionStore.clearSelection()
   }

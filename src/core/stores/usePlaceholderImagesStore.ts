@@ -157,7 +157,20 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
   }
 
   function clearSlotImages(slotId: string): void {
+    if (activeImageId.value && getChildContext(activeImageId.value)?.slotId === slotId) activeImageId.value = null
     delete children.value[slotId]
+  }
+
+  /** True once the slot has an entry, even an emptied one — the live store then wins over savedState. */
+  function hasSlot(slotId: string): boolean {
+    return slotId in children.value
+  }
+
+  /** New session: drop every entry and any canvas action still queued for the old slots. */
+  function reset(): void {
+    children.value = {}
+    _pendingActions.value = []
+    activeImageId.value = null
   }
 
   function setSlotImages(slotId: string, state: Record<string, PHChildEntry[]> | undefined): void {
@@ -198,6 +211,7 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     children,
     activeImageId,
     hasPendingActions,
+    hasSlot,
     getChildContext,
     getSlotImages,
     getPlaceholderImages,
@@ -218,6 +232,7 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     cloneSpineChild,
     clearSlotImages,
     setSlotImages,
+    reset,
 
     // ── Sync (internal queue) ──────────────────────────────
     drainActions,

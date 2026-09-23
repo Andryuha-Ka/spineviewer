@@ -8,49 +8,57 @@
 
 import { onMounted, onUnmounted } from 'vue'
 import type { Ref } from 'vue'
-import { useAnimationStore } from '@/core/stores/useAnimationStore'
+import { useAnimationStore, FRAME_STEP_SECONDS } from '@/core/stores/useAnimationStore'
 import type PreviewStage from '@/components/stage/PreviewStage.vue'
+
+const SPACE_CONTROL_ROLES = new Set(['checkbox', 'switch', 'button', 'combobox'])
+
+/** Focused controls that react to Space themselves; n-select focuses a role-less div inside `.n-base-selection`. */
+function isSpaceControl(el: HTMLElement): boolean {
+  return SPACE_CONTROL_ROLES.has(el.getAttribute?.('role') ?? '') || !!el.closest?.('.n-base-selection')
+}
+
+/** An open AnimationSelect menu navigates folders with ← / →. */
+function isAnimationMenuOpen(): boolean {
+  return !!document.querySelector('[role="combobox"][aria-expanded="true"]')
+}
 
 export function useViewerKeyboard(
   stageRef: Ref<InstanceType<typeof PreviewStage> | null>
 ): void {
   const animationStore = useAnimationStore()
 
+  function stepFrame(direction: -1 | 1) {
+    if (animationStore.isPlaying) animationStore.pause()
+    stageRef.value?.seekDelta(animationStore.currentTrack, direction * FRAME_STEP_SECONDS)
+  }
+
   function onKeyDown(e: KeyboardEvent) {
     const el = e.target as HTMLElement
     const tag = el.tagName
-    // NaiveUI cascader renders a real <input> inside its trigger — do not bail out for
-    // those inputs so we can intercept Space and prevent the dropdown from opening.
-    const inCascader = !!el.closest?.('.n-cascader')
-    if ((tag === 'INPUT' || tag === 'TEXTAREA') && !inCascader) return
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return
     // isComposing=true means an IME/dead-key sequence is in progress — ignore to avoid
     // misfires when switching to a non-Latin keyboard layout (e.g. Ukrainian/CJK)
     if (e.isComposing || e.keyCode === 229) return
 
-    // Space on focused interactive controls (checkbox, switch, button, cascader) would
-    // toggle/open them in addition to firing our shortcut. Stop propagation here
-    // (capture phase) so the control never receives the Space event — our handler takes over.
-    if (e.code === 'Space') {
-      const role = el.getAttribute?.('role') ?? ''
-      if (role === 'checkbox' || role === 'switch' || role === 'button' || role === 'combobox' || inCascader) {
-        e.stopPropagation()
-      }
-    }
+    // Capture phase: keep Space away from the focused control so it only toggles playback.
+    if (e.code === 'Space' && isSpaceControl(el)) e.stopPropagation()
 
     switch (e.code) {
       case 'Space':
         e.preventDefault()
-        animationStore.isPlaying ? animationStore.pause() : animationStore.play()
+        if (animationStore.isPlaying) animationStore.pause()
+        else animationStore.play()
         break
       case 'ArrowLeft':
+        if (isAnimationMenuOpen()) return
         e.preventDefault()
-        if (animationStore.isPlaying) animationStore.pause()
-        stageRef.value?.seekDelta(animationStore.currentTrack, -1 / 30)
+        stepFrame(-1)
         break
       case 'ArrowRight':
+        if (isAnimationMenuOpen()) return
         e.preventDefault()
-        if (animationStore.isPlaying) animationStore.pause()
-        stageRef.value?.seekDelta(animationStore.currentTrack, 1 / 30)
+        stepFrame(1)
         break
       case 'KeyR':
         stageRef.value?.clearTracks()
@@ -60,7 +68,10 @@ export function useViewerKeyboard(
           ? animationStore.tracks
           : animationStore.tracks.filter(t => t.trackIndex === animationStore.currentTrack)
         for (const t of targets) {
-          stageRef.value?.setTrackLoop(t.trackIndex, !t.loop)
+          const loop = animationStore.trackPlaylists[t.trackIndex]?.length
+            ? animationStore.isTrackListLoop(t.trackIndex)
+            : t.loop
+          stageRef.value?.setTrackLoop(t.trackIndex, !loop)
         }
         break
       }
@@ -71,14 +82,10 @@ export function useViewerKeyboard(
     }
   }
 
-  // Block Space keyup on interactive controls (NaiveUI handles toggle on keyup,
-  // so keydown stopPropagation alone is not enough).
+  // Naive UI toggles checkboxes and switches on keyup, so keydown alone is not enough.
   function onKeyUpCapture(e: KeyboardEvent) {
     if (e.code !== 'Space') return
-    const el = e.target as HTMLElement
-    const role = el.getAttribute?.('role') ?? ''
-    const inCascader = !!el.closest?.('.n-cascader')
-    if (role === 'checkbox' || role === 'switch' || role === 'button' || role === 'combobox' || inCascader) {
+    if (isSpaceControl(e.target as HTMLElement)) {
       e.stopPropagation()
       e.preventDefault()
     }

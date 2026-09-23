@@ -85,7 +85,8 @@ export function useViewportSync(
   }
 
   function syncZOrder(): void {
-    const slots = fileLoaderStore.spineSlots
+    // child slots live inside placeholders; the list and backgroundStore.listIndex count top-level slots only
+    const slots = fileLoaderStore.spineSlots.filter(s => !s.parentSlotId)
     const n = slots.length
     const bgListIdx = Math.max(0, Math.min(n, backgroundStore.listIndex))
 

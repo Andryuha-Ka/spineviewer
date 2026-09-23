@@ -15,8 +15,8 @@ import type {
 } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 // TODO: replace with @pixi-spine typed module when available
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySpineModule = Record<string, any>
 
 /**
@@ -278,9 +278,10 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
 
   getActiveAttachments(): AttachmentInfo[] {
     if (!this._spine) return []
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return this._spine.skeleton.slots
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .filter((s: any) => s.attachment !== null)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((s: any) => ({
         slotName: s.data.name,
         attachmentName: s.attachment?.name ?? '',
@@ -294,7 +295,6 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     const seen = new Set<string>()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const slots: any[] = this._skeletonData.slots ?? []
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const skin of this._skeletonData.skins ?? []) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const atts: any = skin.attachments
@@ -351,7 +351,6 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     const anim = this._skeletonData?.animations?.find((a: any) => a.name === animationName)
     if (!anim) return []
     const markers: AnimationEventMarker[] = []
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const tl of anim.timelines ?? []) {
       // frames may be Float32Array (spine 4.x) or Array (spine 3.8) — avoid Array.isArray
       if (!Array.isArray(tl.events) || tl.frames == null) continue
@@ -430,9 +429,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
   getFreeBones(): string[] {
     if (!this._skeletonData) return []
     const animated = new Set<string>()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const anim of this._skeletonData.animations ?? []) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const tl of anim.timelines ?? []) {
         // spine 4.x: BoneTimeline has boneIndex (number) → look up name in skeletonData.bones
         if (typeof tl.boneIndex === 'number') {

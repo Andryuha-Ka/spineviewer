@@ -6,7 +6,8 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  *
  * Compares src/**\/*.{ts,vue} files against kb/module-index.md.
- * Reports missing, extra, and auto-generated files.
+ * Reports missing, extra, and auto-generated files, and `Key exports` names
+ * of .ts entries that the file no longer exports.
  * Run: node scripts/check-index.mjs
  */
 
@@ -54,6 +55,34 @@ function extractIndexedPaths(indexContent) {
   return paths
 }
 
+// Map of indexed path → names listed in its `**Key exports:**` line (.ts entries only)
+function extractKeyExports(indexContent) {
+  const result = new Map()
+  const re = /###\s+`(src\/[^`]+\.ts)`[^#]*?\*\*Key exports:\*\*([^\n]*)/g
+  let m
+  while ((m = re.exec(indexContent)) !== null) {
+    const names = [...m[2].matchAll(/`([^`]+)`/g)]
+      .map(x => x[1].match(/^[A-Za-z_$][\w$]*/)?.[0])
+      .filter(Boolean)
+    result.set(m[1], names)
+  }
+  return result
+}
+
+// Names a TS module exports (declarations, export lists, default class/function names)
+function collectExports(source) {
+  const names = new Set()
+  const decl = /export\s+(?:declare\s+)?(?:default\s+)?(?:abstract\s+)?(?:async\s+)?(?:function\*?|const|let|var|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g
+  for (const m of source.matchAll(decl)) names.add(m[1])
+  for (const m of source.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)) {
+    for (const part of m[1].split(',')) {
+      const name = part.trim().split(/\s+as\s+/).pop()?.replace(/^type\s+/, '')
+      if (name) names.add(name)
+    }
+  }
+  return names
+}
+
 // ── main ────────────────────────────────────────────────────────────────────
 
 const indexContent = readFileSync(INDEX_FILE, 'utf8')
@@ -73,9 +102,17 @@ for (const f of indexed) {
   if (!srcFiles.includes(f))     { extra.push(f) }
 }
 
+const staleExports = []   // { file, names } listed in the index but not exported
+for (const [file, names] of extractKeyExports(indexContent)) {
+  if (!srcFiles.includes(file)) continue
+  const exported = collectExports(readFileSync(join(ROOT, file), 'utf8'))
+  const stale = names.filter(n => !exported.has(n))
+  if (stale.length > 0) staleExports.push({ file, names: stale })
+}
+
 // ── report ───────────────────────────────────────────────────────────────────
 
-const ok = missing.length === 0 && extra.length === 0
+const ok = missing.length === 0 && extra.length === 0 && staleExports.length === 0
 
 console.log('\n╔══════════════════════════════════════════════════════╗')
 console.log('║         Spine Viewer Pro — Codebase Index Check      ║')
@@ -108,11 +145,20 @@ if (extra.length > 0) {
   console.log()
 }
 
+if (staleExports.length > 0) {
+  console.log(`⚠️   STALE KEY EXPORTS (${staleExports.length} entries)`)
+  console.log('   Listed in kb/module-index.md but not exported by the file:\n')
+  for (const { file, names } of staleExports) console.log(`   - ${file}: ${names.join(', ')}`)
+  console.log()
+}
+
 console.log('📋  Recommendations:')
 if (missing.length > 0)
   console.log('   1. Copy the stub entries above into kb/module-index.md and fill in Purpose + Key exports.')
 if (extra.length > 0)
   console.log('   2. Remove or update stale entries in kb/module-index.md.')
-console.log('   3. Re-run `npm run check-index` to verify.\n')
+if (staleExports.length > 0)
+  console.log('   3. Fix the Key exports lines listed above.')
+console.log('   4. Re-run `npm run check-index` to verify.\n')
 
 process.exit(1)

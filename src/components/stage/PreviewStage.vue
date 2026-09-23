@@ -123,6 +123,7 @@ import { useLoopStateMachine } from '@/core/composables/stage/useLoopStateMachin
 import { useViewportSync } from '@/core/composables/stage/useViewportSync'
 import { usePanAndDrag } from '@/core/composables/stage/usePanAndDrag'
 import { useSeekDrag } from '@/core/composables/stage/useSeekDrag'
+import { useSlotSwitch, type ActiveStage } from '@/core/composables/stage/useSlotSwitch'
 import type { PixiSpriteObject } from '@/core/types/PixiSpriteObject'
 import type { IPixiApp } from '@/core/types/IPixiApp'
 import type { IProgressOverlay } from '@/core/types/IProgressOverlay'
@@ -130,6 +131,7 @@ import type { TrackDisplayState, MarkerDisplay } from '@/core/types/IProgressOve
 import type { ISpineAdapter, AnimationEventMarker } from '@/core/types/ISpineAdapter'
 import type { FileSet, PHSpineEntry } from '@/core/types/FileSet'
 import { makeLoopState, computeNorm, resetLoopState } from '@/core/overlay/overlayMath'
+import { queueTrackList, rearmListLoops, playlistPosition } from '@/core/utils/slotState'
 
 const versionStore   = useVersionStore()
 const viewerStore    = useViewerStore()
@@ -148,16 +150,10 @@ const placeholderImagesStore  = usePlaceholderImagesStore()
 // ── Mutable adapter/state references ─────────────────────────────────────────
 let bgSprite: PixiSpriteObject | null = null
 let pixiApp: IPixiApp | null = null
-let spineAdapter: ISpineAdapter | null = null
-let spineObj: unknown = null
+// the active top-level slot on stage (the parent while a child spine is active)
+const onStage: ActiveStage = { adapter: null, obj: null }
 const mountedAdapters     = new Map<string, ISpineAdapter>()
 const mountedSpineObjects = new Map<string, PixiSpriteObject>()
-
-// Slot-transition guards
-let _pendingChildSlotId: string | null = null
-let _redirectedFromSlotId: string | null = null
-let _suppressAnimPlay = false
-let _pendingSeekTimes: Record<number, number> | null = null
 
 // Watchers created after an await in onMounted are not bound to the component — stop them on unmount.
 const stageWatchStops: Array<ReturnType<typeof watch>> = []
@@ -185,7 +181,7 @@ const fpsClass = computed(() => {
 const children = useChildAdapters()
 const loopSM   = useLoopStateMachine()
 
-function _uiAdapter(): ISpineAdapter | null { return children.activeChildAdapter.value ?? spineAdapter }
+function _uiAdapter(): ISpineAdapter | null { return children.activeChildAdapter.value ?? onStage.adapter }
 
 // progressOverlay is assigned in onMounted; the seek callback closes over the variable reference
 let progressOverlay: IProgressOverlay | null = null
@@ -212,13 +208,13 @@ const { baseX, baseY, originScreenX, originScreenY, selectedBonePos, selectedSlo
 
 const panDrag = usePanAndDrag(
   containerRef as Ref<HTMLElement | null>,
-  () => spineAdapter,
+  () => onStage.adapter,
   () => mountedAdapters,
   () => mountedSpineObjects,
   () => children.childAdapters,
   () => children.childAdapterMeta,
   () => children.activeChildAdapter.value,
-  () => spineObj,
+  () => onStage.obj,
   () => baseX.value,
   () => baseY.value,
   () => progressOverlay,
@@ -238,34 +234,45 @@ const activePHItems = computed(() =>
 )
 
 function applyPlaceholderLabels() {
-  if (!spineAdapter) return
+  if (!onStage.adapter) return
   if (viewerStore.showPlaceholders && activePHItems.value.length > 0) {
-    spineAdapter.setPlaceholderLabels(activePHItems.value)
+    onStage.adapter.setPlaceholderLabels(activePHItems.value)
   } else {
-    spineAdapter.clearPlaceholderLabels()
+    onStage.adapter.clearPlaceholderLabels()
   }
 }
 
 watch(() => viewerStore.showPlaceholders, applyPlaceholderLabels)
 watch(() => viewerStore.disabledPlaceholders, applyPlaceholderLabels)
 
+const slotSwitch = useSlotSwitch({
+  onStage,
+  mountedAdapters,
+  mountedSpineObjects,
+  children,
+  getPixiApp: () => pixiApp,
+  loading,
+  spineLoaded,
+  spineError,
+  phItems,
+  loadSpine,
+  applySkins,
+  applyPlaceholderLabels,
+  drainPlaceholderActions,
+  applyViewport,
+  syncZOrder,
+})
+
 // ── Drain placeholder actions ──────────────────────────────────────────────────
-// While a child spine is active, spineAdapter still belongs to its parent slot.
+// While a child spine is active, onStage.adapter still belongs to its parent slot.
 function adapterForSlot(slotId: string): ISpineAdapter | null {
   const active = slotSelectionStore.activeSlot
-  if (slotId === active?.id || slotId === active?.parentSlotId) return spineAdapter
+  if (slotId === active?.id || slotId === active?.parentSlotId) return onStage.adapter
   return mountedAdapters.get(slotId) ?? null
 }
 
-function isChildMounted(childSlotId: string): boolean {
-  for (const meta of children.childAdapterMeta.values()) {
-    if (meta.childSlotId === childSlotId) return true
-  }
-  return false
-}
-
 async function drainPlaceholderActions() {
-  if (!spineAdapter) return
+  if (!onStage.adapter) return
   const actions = placeholderImagesStore.drainActions()
   for (const action of actions) {
     if (action.type === 'reorder-child') {
@@ -303,15 +310,17 @@ async function drainPlaceholderActions() {
         children.childAdapterMeta.delete(action.imageId)
       }
     } else {
-      if (action.slotId !== slotSelectionStore.activeSlotId) continue
+      // A slot that is not on stage picks its images up from the store when it is restored.
+      const adapter = adapterForSlot(action.slotId)
+      if (!adapter) continue
       if (action.type === 'add') {
-        spineAdapter.addImageToPlaceholder(action.phName, action.dataURL!, action.imageId!)
-        const ctx = placeholderImagesStore.getChildContext(action.imageId!)
+        adapter.addImageToPlaceholder(action.phName, action.dataURL, action.imageId)
+        const ctx = placeholderImagesStore.getChildContext(action.imageId)
         if (ctx && (ctx.entry.posX !== 0 || ctx.entry.posY !== 0 || ctx.entry.scale !== 1)) {
-          spineAdapter.setImageTransform(action.imageId!, ctx.entry.posX, ctx.entry.posY, ctx.entry.scale)
+          adapter.setImageTransform(action.imageId, ctx.entry.posX, ctx.entry.posY, ctx.entry.scale)
         }
       } else if (action.type === 'remove') {
-        spineAdapter.removeImageFromPlaceholder(action.phName, action.imageId!)
+        adapter.removeImageFromPlaceholder(action.phName, action.imageId)
       }
     }
   }
@@ -382,11 +391,13 @@ onMounted(async () => {
 
       fps.value = Math.round(pixiApp!.ticker.FPS)
       profilerStore.recordFrame(fps.value, ms)
-      if (spineAdapter) {
-        spineAdapter.tickPlaceholderLabels()
+      rearmOffUiAdapters()
+      if (onStage.adapter) {
+        onStage.adapter.tickPlaceholderLabels()
         const uiAd = _uiAdapter()!
         const states = uiAd.getTrackStates()
         animationStore.setTracks(states)
+        rearmListLoops(uiAd, states, animationStore.trackPlaylists, animationStore.trackEnabled)
 
         for (const state of states) {
           if (!animationStore.isTrackEnabled(state.trackIndex) && state.timeScale !== 0) {
@@ -395,7 +406,7 @@ onMounted(async () => {
         }
 
         if (animationStore.isPlaying && states.length > 0) {
-          const hasLoop  = states.some(t => t.loop)
+          const hasLoop  = states.some(t => t.loop || (animationStore.isTrackListLoop(t.trackIndex) && (animationStore.trackPlaylists[t.trackIndex]?.length ?? 0) >= 2))
           const hasQueue = states.some(t => t.queue.length > 0)
           if (!hasLoop && !hasQueue && states.every(t => t.duration > 0 && t.time >= t.duration - 0.02)) {
             animationStore.stop()
@@ -570,11 +581,11 @@ onMounted(async () => {
     watchStage(
       () => animationStore.tracks.map(t => `${t.trackIndex}:${t.animationName}`),
       () => {
-        if (!spineAdapter) return
+        if (!onStage.adapter) return
         const next = new Map<number, AnimationEventMarker[]>()
         const flat: typeof eventsStore.animationMarkers[0][] = []
         for (const track of animationStore.tracks) {
-          const markers = spineAdapter.getAnimationEvents(track.animationName)
+          const markers = onStage.adapter.getAnimationEvents(track.animationName)
           next.set(track.trackIndex, markers)
           for (const m of markers) flat.push({ ...m, trackIndex: track.trackIndex, animationName: track.animationName })
         }
@@ -607,7 +618,7 @@ onMounted(async () => {
     watchStage(
       () => animationStore.isPlaying,
       (playing) => {
-        if (_suppressAnimPlay) return
+        if (slotSwitch.isAnimPlaySuppressed()) return
         const uiAd = _uiAdapter()
         if (!uiAd) return
         if (playing) {
@@ -616,17 +627,14 @@ onMounted(async () => {
             loopSM.lastDcNormPos = -1
             for (const [idxStr, playlist] of Object.entries(animationStore.trackPlaylists)) {
               const trackIndex = Number(idxStr)
-              if (!animationStore.isTrackEnabled(trackIndex) || playlist.length === 0) continue
-              uiAd.setAnimation(trackIndex, playlist[0].animationName, playlist[0].loop)
-              for (let i = 1; i < playlist.length; i++) {
-                uiAd.addAnimation(trackIndex, playlist[i].animationName, playlist[i].loop)
-              }
+              if (!animationStore.isTrackEnabled(trackIndex)) continue
+              queueTrackList(uiAd, trackIndex, playlist)
             }
-            if (_pendingSeekTimes) {
-              for (const [idxStr, time] of Object.entries(_pendingSeekTimes)) {
+            const seekTimes = slotSwitch.takePendingSeekTimes()
+            if (seekTimes) {
+              for (const [idxStr, time] of Object.entries(seekTimes)) {
                 uiAd.seekTo(Number(idxStr), time)
               }
-              _pendingSeekTimes = null
             }
           }
           animationStore.isPaused = false
@@ -642,494 +650,11 @@ onMounted(async () => {
       },
     )
 
-    watchStage(
-      () => animationStore.loop,
-      (newLoop) => {
-        const uiAd = _uiAdapter()
-        if (!uiAd) return
-        for (const track of animationStore.tracks) {
-          uiAd.setTrackLoop(track.trackIndex, newLoop)
-        }
-        for (const idxStr of Object.keys(animationStore.trackPlaylists)) {
-          animationStore.updateTrackPlaylistFirstLoop(Number(idxStr), newLoop)
-        }
-      },
-    )
-
-    // ── Active slot watcher ───────────────────────────────────────────────────
-    watchStage(
-      () => slotSelectionStore.activeSlotId,
-      async (newId, oldId) => {
-        if (!newId || newId === oldId || loading.value) return
-
-        const _fromId = _redirectedFromSlotId ?? oldId
-        _redirectedFromSlotId = null
-        const prevSlot = _fromId ? fileLoaderStore.spineSlots.find(s => s.id === _fromId) : null
-        const effectiveOldId = prevSlot?.parentSlotId ?? _fromId
-
-        // Guard 1 — child slot activation
-        const newSlot = fileLoaderStore.spineSlots.find(s => s.id === newId)
-        if (newSlot?.parentSlotId) {
-          placeholderImagesStore.setActiveImage(null)
-
-          let childAdapterRef: ISpineAdapter | null = null
-          for (const [entryId, meta] of children.childAdapterMeta) {
-            if (meta.childSlotId === newId) { childAdapterRef = children.childAdapters.get(entryId) ?? null; break }
-          }
-          if (!childAdapterRef) {
-            _redirectedFromSlotId = _fromId
-            _pendingChildSlotId = newId
-            slotSelectionStore.setActiveSlot(newSlot.parentSlotId!)
-            return
-          }
-
-          if (!children.activeChildAdapter.value && spineAdapter && effectiveOldId) {
-            const parentTrackStates = spineAdapter.getTrackStates()
-            const parentTrackTimes: Record<number, number> = {}
-            for (const ts of parentTrackStates) parentTrackTimes[ts.trackIndex] = ts.time
-            const leavingParentSlot = fileLoaderStore.spineSlots.find(s => s.id === effectiveOldId)
-            fileLoaderStore.saveSlotState(effectiveOldId, {
-              speed:               animationStore.speed,
-              selectedAnimation:   animationStore.selectedAnimation,
-              currentTrack:        animationStore.currentTrack,
-              loop:                animationStore.loop,
-              trackEnabled:        { ...animationStore.trackEnabled },
-              trackPlaylists:      JSON.parse(JSON.stringify(animationStore.trackPlaylists)),
-              wasPlaying:          animationStore.isPlaying,
-              trackTimes:          parentTrackTimes,
-              selectedSkins:       [...skeletonStore.activeSkins],
-              showPlaceholders:    viewerStore.showPlaceholders,
-              disabledPlaceholders:[...viewerStore.disabledPlaceholders],
-              syncEnabled:         leavingParentSlot?.syncEnabled ?? true,
-              indPosX:             leavingParentSlot?.indPosX ?? 0,
-              indPosY:             leavingParentSlot?.indPosY ?? 0,
-              indZoom:             leavingParentSlot?.indZoom ?? 1,
-              placeholderChildren: placeholderImagesStore.getSlotImages(effectiveOldId),
-            })
-            if (effectiveOldId !== newSlot.parentSlotId) {
-              if (slotSelectionStore.isPinned(effectiveOldId)) {
-                mountedAdapters.set(effectiveOldId, spineAdapter)
-                if (spineObj) mountedSpineObjects.set(effectiveOldId, spineObj as PixiSpriteObject)
-              } else {
-                children.destroyChildAdaptersForSlot(effectiveOldId)
-                spineAdapter.destroy()
-                mountedAdapters.delete(effectiveOldId)
-                mountedSpineObjects.delete(effectiveOldId)
-              }
-              spineAdapter = null
-              spineObj = null
-            }
-          } else if (children.activeChildAdapter.value && prevSlot?.parentSlotId && oldId) {
-            children.saveChildState(oldId)
-          }
-
-          children.activeChildAdapter.value = childAdapterRef
-
-          _suppressAnimPlay = true
-          skeletonStore.clear()
-          animationStore.reset()
-          eventsStore.clear()
-          inspectorStore.clear()
-          skeletonStore.attachAdapter(childAdapterRef)
-          skeletonStore.populate({
-            animations: childAdapterRef.animations,
-            skins:      childAdapterRef.skins,
-            bones:      childAdapterRef.bones,
-            slots:      childAdapterRef.slots,
-            events:     childAdapterRef.events,
-            freeBones:  childAdapterRef.getFreeBones(),
-          })
-          childAdapterRef.onEvent(e => eventsStore.push(e))
-          if (newSlot.fileSet && typeof newSlot.fileSet.atlas.fileBody === 'string') {
-            atlasStore.load(newSlot.fileSet.atlas.fileBody, newSlot.fileSet.images)
-          } else {
-            atlasStore.clear()
-          }
-          if (newSlot.fileSet) complexityStore.analyze(childAdapterRef, newSlot.fileSet, atlasStore.pages)
-
-          const liveChildStates = childAdapterRef.getTrackStates()
-          const liveChildPlaylists: Record<number, Array<{ animationName: string; loop: boolean }>> = {}
-          for (const ts of liveChildStates) {
-            liveChildPlaylists[ts.trackIndex] = [{ animationName: ts.animationName, loop: ts.loop }, ...ts.queue]
-          }
-          const childSs = newSlot.savedState
-          animationStore.speed             = childSs?.speed ?? 1
-          animationStore.selectedAnimation = childSs?.selectedAnimation ?? null
-          animationStore.currentTrack      = childSs?.currentTrack ?? 0
-          animationStore.loop              = childSs?.loop ?? false
-          animationStore.trackEnabled      = childSs?.trackEnabled ? { ...childSs.trackEnabled } : {}
-          for (const [idxStr, playlist] of Object.entries(liveChildPlaylists)) {
-            animationStore.setTrackPlaylist(Number(idxStr), playlist)
-          }
-          if (childSs?.selectedSkins?.length) skeletonStore.activeSkins = [...childSs.selectedSkins]
-          animationStore.isPaused = false
-          animationStore.isPlaying = childSs?.wasPlaying ?? false
-
-          await nextTick()
-          _suppressAnimPlay = false
-          childAdapterRef.setTimeScale((childSs?.wasPlaying ?? false) ? (childSs?.speed ?? 1) : 0)
-          return
-        }
-
-        // Step 1: Save state of leaving slot
-        if (effectiveOldId) {
-          if (children.activeChildAdapter.value) {
-            if (oldId) children.saveChildState(oldId)
-            children.activeChildAdapter.value = null
-            const parentSs = fileLoaderStore.spineSlots.find(s => s.id === effectiveOldId)?.savedState
-            if (parentSs && spineAdapter) {
-              const liveStates = spineAdapter.getTrackStates()
-              const trackTimes: Record<number, number> = {}
-              for (const ts of liveStates) trackTimes[ts.trackIndex] = ts.time
-              fileLoaderStore.saveSlotState(effectiveOldId, {
-                ...parentSs,
-                trackTimes,
-                placeholderChildren: placeholderImagesStore.getSlotImages(effectiveOldId),
-              })
-            }
-          } else {
-            const leavingSlot = fileLoaderStore.spineSlots.find(s => s.id === effectiveOldId)
-            const leavingTrackStates = spineAdapter?.getTrackStates() ?? []
-            const trackTimes: Record<number, number> = {}
-            for (const ts of leavingTrackStates) trackTimes[ts.trackIndex] = ts.time
-            fileLoaderStore.saveSlotState(effectiveOldId, {
-              speed:              animationStore.speed,
-              selectedAnimation:  animationStore.selectedAnimation,
-              currentTrack:       animationStore.currentTrack,
-              loop:               animationStore.loop,
-              trackEnabled:       { ...animationStore.trackEnabled },
-              trackPlaylists:       JSON.parse(JSON.stringify(animationStore.trackPlaylists)),
-              wasPlaying:           animationStore.isPlaying,
-              trackTimes,
-              selectedSkins:        [...skeletonStore.activeSkins],
-              showPlaceholders:     viewerStore.showPlaceholders,
-              disabledPlaceholders: [...viewerStore.disabledPlaceholders],
-              syncEnabled:          leavingSlot?.syncEnabled ?? true,
-              indPosX:              leavingSlot?.indPosX ?? 0,
-              indPosY:              leavingSlot?.indPosY ?? 0,
-              indZoom:              leavingSlot?.indZoom ?? 1,
-              placeholderChildren:  placeholderImagesStore.getSlotImages(effectiveOldId),
-            })
-          }
-        }
-
-        // Step 2: Park or destroy old adapter
-        if (effectiveOldId && spineAdapter) {
-          for (const action of placeholderImagesStore.peekActions()) {
-            if (action.type === 'move-child' && action.kind === 'image' && action.slotId === effectiveOldId && action.imageId) {
-              spineAdapter.removeImageFromPlaceholder(action.phName, action.imageId)
-            }
-          }
-        }
-        if (effectiveOldId && spineAdapter) {
-          if (slotSelectionStore.isPinned(effectiveOldId) || effectiveOldId === newId) {
-            mountedAdapters.set(effectiveOldId, spineAdapter)
-            if (spineObj) mountedSpineObjects.set(effectiveOldId, spineObj as PixiSpriteObject)
-          } else {
-            children.destroyChildAdaptersForSlot(effectiveOldId)
-            spineAdapter.destroy()
-            mountedAdapters.delete(effectiveOldId)
-            mountedSpineObjects.delete(effectiveOldId)
-          }
-          spineAdapter = null
-          spineObj = null
-        }
-
-        // Step 3: Clear stores
-        skeletonStore.clear()
-        animationStore.reset()
-        inspectorStore.clear()
-        eventsStore.clear()
-        atlasStore.clear()
-        profilerStore.clear()
-        complexityStore.clear()
-        placeholderImagesStore.setActiveImage(null)
-        phItems.value = []
-        viewerStore.showPlaceholders = localStorage.getItem('svp:viewer:showPlaceholders') !== 'false'
-        viewerStore.clearDisabledPlaceholders()
-        spineLoaded.value = false
-
-        // Step 4: Get new slot
-        const slot = fileLoaderStore.spineSlots.find(s => s.id === newId)
-        if (!slot?.fileSet) return
-
-        const restoreState = (s: typeof slot.savedState) => {
-          if (!s) return
-          animationStore.speed              = s.speed
-          animationStore.selectedAnimation  = s.selectedAnimation
-          animationStore.currentTrack       = s.currentTrack
-          animationStore.loop               = s.loop
-          animationStore.trackEnabled       = { ...s.trackEnabled }
-          for (const [idxStr, playlist] of Object.entries(s.trackPlaylists)) {
-            animationStore.setTrackPlaylist(Number(idxStr), playlist)
-          }
-          for (const [idxStr, playlist] of Object.entries(s.trackPlaylists)) {
-            const trackIndex = Number(idxStr)
-            if (playlist.length === 0) continue
-            if (!animationStore.isTrackEnabled(trackIndex)) continue
-            spineAdapter?.setAnimation(trackIndex, playlist[0].animationName, playlist[0].loop)
-            for (let i = 1; i < playlist.length; i++) {
-              spineAdapter?.addAnimation(trackIndex, playlist[i].animationName, playlist[i].loop)
-            }
-          }
-          if (s.wasPlaying) {
-            if (s.trackTimes && Object.keys(s.trackTimes).length > 0) {
-              _pendingSeekTimes = { ...s.trackTimes }
-            }
-            animationStore.isPaused = false
-            animationStore.play()
-          } else if (s.trackTimes) {
-            for (const [idxStr, time] of Object.entries(s.trackTimes)) {
-              spineAdapter?.seekTo(Number(idxStr), time)
-            }
-          }
-          if (s.selectedSkins?.length) {
-            skeletonStore.activeSkins = [...s.selectedSkins]
-          }
-          if (s.showPlaceholders !== undefined) {
-            viewerStore.showPlaceholders = s.showPlaceholders
-          }
-          if (s.disabledPlaceholders?.length) {
-            viewerStore.disabledPlaceholders = new Set(s.disabledPlaceholders)
-          }
-          const target = slot
-          if (target) {
-            target.syncEnabled = s.syncEnabled ?? true
-            target.indPosX     = s.indPosX ?? 0
-            target.indPosY     = s.indPosY ?? 0
-            target.indZoom     = s.indZoom ?? 1
-          }
-          applyViewport()
-          const _restoredChildren = s.placeholderChildren ?? s.placeholderImages
-          if (_restoredChildren) {
-            placeholderImagesStore.setSlotImages(slot.id, _restoredChildren)
-            for (const [phName, entries] of Object.entries(_restoredChildren)) {
-              for (const entry of entries) {
-                if (entry.kind !== 'image') continue
-                spineAdapter?.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
-                spineAdapter?.setImageTransform(entry.imageId, entry.posX ?? 0, entry.posY ?? 0, entry.scale ?? 1)
-              }
-            }
-          } else {
-            placeholderImagesStore.clearSlotImages(slot.id)
-          }
-        }
-
-        // Step 5a: Reuse pinned adapter
-        if (mountedAdapters.has(newId)) {
-          loading.value = true
-          try {
-            spineAdapter = mountedAdapters.get(newId)!
-            spineObj = mountedSpineObjects.get(newId) ?? null
-            spineLoaded.value = true
-
-            skeletonStore.attachAdapter(spineAdapter)
-            skeletonStore.populate({
-              animations: spineAdapter.animations,
-              skins:      spineAdapter.skins,
-              bones:      spineAdapter.bones,
-              slots:      spineAdapter.slots,
-              events:     spineAdapter.events,
-              freeBones:  spineAdapter.getFreeBones(),
-            })
-            spineAdapter.onEvent(e => eventsStore.push(e))
-            if (typeof slot.fileSet.atlas.fileBody === 'string') {
-              atlasStore.load(slot.fileSet.atlas.fileBody, slot.fileSet.images)
-            }
-            complexityStore.analyze(spineAdapter, slot.fileSet, atlasStore.pages)
-
-            const PH_RE_5A = /placeholder/i
-            const phSlots5A = new Set(spineAdapter.slots.filter(s => PH_RE_5A.test(s.name)).map(s => s.name))
-            phItems.value = [
-              ...[...phSlots5A].map(name => ({ name, kind: 'slot' as const })),
-              ...spineAdapter.bones
-                .filter(b => PH_RE_5A.test(b.name) && !phSlots5A.has(b.name))
-                .map(b => ({ name: b.name, kind: 'bone' as const })),
-            ]
-            fileLoaderStore.setSlotPlaceholders(
-              slot.id,
-              phItems.value
-                .filter(p => p.kind !== 'attachment')
-                .map(p => ({ name: p.name, kind: p.kind as 'bone' | 'slot' })),
-            )
-            {
-              const liveStates = spineAdapter.getTrackStates()
-              const livePlaylists: Record<number, Array<{ animationName: string; loop: boolean }>> = {}
-              for (const ts of liveStates) {
-                livePlaylists[ts.trackIndex] = [
-                  { animationName: ts.animationName, loop: ts.loop },
-                  ...ts.queue,
-                ]
-              }
-              const ss = slot.savedState
-              animationStore.speed             = ss?.speed ?? 1
-              animationStore.selectedAnimation = ss?.selectedAnimation ?? null
-              animationStore.currentTrack      = ss?.currentTrack ?? 0
-              animationStore.loop              = ss?.loop ?? false
-              animationStore.trackEnabled      = ss?.trackEnabled ? { ...ss.trackEnabled } : {}
-              for (const [idxStr, playlist] of Object.entries(livePlaylists)) {
-                animationStore.setTrackPlaylist(Number(idxStr), playlist)
-              }
-              _suppressAnimPlay = true
-              animationStore.isPaused = false
-              animationStore.isPlaying = ss?.wasPlaying ?? true
-              if (ss?.selectedSkins?.length) skeletonStore.activeSkins = [...ss.selectedSkins]
-              if (ss?.showPlaceholders !== undefined) viewerStore.showPlaceholders = ss.showPlaceholders
-              if (ss?.disabledPlaceholders?.length) viewerStore.disabledPlaceholders = new Set(ss.disabledPlaceholders)
-              const pinnedSlot = slot
-              if (pinnedSlot) {
-                pinnedSlot.syncEnabled = ss?.syncEnabled ?? true
-                pinnedSlot.indPosX     = ss?.indPosX ?? 0
-                pinnedSlot.indPosY     = ss?.indPosY ?? 0
-                pinnedSlot.indZoom     = ss?.indZoom ?? 1
-              }
-              applyViewport()
-              syncZOrder()
-              await nextTick()
-              _suppressAnimPlay = false
-              spineAdapter?.setTimeScale((ss?.wasPlaying ?? true) ? (ss?.speed ?? 1) : 0)
-            }
-            applySkins()
-            applyPlaceholderLabels()
-            const ss5a = slot.savedState
-            const _ss5aChildren = ss5a?.placeholderChildren ?? ss5a?.placeholderImages
-            if (_ss5aChildren) {
-              placeholderImagesStore.setSlotImages(newId, _ss5aChildren)
-              for (const [phName, entries] of Object.entries(_ss5aChildren)) {
-                for (const entry of entries) {
-                  if (entry.kind !== 'image') continue
-                  spineAdapter?.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
-                  spineAdapter?.setImageTransform(entry.imageId, entry.posX ?? 0, entry.posY ?? 0, entry.scale ?? 1)
-                }
-              }
-            }
-            drainPlaceholderActions()
-            if (spineAdapter) await children.reloadChildAdaptersForSlot(spineAdapter, newId)
-            if (_pendingChildSlotId) {
-              const _pendingId = _pendingChildSlotId
-              _pendingChildSlotId = null
-              if (isChildMounted(_pendingId)) {
-                await nextTick()
-                slotSelectionStore.setActiveSlot(_pendingId)
-              } else {
-                console.warn('[PreviewStage] child spine could not be mounted, staying on parent:', _pendingId)
-              }
-            }
-          } catch (e) {
-            spineError.value = e instanceof Error ? e.message : 'Failed to restore spine'
-            console.error('[PreviewStage] restore pinned error:', e)
-          } finally {
-            loading.value = false
-          }
-        } else {
-          // Step 5b: Fresh load
-          await loadSpine(slot.fileSet, newId, false)
-          restoreState(slot.savedState)
-          if (!slot.savedState) {
-            const liveImages = placeholderImagesStore.getSlotImages(newId)
-            for (const [phName, entries] of Object.entries(liveImages)) {
-              for (const entry of entries) {
-                if (entry.kind !== 'image') continue
-                spineAdapter?.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
-                spineAdapter?.setImageTransform(entry.imageId, entry.posX ?? 0, entry.posY ?? 0, entry.scale ?? 1)
-              }
-            }
-          }
-          applySkins()
-          applyPlaceholderLabels()
-          drainPlaceholderActions()
-          if (spineAdapter) await children.reloadChildAdaptersForSlot(spineAdapter, newId)
-          if (_pendingChildSlotId) {
-            const _pendingId = _pendingChildSlotId
-            _pendingChildSlotId = null
-            if (isChildMounted(_pendingId)) {
-              await nextTick()
-              slotSelectionStore.setActiveSlot(_pendingId)
-            } else {
-              console.warn('[PreviewStage] child spine could not be mounted, staying on parent:', _pendingId)
-            }
-          }
-        }
-      },
-    )
-
-    // ── Pinned slot watcher ───────────────────────────────────────────────────
-    watchStage(
-      () => slotSelectionStore.pinnedSlotIds,
-      async (newPinned) => {
-        if (!pixiApp) return
-        const _activeParentSlotId = slotSelectionStore.activeSlot?.parentSlotId ?? null
-        for (const [slotId, adapter] of [...mountedAdapters.entries()]) {
-          if (slotId === slotSelectionStore.activeSlotId) continue
-          if (slotId === _activeParentSlotId) continue
-          if (!newPinned.has(slotId)) {
-            children.destroyChildAdaptersForSlot(slotId)
-            adapter.destroy()
-            mountedAdapters.delete(slotId)
-            mountedSpineObjects.delete(slotId)
-          }
-        }
-        for (const slotId of newPinned) {
-          if (slotId === slotSelectionStore.activeSlotId) continue
-          if (mountedAdapters.has(slotId)) continue
-          const slot = fileLoaderStore.spineSlots.find(s => s.id === slotId)
-          if (!slot?.fileSet) continue
-          if (slot.parentSlotId) continue
-          try {
-            const adapter = await createSpineAdapter(
-              versionStore.pixiVersion!,
-              versionStore.spineVersion!,
-            )
-            await adapter.load(slot.fileSet)
-            adapter.mount(pixiApp.stage)
-            const ss = slot.savedState
-            if (ss) {
-              for (const [idxStr, playlist] of Object.entries(ss.trackPlaylists)) {
-                const trackIdx = Number(idxStr)
-                if (playlist.length > 0) {
-                  adapter.setAnimation(trackIdx, playlist[0].animationName, playlist[0].loop)
-                  for (let i = 1; i < playlist.length; i++) {
-                    adapter.addAnimation(trackIdx, playlist[i].animationName, playlist[i].loop)
-                  }
-                }
-              }
-              adapter.setTimeScale(ss.wasPlaying ? ss.speed : 0)
-              if (ss.selectedSkins?.length) adapter.setSkins(ss.selectedSkins)
-              const _pinnedChildren = ss.placeholderChildren ?? ss.placeholderImages
-              if (_pinnedChildren) {
-                const liveChildren = placeholderImagesStore.getSlotImages(slotId)
-                const hasLiveData = Object.keys(liveChildren).length > 0
-                const sourceForImages = hasLiveData ? liveChildren : _pinnedChildren
-                if (!hasLiveData) {
-                  placeholderImagesStore.setSlotImages(slotId, _pinnedChildren)
-                }
-                for (const [phName, entries] of Object.entries(sourceForImages)) {
-                  for (const entry of entries) {
-                    if (entry.kind !== 'image') continue
-                    adapter.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
-                    adapter.setImageTransform(entry.imageId, entry.posX ?? 0, entry.posY ?? 0, entry.scale ?? 1)
-                  }
-                }
-              }
-            }
-            const obj = pixiApp.getLastStageChild()
-            mountedAdapters.set(slotId, adapter)
-            if (obj) mountedSpineObjects.set(slotId, obj as PixiSpriteObject)
-            await children.reloadChildAdaptersForSlot(adapter, slotId)
-            applyViewport()
-            syncZOrder()
-          } catch (e) {
-            console.error('[PreviewStage] failed to mount pinned spine:', slotId, e)
-            slotSelectionStore.setPinned(slotId, false)
-          }
-        }
-      },
-    )
+    slotSwitch.start(watchStage)
 
     watchStage(
-      () => fileLoaderStore.spineSlots.map(s => s.id),
+      () => fileLoaderStore.spineSlots.filter(s => !s.parentSlotId).map(s => s.id).join(),
       () => syncZOrder(),
-      { deep: false },
     )
 
     if (slotSelectionStore.activeSlot?.fileSet) {
@@ -1149,7 +674,7 @@ onUnmounted(() => {
   stageWatchStops.length = 0
   containerRef.value?.removeEventListener('wheel', onWheel)
   seekDrag.cleanup()
-  spineObj = null
+  onStage.obj = null
   if (bgSprite) {
     bgSprite.destroy?.({ texture: true })
     bgSprite = null
@@ -1164,7 +689,7 @@ onUnmounted(() => {
   }
   mountedAdapters.clear()
   mountedSpineObjects.clear()
-  spineAdapter = null
+  onStage.adapter = null
   pixiApp?.destroy()
   pixiApp = null
   inspectorStore.clear()
@@ -1193,15 +718,15 @@ async function loadSpine(fileSet: FileSet, slotId?: string, resetViewport = true
   loopSM.dcRaw.fill(null)
   loopSM.lastDcNormPos = -1
 
-  if (spineAdapter) {
-    const oldSlotId = [...mountedAdapters.entries()].find(([, a]) => a === spineAdapter)?.[0]
+  if (onStage.adapter) {
+    const oldSlotId = [...mountedAdapters.entries()].find(([, a]) => a === onStage.adapter)?.[0]
     if (oldSlotId) {
       mountedAdapters.delete(oldSlotId)
       mountedSpineObjects.delete(oldSlotId)
     }
-    spineAdapter.destroy()
-    spineAdapter = null
-    spineObj = null
+    onStage.adapter.destroy()
+    onStage.adapter = null
+    onStage.obj = null
     skeletonStore.clear()
     animationStore.reset()
     inspectorStore.clear()
@@ -1215,47 +740,47 @@ async function loadSpine(fileSet: FileSet, slotId?: string, resetViewport = true
   loadingText.value = 'Loading Spine…'
 
   try {
-    spineAdapter = await createSpineAdapter(
+    onStage.adapter = await createSpineAdapter(
       versionStore.pixiVersion!,
       versionStore.spineVersion!,
     )
-    await spineAdapter.load(fileSet)
+    await onStage.adapter.load(fileSet)
 
     const container = containerRef.value!
     const { width, height } = container.getBoundingClientRect()
 
-    spineAdapter.mount(pixiApp.stage)
-    spineAdapter.setTimeScale(animationStore.isPlaying ? animationStore.speed : 0)
+    onStage.adapter.mount(pixiApp.stage)
+    onStage.adapter.setTimeScale(animationStore.isPlaying ? animationStore.speed : 0)
 
-    spineObj = pixiApp.getLastStageChild()
+    onStage.obj = pixiApp.getLastStageChild()
     baseX.value = width / 2
     baseY.value = height * 0.5
     spineLoaded.value = true
     if (resetViewport) viewerStore.resetView()
 
     if (slotId) {
-      mountedAdapters.set(slotId, spineAdapter)
-      if (spineObj) mountedSpineObjects.set(slotId, spineObj as PixiSpriteObject)
+      mountedAdapters.set(slotId, onStage.adapter)
+      if (onStage.obj) mountedSpineObjects.set(slotId, onStage.obj as PixiSpriteObject)
     }
 
     applyViewport()
     syncZOrder()
 
-    skeletonStore.attachAdapter(spineAdapter)
+    skeletonStore.attachAdapter(onStage.adapter)
     skeletonStore.populate({
-      animations: spineAdapter.animations,
-      skins:      spineAdapter.skins,
-      bones:      spineAdapter.bones,
-      slots:      spineAdapter.slots,
-      events:     spineAdapter.events,
-      freeBones:  spineAdapter.getFreeBones(),
+      animations: onStage.adapter.animations,
+      skins:      onStage.adapter.skins,
+      bones:      onStage.adapter.bones,
+      slots:      onStage.adapter.slots,
+      events:     onStage.adapter.events,
+      freeBones:  onStage.adapter.getFreeBones(),
     })
 
     const PH_RE = /placeholder/i
-    const phSlotNames = new Set(spineAdapter.slots.filter(s => PH_RE.test(s.name)).map(s => s.name))
+    const phSlotNames = new Set(onStage.adapter.slots.filter(s => PH_RE.test(s.name)).map(s => s.name))
     phItems.value = [
       ...[...phSlotNames].map(name => ({ name, kind: 'slot' as const })),
-      ...spineAdapter.bones
+      ...onStage.adapter.bones
         .filter(b => PH_RE.test(b.name) && !phSlotNames.has(b.name))
         .map(b => ({ name: b.name, kind: 'bone' as const })),
     ]
@@ -1268,15 +793,15 @@ async function loadSpine(fileSet: FileSet, slotId?: string, resetViewport = true
       )
     }
     if (phItems.value.length > 0 && viewerStore.showPlaceholders) {
-      spineAdapter.setPlaceholderLabels(phItems.value)
+      onStage.adapter.setPlaceholderLabels(phItems.value)
     }
 
-    spineAdapter.onEvent(e => eventsStore.push(e))
+    onStage.adapter.onEvent(e => eventsStore.push(e))
 
     if (typeof fileSet.atlas.fileBody === 'string') {
       atlasStore.load(fileSet.atlas.fileBody, fileSet.images)
     }
-    complexityStore.analyze(spineAdapter, fileSet, atlasStore.pages)
+    complexityStore.analyze(onStage.adapter, fileSet, atlasStore.pages)
   } catch (e) {
     spineError.value = e instanceof Error ? e.message : 'Failed to load Spine'
     console.error('[PreviewStage] loadSpine error:', e)
@@ -1298,19 +823,19 @@ async function captureAnimFrames(
   onFrame: (canvas: HTMLCanvasElement, index: number, total: number) => void,
   signal?: AbortSignal,
 ): Promise<boolean> {
-  if (!pixiApp || !spineAdapter) return false
+  if (!pixiApp || !onStage.adapter) return false
   const entry = animationStore.tracks.find(t => t.trackIndex === track)
   if (!entry || entry.duration <= 0) return false
 
   const wasPlaying = animationStore.isPlaying
-  spineAdapter.setTimeScale(0)
+  onStage.adapter.setTimeScale(0)
   const duration = entry.duration
 
   try {
     for (let i = 0; i < frameCount; i++) {
       if (signal?.aborted) return false
       const t = frameCount === 1 ? 0 : (i / (frameCount - 1)) * duration
-      spineAdapter.seekTo(track, t)
+      onStage.adapter.seekTo(track, t)
       await new Promise<void>(r => requestAnimationFrame(() => r()))
       if (signal?.aborted) return false
       const frame = await pixiApp!.extractFrame()
@@ -1318,12 +843,31 @@ async function captureAnimFrames(
     }
   } finally {
     if (wasPlaying) {
-      spineAdapter.setTimeScale(animationStore.speed)
+      onStage.adapter.setTimeScale(animationStore.speed)
     }
-    spineAdapter.seekTo(track, 0)
+    onStage.adapter.seekTo(track, 0)
   }
 
   return true
+}
+
+// pinned, parked-parent and inactive child adapters cycle their lists from their slot's saved state
+function rearmOffUiAdapters(): void {
+  const uiAd = _uiAdapter()
+  const candidates: Array<[ISpineAdapter, string | undefined]> = [...mountedAdapters].map(([id, a]) => [a, id])
+  if (onStage.adapter) candidates.push([onStage.adapter, slotSelectionStore.activeSlot?.parentSlotId])
+  for (const [entryId, meta] of children.childAdapterMeta) {
+    const a = children.childAdapters.get(entryId)
+    if (a) candidates.push([a, meta.childSlotId])
+  }
+  const seen = new Set<ISpineAdapter>()
+  for (const [a, slotId] of candidates) {
+    if (a === uiAd || seen.has(a) || !slotId) continue
+    seen.add(a)
+    const saved = fileLoaderStore.spineSlots.find(s => s.id === slotId)?.savedState
+    if (!saved || !Object.values(saved.trackPlaylists).some(l => l.length >= 2 && l[0].loop)) continue
+    rearmListLoops(a, a.getTrackStates(), saved.trackPlaylists, saved.trackEnabled)
+  }
 }
 
 defineExpose({
@@ -1336,22 +880,43 @@ defineExpose({
   addAnimation: (track: number, name: string, loop: boolean) => {
     animationStore.setTrackEnabled(track, true)
     animationStore.appendToTrackPlaylist(track, name, loop)
-    _uiAdapter()?.addAnimation(track, name, loop)
+    const ad = _uiAdapter()
+    const length = animationStore.trackPlaylists[track]?.length ?? 0
+    // a list of two or more is queued non-looping and cycled by the ticker
+    if (length === 2) ad?.setTrackLoop(track, false)
+    ad?.addAnimation(track, name, length === 1 ? loop : false)
   },
   setTrackLoop: (track: number, loop: boolean) => {
-    _uiAdapter()?.setTrackLoop(track, loop)
-    if (animationStore.trackPlaylists[track]?.length) {
-      animationStore.updateTrackPlaylistFirstLoop(track, loop)
-    } else {
-      const liveTrack = animationStore.tracks.find(t => t.trackIndex === track)
-      if (liveTrack) {
-        animationStore.setTrackPlaylist(track, [{ animationName: liveTrack.animationName, loop }])
-      }
+    const ad = _uiAdapter()
+    const list = animationStore.trackPlaylists[track]
+    const live = animationStore.tracks.find(t => t.trackIndex === track)
+    if (list?.length) {
+      animationStore.setTrackListLoop(track, loop)
+    } else if (live) {
+      animationStore.setTrackPlaylist(track, [{ animationName: live.animationName, loop }])
     }
+    const length = list?.length ?? 0
+    if (length <= 1) { ad?.setTrackLoop(track, loop); return }
+    if (loop || !ad || !live) return
+    // drop a re-armed cycle: keep only the entries left until the end of the list
+    const pos = playlistPosition(length, live.queue.length, false)
+    for (let n = live.queue.length; n > length - 1 - pos; n--) ad.removeQueueEntry(track, n - 1)
   },
   removeQueueEntry: (track: number, index: number) => {
-    animationStore.removeFromTrackPlaylist(track, index + 1)
-    _uiAdapter()?.removeQueueEntry(track, index)
+    const ad = _uiAdapter()
+    const list = animationStore.trackPlaylists[track]
+    const queued = animationStore.tracks.find(t => t.trackIndex === track)?.queue.length ?? 0
+    // live-chain rows (no list, or a queue longer than it — same rule as the Anim tab) emit queue index + 1
+    if (!list?.length || queued > list.length) {
+      if (index < 1) return
+      if (list && index < list.length) animationStore.removePlaylistEntry(track, index)
+      ad?.removeQueueEntry(track, index - 1)
+      return
+    }
+    const length = list.length
+    const k = (index - playlistPosition(length, queued, false) - 1 + length) % length
+    animationStore.removePlaylistEntry(track, index)
+    if (k < queued) ad?.removeQueueEntry(track, k)
   },
   clearTrack: (track: number) => {
     animationStore.clearTrackPlaylist(track)

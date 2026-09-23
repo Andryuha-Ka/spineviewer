@@ -65,8 +65,7 @@ export interface SpineSlotSavedState {
   // Placeholders
   showPlaceholders: boolean
   disabledPlaceholders: string[]
-  placeholderImages?: Record<string, PHImageEntry[]>     // deprecated, kept for legacy read-compat
-  placeholderChildren?: Record<string, PHChildEntry[]>  // takes precedence on restore
+  placeholderChildren?: Record<string, PHChildEntry[]>
   // Independent movement
   syncEnabled: boolean
   indPosX: number

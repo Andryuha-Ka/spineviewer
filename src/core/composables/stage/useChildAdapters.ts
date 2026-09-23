@@ -16,6 +16,7 @@ import { useViewerStore } from '@/core/stores/useViewerStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import type { ISpineAdapter } from '@/core/types/ISpineAdapter'
 import type { PHSpineEntry } from '@/core/types/FileSet'
+import { buildSlotSavedState, playlistsOf, replaySavedTracks, trackTimesOf } from '@/core/utils/slotState'
 
 export interface ChildAdapterMeta {
   parentSlotId: string
@@ -44,36 +45,63 @@ export function useChildAdapters() {
   function saveChildState(childSlotId: string): void {
     const childSlot = fileLoaderStore.spineSlots.find(s => s.id === childSlotId)
     if (!childSlot) return
-    const childTrackTimes: Record<number, number> = {}
-    if (activeChildAdapter.value) {
-      for (const ts of activeChildAdapter.value.getTrackStates()) childTrackTimes[ts.trackIndex] = ts.time
-    }
+    fileLoaderStore.saveSlotState(childSlotId, buildSlotSavedState({
+      playback:             animationStore,
+      activeSkins:          skeletonStore.activeSkins,
+      showPlaceholders:     viewerStore.showPlaceholders,
+      disabledPlaceholders: viewerStore.disabledPlaceholders,
+      slot:                 childSlot,
+      trackTimes:           trackTimesOf(activeChildAdapter.value?.getTrackStates() ?? []),
+      placeholderChildren:  {},
+    }))
+  }
+
+  /** Keeps a child's live tracks in its savedState so a later remount resumes them. */
+  function snapshotChildState(childSlotId: string, adapter: ISpineAdapter): void {
+    const childSlot = fileLoaderStore.spineSlots.find(s => s.id === childSlotId)
+    if (!childSlot) return
+    const states = adapter.getTrackStates()
+    const prev = childSlot.savedState
+    const trackPlaylists = slotSelectionStore.activeSlotId === childSlotId
+      ? Object.fromEntries(Object.entries(animationStore.trackPlaylists).map(([t, l]) => [t, l.map(e => ({ ...e }))]))
+      : prev && Object.values(prev.trackPlaylists).some(l => l.length > 0)
+        ? prev.trackPlaylists
+        : playlistsOf(states)
+    const trackTimes = trackTimesOf(states)
     fileLoaderStore.saveSlotState(childSlotId, {
-      speed:               animationStore.speed,
-      selectedAnimation:   animationStore.selectedAnimation,
-      currentTrack:        animationStore.currentTrack,
-      loop:                animationStore.loop,
-      trackEnabled:        { ...animationStore.trackEnabled },
-      trackPlaylists:      JSON.parse(JSON.stringify(animationStore.trackPlaylists)),
-      wasPlaying:          animationStore.isPlaying,
-      trackTimes:          childTrackTimes,
-      selectedSkins:       [...skeletonStore.activeSkins],
-      showPlaceholders:    viewerStore.showPlaceholders,
-      disabledPlaceholders:[...viewerStore.disabledPlaceholders],
-      syncEnabled:         childSlot.syncEnabled ?? true,
-      indPosX:             childSlot.indPosX ?? 0,
-      indPosY:             childSlot.indPosY ?? 0,
-      indZoom:             childSlot.indZoom ?? 1,
-      placeholderChildren: {},
+      speed:                prev?.speed ?? 1,
+      selectedAnimation:    prev?.selectedAnimation ?? null,
+      currentTrack:         prev?.currentTrack ?? 0,
+      loop:                 prev?.loop ?? false,
+      trackEnabled:         { ...prev?.trackEnabled },
+      trackPlaylists,
+      // a child that was never activated plays at the default time scale
+      wasPlaying:           prev?.wasPlaying ?? true,
+      trackTimes,
+      selectedSkins:        [...(prev?.selectedSkins ?? [])],
+      showPlaceholders:     prev?.showPlaceholders ?? viewerStore.showPlaceholders,
+      disabledPlaceholders: [...(prev?.disabledPlaceholders ?? [])],
+      syncEnabled:          childSlot.syncEnabled ?? true,
+      indPosX:              childSlot.indPosX ?? 0,
+      indPosY:              childSlot.indPosY ?? 0,
+      indZoom:              childSlot.indZoom ?? 1,
+      placeholderChildren:  {},
     })
+  }
+
+  function destroyChildAdapter(entryId: string): void {
+    const adapter = childAdapters.get(entryId)
+    const meta = childAdapterMeta.get(entryId)
+    if (adapter && meta) snapshotChildState(meta.childSlotId, adapter)
+    adapter?.destroy()
+    childAdapters.delete(entryId)
+    childAdapterMeta.delete(entryId)
   }
 
   function destroyChildAdaptersForSlot(slotId: string): void {
     for (const [entryId, meta] of [...childAdapterMeta.entries()]) {
       if (meta.parentSlotId !== slotId) continue
-      childAdapters.get(entryId)?.destroy()
-      childAdapters.delete(entryId)
-      childAdapterMeta.delete(entryId)
+      destroyChildAdapter(entryId)
     }
   }
 
@@ -162,13 +190,8 @@ export function useChildAdapters() {
       const childSlot = fileLoaderStore.spineSlots.find(s => s.id === entry.childSlotId)
       if (childSlot?.savedState) {
         const ss = childSlot.savedState
-        for (const [idxStr, playlist] of Object.entries(ss.trackPlaylists)) {
-          const trackIdx = Number(idxStr)
-          if (playlist.length > 0) {
-            childAdapter.setAnimation(trackIdx, playlist[0].animationName, playlist[0].loop)
-            for (let i = 1; i < playlist.length; i++) childAdapter.addAnimation(trackIdx, playlist[i].animationName, playlist[i].loop)
-          }
-        }
+        replaySavedTracks(childAdapter, ss)
+        if (ss.selectedSkins.length > 0) childAdapter.setSkins(ss.selectedSkins)
         childAdapter.setTimeScale(ss.wasPlaying ? ss.speed : 0)
       }
     } catch (e) {
@@ -189,8 +212,8 @@ export function useChildAdapters() {
 
   /**
    * Reparents a mounted child spine into another placeholder without reloading it.
-   * Destroys the adapter when the destination parent is not on stage — it is remounted
-   * by reloadChildAdaptersForSlot once that parent loads.
+   * Destroys the adapter when the destination parent is not on stage — its tracks are
+   * snapshotted first and replayed when reloadChildAdaptersForSlot remounts it.
    */
   function moveChildAdapter(
     entryId: string,
@@ -205,9 +228,7 @@ export function useChildAdapters() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const spineObj = childAdapter.getSpineObject() as any
     if (!dstContainer || !spineObj) {
-      childAdapter.destroy()
-      childAdapters.delete(entryId)
-      childAdapterMeta.delete(entryId)
+      destroyChildAdapter(entryId)
       return
     }
     const zIndex = [...childAdapterMeta.entries()].filter(

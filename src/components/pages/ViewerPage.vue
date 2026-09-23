@@ -136,6 +136,7 @@ import { useExportStore } from '@/core/stores/useExportStore'
 import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
 import { groupSpineFiles, readFileAsDataURL } from '@/core/utils/fileLoader'
 import { validateSpineFileSet } from '@/core/utils/spineValidator'
+import { spineVersionProblem } from '@/core/utils/versionDetector'
 
 const emit = defineEmits<{
   back:           []
@@ -215,6 +216,8 @@ async function onCanvasDrop(e: DragEvent) {
     for (const slot of result.slots) {
       if (!slot.error && slot.fileSet) {
         const errs = validateSpineFileSet(slot.fileSet)
+        const versionProblem = versionStore.spineVersion && spineVersionProblem(slot.fileSet, versionStore.spineVersion)
+        if (versionProblem) errs.push(versionProblem)
         if (errs.length > 0) slot.validationErrors = errs
       }
       fileLoaderStore.addSlot(slot)

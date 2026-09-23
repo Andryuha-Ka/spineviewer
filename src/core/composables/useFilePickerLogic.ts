@@ -113,8 +113,8 @@ export function useFilePickerLogic(emit: EmitFn, onHistorySaved?: () => void) {
     // browsers clear DataTransfer.items after the first event-loop tick.
     const handlePromises: Promise<FileSystemHandle | null>[] = isFileSystemAccessSupported()
       ? Array.from(e.dataTransfer.items).map(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           // TODO: remove cast when File System Access API types are stable in TypeScript lib
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           item => (((item as any).getAsFileSystemHandle?.() ?? Promise.resolve(null)) as Promise<FileSystemHandle | null>),
         )
       : []
@@ -129,8 +129,8 @@ export function useFilePickerLogic(emit: EmitFn, onHistorySaved?: () => void) {
         if (handle?.kind === 'file') {
           handles.push(handle as FileSystemFileHandle)
         } else if (handle?.kind === 'directory') {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           // TODO: remove cast when File System Access API types are stable in TypeScript lib
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           for await (const entry of (handle as any).values()) {
             if (entry.kind === 'file') handles.push(entry as FileSystemFileHandle)
           }

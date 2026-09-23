@@ -48,8 +48,8 @@ export function waitForPixi7Textures(textures: Iterable<unknown>): Promise<void>
   const promises = [...textures].map(
     tex =>
       new Promise<void>((resolve, reject) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         // TODO: use proper Pixi7 BaseTexture type after @pixi-spine types stabilize
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const bt = (tex as any)?.baseTexture
         if (!bt || bt.valid) { resolve(); return }
         bt.once('loaded', resolve)

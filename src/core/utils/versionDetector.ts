@@ -6,6 +6,8 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
 
+import type { FileSet } from '@/core/types/FileSet'
+
 /** Supported Spine major.minor versions */
 const KNOWN_VERSIONS = ['3.8', '4.0', '4.1', '4.2'] as const
 
@@ -54,4 +56,14 @@ export function detectSpineVersionFromSkel(buffer: ArrayBuffer): string {
 export function isCompatible(detected: string, selected: string): boolean {
   if (detected === 'unknown') return true
   return detected === selected
+}
+
+/** Mismatch message when the file set's skeleton cannot be loaded by the session's Spine runtime, else null. */
+export function spineVersionProblem(fileSet: FileSet, sessionVersion: string): string | null {
+  const { type, fileBody, filename } = fileSet.skeleton
+  const detected = type === 'skeleton-json'
+    ? detectSpineVersion(fileBody as string)
+    : detectSpineVersionFromSkel(fileBody as ArrayBuffer)
+  if (isCompatible(detected, sessionVersion)) return null
+  return `Spine version mismatch: ${filename} is ${detected}, viewer is set to ${sessionVersion}`
 }

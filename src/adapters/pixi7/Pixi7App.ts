@@ -30,6 +30,7 @@ export class Pixi7App implements IPixiApp {
     // Expose app to Pixi DevTools browser extension
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).__PIXI_APP__ = this._app;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).__PIXI_APP_NEW__ = this._app;
 
     // Count WebGL draw calls by wrapping the GL context.
@@ -45,10 +46,10 @@ export class Pixi7App implements IPixiApp {
         ;(gl as any).drawElements = (...args: any[]) => { inc(); return (origDE as any)(...args) }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(gl as any).drawArrays = (...args: any[]) => { inc(); return (origDA as any)(...args) }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this._app.ticker.add(() => {
           this._lastDrawCalls = this._frameDrawCalls
           this._frameDrawCalls = 0
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }, null, -100 as any)
       }
     } catch { /* GL wrapping not available */ }
@@ -93,7 +94,6 @@ export class Pixi7App implements IPixiApp {
 
   setSortableChildren(enabled: boolean): void {
     // PIXI 7 Container does not declare sortableChildren in TS types — cast required
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(this._app.stage as PIXI.Container & { sortableChildren?: boolean }).sortableChildren = enabled
   }
 

@@ -302,7 +302,6 @@ export default class Spine42Adapter implements ISpineAdapter {
     const seen = new Set<string>()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const slots: any[] = this._skeletonData.slots ?? []
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const skin of this._skeletonData.skins ?? []) {
       // spine-core 4.x: skin.attachments is Array<Map<string, Attachment>>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -342,7 +341,6 @@ export default class Spine42Adapter implements ISpineAdapter {
     const anim = this._skeletonData?.animations?.find((a: any) => a.name === animationName)
     if (!anim) return []
     const markers: AnimationEventMarker[] = []
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const tl of anim.timelines ?? []) {
       // frames may be Float32Array (spine 4.x) or Array (spine 3.8) — avoid Array.isArray
       if (!Array.isArray(tl.events) || tl.frames == null) continue

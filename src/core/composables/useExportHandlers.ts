@@ -38,7 +38,7 @@ export function useExportHandlers(
     exportStore.start('png')
     try {
       const canvas = await stageRef.value.captureCurrentFrame()
-      if (!canvas) return
+      if (!canvas) { exportStore.fail('Nothing to capture'); return }
       const blob = await canvasToBlob(canvas)
       downloadBlob(blob, 'spine-frame.png')
     } catch (e) {

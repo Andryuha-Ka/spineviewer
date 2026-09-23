@@ -157,8 +157,8 @@ export async function reloadSession(session: HistorySession): Promise<File[] | n
 
     const files: File[] = []
     for (const handle of stored.handles) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       // TODO: remove cast when File System Access API types are stable in TypeScript lib
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const perm = await (handle as any).requestPermission({ mode: 'read' })
       if (perm !== 'granted') return null
       files.push(await handle.getFile())
@@ -196,8 +196,8 @@ export async function pickFilesViaFSAA(
   startIn?: FileSystemHandle,
 ): Promise<{ files: File[]; handles: FileSystemFileHandle[] } | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // TODO: remove cast when File System Access API types are stable in TypeScript lib
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handles: FileSystemFileHandle[] = await (window as any).showOpenFilePicker({
       multiple,
       ...(startIn ? { startIn } : {}),
@@ -217,13 +217,13 @@ export async function pickFilesViaFSAA(
 /** Attempt to open a folder via File System Access API. Returns handles + files. */
 export async function pickFolderViaFSAA(): Promise<{ files: File[]; handles: FileSystemFileHandle[] } | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // TODO: remove cast when File System Access API types are stable in TypeScript lib
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dirHandle: FileSystemDirectoryHandle = await (window as any).showDirectoryPicker({ mode: 'read' })
     const handles: FileSystemFileHandle[] = []
     const files: File[] = []
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // TODO: remove cast when File System Access API types are stable in TypeScript lib
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for await (const entry of (dirHandle as any).values()) {
       if (entry.kind === 'file') {
         handles.push(entry as FileSystemFileHandle)
@@ -246,15 +246,15 @@ export async function handlesFromDataTransfer(dt: DataTransfer): Promise<FileSys
   const handles: FileSystemFileHandle[] = []
   for (const item of Array.from(dt.items)) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       // TODO: remove cast when File System Access API types are stable in TypeScript lib
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const handle = await (item as any).getAsFileSystemHandle?.()
       if (handle?.kind === 'file') {
         handles.push(handle as FileSystemFileHandle)
       } else if (handle?.kind === 'directory') {
         // Enumerate files from dropped directory
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         // TODO: remove cast when File System Access API types are stable in TypeScript lib
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for await (const entry of (handle as any).values()) {
           if (entry.kind === 'file') handles.push(entry as FileSystemFileHandle)
         }

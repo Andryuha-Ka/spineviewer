@@ -58,8 +58,8 @@ export class Pixi8ProgressOverlay implements IProgressOverlay {
     this._stageH = h
 
     this._container = new PIXI.Container()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // TODO: PIXI 8 Container may not declare zIndex in all versions — cast for safety
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(this._container as any).zIndex = 10000
 
     this._gfx = new PIXI.Graphics()
@@ -73,8 +73,8 @@ export class Pixi8ProgressOverlay implements IProgressOverlay {
     this._dcText.alpha = 0.65
     this._container.addChild(this._dcText)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // TODO: Pixi8 stage type may not expose addChild in all declarations — cast for safety
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(stage as any).addChild(this._container)
   }
 
@@ -228,8 +228,8 @@ export class Pixi8ProgressOverlay implements IProgressOverlay {
     this._dcText.destroy()
     this._dcTitleText.destroy()
     this._gfx.destroy()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // TODO: PIXI 8 Container.parent is not always declared in TS types — cast for safety
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((this._container as any).parent) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(this._container as any).parent.removeChild(this._container)

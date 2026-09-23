@@ -123,13 +123,25 @@
       <span class="slot-side-badge">{{ side === 'left' ? 'A' : 'B' }}</span>
 
       <template v-if="adapter">
-        <select v-if="skinNames.length > 1" class="anim-select skin-select" :value="currentSkinName ?? ''" @change="onSkinChange">
-          <option v-for="name in skinNames" :key="name" :value="name">{{ name }}</option>
-        </select>
-        <select class="anim-select" :value="currentAnimName ?? ''" @change="onAnimChange">
-          <option v-if="!currentAnimName" value="" disabled>— select —</option>
-          <option v-for="name in animationNames" :key="name" :value="name">{{ name }}</option>
-        </select>
+        <AnimationSelect
+          v-if="skinNames.length > 1"
+          class="cmp-select cmp-select--skin"
+          placement="top-start"
+          placeholder="Skin…"
+          :value="currentSkinName"
+          :animations="skinNames"
+          :clearable="false"
+          @select="onSkinChange"
+        />
+        <AnimationSelect
+          class="cmp-select"
+          placement="top-start"
+          placeholder="— select —"
+          :value="currentAnimName"
+          :animations="animationNames"
+          :clearable="false"
+          @select="onAnimChange"
+        />
 
         <!-- Play/Pause: master only -->
         <template v-if="isMaster">
@@ -162,6 +174,7 @@ import { createPixiApp, createSpineAdapter } from '@/core/AdapterFactory'
 import { useVersionStore } from '@/core/stores/useVersionStore'
 import { useCompareStore } from '@/core/stores/useCompareStore'
 import { useViewerStore } from '@/core/stores/useViewerStore'
+import AnimationSelect from '@/components/ui/AnimationSelect.vue'
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -582,18 +595,16 @@ function togglePlay() {
   adapterInst.setTimeScale(isPlaying.value ? 1 : 0)
 }
 
-function onAnimChange(e: Event) {
-  const name = (e.target as HTMLSelectElement).value
-  if (!adapterInst || !name) return
+function onAnimChange(name: string) {
+  if (!adapterInst) return
   currentAnimName.value = name
   adapterInst.setAnimation(0, name, true)
   isPlaying.value = true
   emit('anim-change', name)
 }
 
-function onSkinChange(e: Event) {
-  const name = (e.target as HTMLSelectElement).value
-  if (!adapterInst || !name) return
+function onSkinChange(name: string) {
+  if (!adapterInst) return
   currentSkinName.value = name
   adapterInst.setSkin(name)
   emit('skin-change', name)
@@ -834,25 +845,19 @@ async function onDrop(e: DragEvent) {
   flex-shrink: 0;
 }
 
-.anim-select {
+/* The canvas bar is always dark, so the shared selector gets fixed colours here. */
+.control-bar :deep(.cmp-select) {
   flex: 1;
   min-width: 0;
+  height: 24px;
   font-size: 0.75rem;
   background: #1e1e24;
-  border: 1px solid rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.1);
   border-radius: 4px;
   color: #d4d4d8;
-  padding: 2px 6px;
-  height: 24px;
-  cursor: pointer;
 }
 
-.anim-select option {
-  background: #1e1e24;
-  color: #d4d4d8;
-}
-
-.skin-select {
+.control-bar :deep(.cmp-select--skin) {
   flex: 0 0 auto;
   max-width: 110px;
   border-color: rgba(124,106,245,0.3);

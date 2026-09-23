@@ -9,7 +9,7 @@
 <template>
   <n-dropdown
     trigger="click"
-    placement="bottom-start"
+    :placement="placement"
     size="small"
     scrollable
     :show="menuOpen"
@@ -62,10 +62,13 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
   clearable?: boolean
   placeholder?: string
+  /** top-start for triggers near the bottom edge, e.g. the compare control bar */
+  placement?: 'bottom-start' | 'top-start'
 }>(), {
   disabled: false,
   clearable: true,
   placeholder: 'Select animation…',
+  placement: 'bottom-start',
 })
 
 const emit = defineEmits<{
@@ -101,13 +104,17 @@ function spaceBelow(top: number): number {
   return Math.max(MENU_MIN_HEIGHT_PX, window.innerHeight - top - MENU_MARGIN_PX)
 }
 
+function spaceAbove(bottom: number): number {
+  return Math.max(MENU_MIN_HEIGHT_PX, bottom - MENU_MARGIN_PX)
+}
+
 function onMenuUpdateShow(show: boolean) {
   if (show) {
     if (props.disabled) return
     const rect = triggerRef.value?.getBoundingClientRect()
     if (rect) {
       rootMenuMinWidth.value  = rect.width
-      rootMenuMaxHeight.value = spaceBelow(rect.bottom)
+      rootMenuMaxHeight.value = props.placement === 'top-start' ? spaceAbove(rect.top) : spaceBelow(rect.bottom)
     }
     submenuMaxHeight.value = {}
   }
@@ -133,8 +140,12 @@ const nodeProps: NonNullable<DropdownProps['nodeProps']> = (option): NodeAttrs =
   // Naive types node attrs as string/number values only; event handlers need a cast.
   return {
     onMouseenter: (e: MouseEvent) => {
-      const top = (e.currentTarget as HTMLElement).getBoundingClientRect().top
-      submenuMaxHeight.value = { ...submenuMaxHeight.value, [String(option.key)]: spaceBelow(top) }
+      const row = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      // an upward menu lets the submenu flip above its row when that side has more room
+      const height = props.placement === 'top-start'
+        ? Math.max(spaceBelow(row.top), spaceAbove(row.bottom))
+        : spaceBelow(row.top)
+      submenuMaxHeight.value = { ...submenuMaxHeight.value, [String(option.key)]: height }
     },
   } as unknown as NodeAttrs
 }

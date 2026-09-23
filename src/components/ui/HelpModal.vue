@@ -41,9 +41,10 @@
         <ul class="help-list">
           <li>Select an animation in the <b>Anim</b> tab and click <b>Set</b> or double-click the row</li>
           <li>Supports <b>tracks 0–11</b> simultaneously — add more via the <b>+</b> button</li>
-          <li>Per-track <b>Loop</b> toggle and animation <b>Queue</b> (chain animations)</li>
+          <li>Per-track <b>Loop</b> toggle and animation <b>Queue</b> (chain animations); the global <b>Loop</b> switch in the Anim tab sets the loop of newly selected animations only</li>
+          <li><b>List loop</b> — with the track Loop on, a queue of several animations plays in a cycle; played entries stay in the list greyed out</li>
           <li><b>Speed</b> control: 0×–3× with fine slider</li>
-          <li><b>Frame stepping</b> ±1 frame at 30 fps via keyboard</li>
+          <li><b>Frame stepping</b> in 1/60 s steps — <kbd>←</kbd> <kbd>→</kbd> step the current track, the Anim tab <b>← 1f / 1f →</b> buttons step every running track</li>
           <li><b>Toolbar track controls</b> — pick a track (0–11), set its animation, play/pause (▶) the track, toggle its Loop or clear it (✕) directly in the top toolbar; works for the active skeleton and for a placeholder child spine selected in the Spines tab</li>
         </ul>
       </section>
@@ -74,11 +75,11 @@
         <div class="tab-grid">
           <div class="tab-item">
             <span class="tab-badge">Spines</span>
-            <span>Appears when 2+ skeletons or a background image is loaded — click to switch the active skeleton; <b>drag</b> the 6-dot handle to reorder (top = highest z-index on stage); <b>pin</b> (📌) to keep a skeleton visible while browsing others; click a <b>pinned non-active spine on canvas</b> to activate it directly. Viewport, animation, skin, and placeholder state saved per skeleton. <b>Sync toggle</b> (🔗) — disable to move/zoom the active item independently (Shift+drag/scroll moves the scene). <b>Clone</b> button duplicates the active skeleton with its full state. <b>Global toolbar</b> (Expand / Sync / Pin) above the list applies the action to all spines at once; Sync also desyncs all placeholder images; state persists when switching to other tabs. <b>Expand</b> a skeleton row (▶) to reveal its placeholder slots — drop images (PNG/JPG/WebP) or <b>spine skeleton files</b> onto them to attach child sprites or live child spines; click a thumbnail to activate it; each child has its own <b>sync toggle</b> (🔗) — disable to drag/scroll-scale that child independently; for images: <b>clone button</b> duplicates the image at (0, 0) with the original scale; <b>drag</b> anywhere on the image row to reorder within the placeholder or move to another placeholder drop zone (even across spines); child spines can be activated by clicking on canvas to control their animation and skins in the side panels. <b>Drop zone</b> at the bottom — drop an image to set a background, or drop spine files to add new skeletons</span>
+            <span>Always shown — click to switch the active skeleton; <b>drag</b> the 6-dot handle to reorder (top = highest z-index on stage) or drop the row on another skeleton's placeholder to make it a child spine; <b>pin</b> (📌) to keep a skeleton visible while browsing others; click a <b>pinned non-active spine on canvas</b> to activate it directly. Viewport, animation, skin, and placeholder state saved per skeleton. <b>Sync toggle</b> (🔗) — disable to move/zoom the active item independently (Shift+drag/scroll moves the scene). <b>Clone</b> button duplicates the active skeleton with its full state. <b>Global toolbar</b> (Expand / Sync / Pin) above the list applies the action to all spines at once; Sync also desyncs all placeholder images; state persists when switching to other tabs. <b>Expand</b> a skeleton row (▶) to reveal its placeholder slots — drop images (PNG/JPG/WebP) or <b>spine skeleton files</b> onto them to attach child sprites or live child spines; click a thumbnail to activate it; each child has its own <b>sync toggle</b> (🔗) — disable to drag/scroll-scale that child independently; for images: <b>clone button</b> duplicates the image at (0, 0) with the original scale; <b>drag</b> anywhere on the image row to reorder within the placeholder or move to another placeholder drop zone (even across spines); child spines can be activated by clicking on canvas to control their animation and skins in the side panels. <b>Drop zone</b> at the bottom — drop an image to set a background, or drop spine files to add new skeletons</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Anim</span>
-            <span>Animation list (sorted alphabetically; folder opens on hover; selected path stays highlighted), tracks, queue, skins, events timeline</span>
+            <span>Animation list (sorted alphabetically; folder opens on hover; selected path stays highlighted), tracks, queue, skins, events table (every event keyframe of the current animations; a row flashes when its event fires)</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Insp</span>
@@ -110,7 +111,7 @@
         <h3 class="sec-title">Compare Mode</h3>
         <p class="help-p">Side-by-side visual and structural comparison of two Spine skeletons. Open via <b>⇄ Compare</b> on the picker page or in the viewer toolbar.</p>
         <ul class="help-list">
-          <li><b>Two canvases</b> side by side with a resizable divider; per-canvas skin and animation selectors</li>
+          <li><b>Two canvases</b> side by side with a resizable divider; per-canvas skin and animation pickers with folder submenus</li>
           <li><b>Time sync</b> (↺) — mirrors playback time from Master to Secondary in real-time</li>
           <li><b>Viewport sync</b> (⊞) — mirrors pan and zoom between canvases</li>
           <li><b>Animation / Skin sync</b> — changes on one side auto-apply the same name to the other when sync is on</li>
@@ -129,7 +130,7 @@
         <table class="kbd-table">
           <tbody>
             <tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr>
-            <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Step −1 / +1 frame</td></tr>
+            <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Pause and step the current track by 1/60 s</td></tr>
             <tr><td><kbd>R</kbd></td><td>Reset pose (clear all tracks)</td></tr>
             <tr><td><kbd>L</kbd></td><td>Toggle loop on current track</td></tr>
             <tr><td><kbd>Shift</kbd> + <kbd>L</kbd></td><td>Toggle loop on all tracks</td></tr>
@@ -181,6 +182,21 @@
       <section class="help-section">
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.11</span>
+            <ul class="help-list">
+              <li><b>List loop</b> — the track Loop on a queue of several animations cycles the whole list; played animations stay in the Anim tab list greyed out</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.10</span>
+            <ul class="help-list">
+              <li><b>Move a spine into a placeholder</b> — drag a skeleton row from the Spines list onto another skeleton's placeholder drop zone; it becomes a child spine and keeps its animation and skins</li>
+              <li><b>Compare pickers</b> — animation and skin selectors on the compare canvases use the folder flyout</li>
+              <li><b>Global Loop</b> sets the loop of newly selected animations only; running tracks keep their own</li>
+              <li><b>Frame stepping</b> — keyboard and Anim tab buttons both step 1/60 s</li>
+            </ul>
+          </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.3.9</span>
             <ul class="help-list">

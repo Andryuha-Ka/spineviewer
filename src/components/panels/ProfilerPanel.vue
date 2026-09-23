@@ -218,8 +218,8 @@ const vramDisplay = computed(() => {
 
 /** JS heap usage via non-standard Chrome performance.memory API */
 const heapDisplay = computed(() => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // TODO: performance.memory is a non-standard Chrome extension — no official @types definition
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mem = (performance as any).memory as { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } | undefined
   if (!mem) return '—'
   const used  = mem.usedJSHeapSize  / (1024 * 1024)

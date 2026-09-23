@@ -20,9 +20,10 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 ### Playback
 - **Multi-track** playback (tracks 0–11 simultaneously)
 - Animation **queue** — chain multiple animations per track
-- Per-track **loop** toggle
+- Per-track **loop** toggle; the global **Loop** switch in the Anim tab sets the loop of newly selected animations, running tracks keep their own
+- **List loop** — with the track Loop on, a queue of several animations plays in a cycle (A → B → C → A…); played entries stay in the Anim tab list greyed out instead of disappearing
 - **Speed control** 0×–3× with fine slider
-- **Frame stepping** ±1 frame at 30/60 fps
+- **Frame stepping** in 1/60 s steps — `←` / `→` step the current track, the Anim tab `← 1f` / `1f →` buttons step every running track
 - Seek to any position
 - **Toolbar track controls** — Track selector (all 12 tracks), animation picker, per-track ▶/⏸, per-track Loop and ✕ clear right in the top toolbar; they drive the active skeleton or the selected placeholder child spine without switching to the Anim tab
 
@@ -51,9 +52,10 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - **Pin button** — keep a skeleton on stage while switching to another
 - Each skeleton's viewport position, animation, skin, placeholder toggle, and playback state is preserved independently
 - **Sync toggle** (🔗) per skeleton — when disabled, the active skeleton moves and scales independently from the global scene; drag moves only it, scroll wheel scales only it; hold **Shift** to move the global scene while sync is off
-- **Clone button** — duplicate the active skeleton with its full current state (animation, skin, position, sync); the clone is fully independent of the original
+- **Clone button** — duplicate the active skeleton with its full current state (animation, skin, position, sync, placeholder images and child spines); the clone is fully independent of the original
 - **Placeholder images** — expand a skeleton row (▶) to reveal its placeholder slots; drop PNG/JPG/WebP images onto a slot to attach them as child sprites at the placeholder's origin; multiple images per slot; each removable individually; click a thumbnail to **activate** it; disable the sync toggle (🔗) on an image to move it by dragging or scale it with the scroll wheel independently; transform saved per skeleton
 - **Placeholder spines** — drop a spine skeleton file onto a placeholder slot to attach it as a live child spine that renders and animates inside the container; click its sprite on canvas to activate it and control animation, skins, and tracks independently; disable sync (🔗) to reposition and scale it freely
+- **Move a spine into a placeholder** — drag a skeleton row by its 6-dot handle onto another skeleton's placeholder drop zone: it becomes a child spine of that placeholder and keeps its animation and skins (a skeleton whose own placeholders hold images or spines cannot be moved)
 - **Drop zone** at the bottom of the Spines tab — drop image files (PNG / JPG / WebP / AVIF) to add a background image, or drop spine file sets to add new skeletons with automatic version detection and validation
 
 ### Background Image
@@ -110,7 +112,7 @@ Side-by-side visual and structural comparison of two Spine skeletons. Accessible
 
 **Layout**
 - Two independent Pixi canvases rendered side by side with a resizable divider
-- Per-canvas control bar: side badge (A / B), skin selector, animation selector, time, FPS
+- Per-canvas control bar: side badge (A / B), skin and animation pickers with folder submenus (same flyout as the Anim tab, opening upward), time, FPS
 - Diff panel with three configurable positions: left, right, bottom (persisted)
 
 **Synchronized Playback**
@@ -140,9 +142,9 @@ Side-by-side visual and structural comparison of two Spine skeletons. Accessible
 | Key | Action |
 |-----|--------|
 | `Space` | Play / Pause |
-| `←` / `→` | Pause and step the current track by −1/30 s / +1/30 s |
+| `←` / `→` | Pause and step the current track by −1/60 s / +1/60 s (not while the animation menu is open) |
 | `R` | Reset pose (clear all tracks) |
-| `L` | Toggle loop on current track |
+| `L` | Toggle loop on current track (loops the whole list when it holds several animations) |
 | `Shift+L` | Toggle loop on all tracks |
 | `0`–`9` | Select track 0–9 |
 
@@ -160,7 +162,7 @@ Side-by-side visual and structural comparison of two Spine skeletons. Accessible
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ (recommended: Node 22 via `nvm use 22`)
+- Node.js 20+ (recommended: Node 22 via `nvm use 22` — the version CI uses)
 
 ### Install and Run
 
@@ -178,6 +180,15 @@ npm run build
 ```
 
 Output goes to `dist/`.
+
+### Lint and Tests
+
+```bash
+npm run lint   # ESLint
+npm test       # Vitest unit and component tests (tests/)
+```
+
+CI runs lint, tests and the build on every push to `master` before deploying.
 
 ---
 
@@ -197,11 +208,21 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 - **Pin** a skeleton (📌 button) to keep it visible on stage while you browse others
 - **Sync toggle** (🔗) — disable to move/zoom the active skeleton independently; hold Shift to move the global scene
 - **Clone** the active skeleton via the clone button in the Spines tab
+- **Drag a skeleton onto a placeholder** of another skeleton to turn it into a child spine
 - **Drop zone** at the bottom of the Spines tab — drop images for background or spine files to add more skeletons
 
 ---
 
 ## Changelog
+
+### v1.3.11
+- **List loop** — the track Loop on a queue of several animations cycles the whole list; played animations stay in the Anim tab list greyed out; the Loop flag no longer flips as the list advances
+
+### v1.3.10
+- **Move a spine into a placeholder** — drag a skeleton row from the Spines list onto another skeleton's placeholder drop zone to make it a child spine; its animation and skins carry over
+- **Compare pickers** — animation and skin selectors on the compare canvases use the folder flyout of the Anim tab
+- **Global Loop** in the Anim tab now sets the loop of newly selected animations only; running tracks keep their own loop (use the track Loop, `L` or `Shift+L` to change them)
+- **Frame stepping** — keyboard and Anim tab buttons both step 1/60 s
 
 ### v1.3.9
 - **Toolbar track controls** — Track selector, animation picker (folder submenus open level with the hovered folder), per-track play/pause arrow, per-track Loop checkbox and clear-track button added to the top toolbar before Play; selecting a track shows its current animation and loop state; works for placeholder child spines selected in the Spines tab

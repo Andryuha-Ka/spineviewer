@@ -79,9 +79,8 @@ const playlistHead = computed(() => animationStore.trackPlaylists[animationStore
 const trackAnimation = computed(() => liveTrack.value?.animationName ?? playlistHead.value?.animationName ?? null)
 
 // Loop for a track without animation — used for the next animation picked here.
-// The global animationStore.loop is not touched: its watcher rewrites loop on every track.
 const emptyTrackLoop = ref(false)
-const trackLoop = computed(() => liveTrack.value?.loop ?? playlistHead.value?.loop ?? emptyTrackLoop.value)
+const trackLoop = computed(() => playlistHead.value?.loop ?? liveTrack.value?.loop ?? emptyTrackLoop.value)
 
 const trackPlaying = computed(() =>
   !!liveTrack.value && animationStore.isTrackPlaying(animationStore.currentTrack),

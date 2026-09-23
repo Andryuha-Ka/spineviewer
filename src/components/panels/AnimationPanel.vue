@@ -69,19 +69,19 @@
         <n-button
           size="small"
           :disabled="!skeletonStore.isLoaded || animationStore.tracks.length === 0"
-          @click="seekAllDelta(-1 / 60)"
+          @click="seekAllDelta(-FRAME_STEP_SECONDS)"
         >← 1f</n-button>
         <n-button
           size="small"
           :disabled="!skeletonStore.isLoaded || animationStore.tracks.length === 0"
-          @click="seekAllDelta(1 / 60)"
+          @click="seekAllDelta(FRAME_STEP_SECONDS)"
         >1f →</n-button>
       </div>
     </section>
 
     <!-- ── Loop ──────────────────────────────────────────── -->
     <section class="section section--row">
-      <label class="label">Loop</label>
+      <label class="label" title="Default loop for newly selected animations; running tracks keep their own loop">Loop</label>
       <n-switch v-model:value="animationStore.loop" size="small" :disabled="!skeletonStore.isLoaded" />
     </section>
 
@@ -191,7 +191,7 @@
           <label class="track-loop-label">
             <n-checkbox
               size="small"
-              :checked="track.loop"
+              :checked="trackLoopOf(track)"
               @update:checked="(v) => emit('setTrackLoop', track.trackIndex, v)"
             />
             <span class="track-loop-text">Loop</span>
@@ -201,42 +201,77 @@
           <n-button size="tiny" @click="emit('clearTrack', track.trackIndex)">✕</n-button>
         </div>
 
-        <!-- Currently playing entry -->
-        <div class="track-entry track-entry--current">
-          <button
-            class="track-play-btn"
-            :title="animationStore.isTrackPlaying(track.trackIndex) ? 'Pause track' : 'Play track'"
-            @click.stop="animationStore.toggleTrackPlay(track.trackIndex)"
+        <!-- Full track list: played rows greyed, the playing row keeps the play button -->
+        <template v-if="rowsByTrack.get(track.trackIndex)">
+          <div
+            v-for="row in rowsByTrack.get(track.trackIndex)"
+            :key="row.index"
+            class="track-entry"
+            :class="`track-entry--${row.state}`"
           >
-            <span class="entry-icon">{{ animationStore.isTrackPlaying(track.trackIndex) ? '⏸' : '▶' }}</span>
-          </button>
-          <span class="entry-name">{{ track.animationName }}</span>
-          <button class="copy-btn" title="Copy name" @click.stop="copyName(track.animationName)">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-          </button>
-        </div>
+            <button
+              v-if="row.control"
+              class="track-play-btn"
+              :title="animationStore.isTrackPlaying(track.trackIndex) ? 'Pause track' : 'Play track'"
+              @click.stop="animationStore.toggleTrackPlay(track.trackIndex)"
+            >
+              <span class="entry-icon">{{ animationStore.isTrackPlaying(track.trackIndex) ? '⏸' : '▶' }}</span>
+            </button>
+            <span v-else class="entry-icon">{{ row.state === 'played' ? '✓' : '⏭' }}</span>
+            <span class="entry-name">{{ row.name }}</span>
+            <button class="copy-btn" title="Copy name" @click.stop="copyName(row.name)">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+            <n-button
+              size="tiny"
+              class="no-shrink"
+              :disabled="row.control"
+              @click="emit('removeQueueEntry', track.trackIndex, row.index)"
+            >✕</n-button>
+          </div>
+        </template>
 
-        <!-- Queued entries -->
-        <div
-          v-for="(entry, i) in track.queue"
-          :key="i"
-          class="track-entry track-entry--queued"
-        >
-          <span class="entry-icon">⏭</span>
-          <span class="entry-name">{{ entry.animationName }}</span>
-          <button class="copy-btn" title="Copy name" @click.stop="copyName(entry.animationName)">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-          </button>
-          <n-button
-            size="tiny"
-            class="no-shrink"
-            @click="emit('removeQueueEntry', track.trackIndex, i)"
-          >✕</n-button>
-        </div>
+        <template v-else>
+          <!-- Currently playing entry -->
+          <div class="track-entry track-entry--current">
+            <button
+              class="track-play-btn"
+              :title="animationStore.isTrackPlaying(track.trackIndex) ? 'Pause track' : 'Play track'"
+              @click.stop="animationStore.toggleTrackPlay(track.trackIndex)"
+            >
+              <span class="entry-icon">{{ animationStore.isTrackPlaying(track.trackIndex) ? '⏸' : '▶' }}</span>
+            </button>
+            <span class="entry-name">{{ track.animationName }}</span>
+            <button class="copy-btn" title="Copy name" @click.stop="copyName(track.animationName)">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+            <n-button size="tiny" class="no-shrink" disabled>✕</n-button>
+          </div>
+
+          <!-- Queued entries -->
+          <div
+            v-for="(entry, i) in track.queue"
+            :key="i"
+            class="track-entry track-entry--queued"
+          >
+            <span class="entry-icon">⏭</span>
+            <span class="entry-name">{{ entry.animationName }}</span>
+            <button class="copy-btn" title="Copy name" @click.stop="copyName(entry.animationName)">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+            <n-button
+              size="tiny"
+              class="no-shrink"
+              @click="emit('removeQueueEntry', track.trackIndex, i + 1)"
+            >✕</n-button>
+          </div>
+        </template>
       </div>
     </section>
 
@@ -283,8 +318,10 @@
 <script setup lang="ts">
 import AnimationSelect from '@/components/ui/AnimationSelect.vue'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
-import { useAnimationStore } from '@/core/stores/useAnimationStore'
+import { useAnimationStore, FRAME_STEP_SECONDS } from '@/core/stores/useAnimationStore'
 import { useEventsStore } from '@/core/stores/useEventsStore'
+import { playlistPosition } from '@/core/utils/slotState'
+import type { TrackState } from '@/core/types/ISpineAdapter'
 
 const emit = defineEmits<{
   setAnimation:     [track: number, name: string, loop: boolean]
@@ -300,6 +337,33 @@ const emit = defineEmits<{
 const skeletonStore  = useSkeletonStore()
 const animationStore = useAnimationStore()
 const eventsStore    = useEventsStore()
+
+type RowState = 'played' | 'current' | 'upcoming'
+interface TrackRow { index: number, name: string, state: RowState, control: boolean }
+
+/** Track Loop: the list flag when the track has a list, else the live entry. */
+function trackLoopOf(track: TrackState): boolean {
+  return animationStore.trackPlaylists[track.trackIndex]?.length
+    ? animationStore.isTrackListLoop(track.trackIndex)
+    : track.loop
+}
+
+function trackRows(track: TrackState): TrackRow[] | null {
+  const list = animationStore.trackPlaylists[track.trackIndex]
+  const queued = track.queue.length
+  if (!list?.length || queued > list.length) return null
+  const atEnd = queued === 0 && !track.loop && track.time >= track.duration - 0.02
+  const pos = playlistPosition(list.length, queued, atEnd)
+  const control = Math.min(pos, list.length - 1)
+  return list.map((entry, index) => ({
+    index,
+    name: entry.animationName,
+    state: index < pos ? 'played' : index === pos ? 'current' : 'upcoming',
+    control: index === control,
+  }))
+}
+
+const rowsByTrack = computed(() => new Map(animationStore.tracks.map(t => [t.trackIndex, trackRows(t)])))
 
 const isAddMode = ref(false)
 
@@ -634,9 +698,13 @@ function onAnimClear() {
   background: var(--c-surface);
 }
 
-.track-entry--queued {
+.track-entry--queued,
+.track-entry--upcoming,
+.track-entry--played {
   background: var(--c-sunken);
 }
+
+.track-entry--played { opacity: 0.45; }
 
 .entry-icon {
   font-size: 0.6rem;
@@ -671,7 +739,9 @@ function onAnimClear() {
 }
 
 .track-entry--current .entry-name { color: var(--c-text-dim); }
-.track-entry--queued  .entry-name { color: var(--c-text-faint); }
+.track-entry--queued  .entry-name,
+.track-entry--upcoming .entry-name,
+.track-entry--played .entry-name { color: var(--c-text-faint); }
 
 /* ── Events table ────────────────────────────────── */
 .events-title-row {

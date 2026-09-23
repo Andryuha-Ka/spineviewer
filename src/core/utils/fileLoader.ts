@@ -6,7 +6,7 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
 
-import type { FileSet, SpineFile, SpineFileType, SpineSlot } from '@/core/types/FileSet'
+import type { FileSet, SpineFileType, SpineSlot } from '@/core/types/FileSet'
 
 // ── Readers ───────────────────────────────────────────────────────────────────
 
@@ -46,61 +46,6 @@ export function guessFileType(filename: string): SpineFileType | null {
   if (name.endsWith('.atlas')) return 'atlas'
   if (/\.(png|jpe?g|webp|avif)$/.test(name)) return 'image'
   return null
-}
-
-// ── Classification ────────────────────────────────────────────────────────────
-
-export type ClassifyResult =
-  | { ok: true; fileSet: FileSet }
-  | { ok: false; error: string }
-
-export async function classifyFiles(files: File[]): Promise<ClassifyResult> {
-  const skeletonFiles = files.filter(f => /\.(json|skel)$/i.test(f.name))
-  const atlasFiles    = files.filter(f => /\.atlas$/i.test(f.name))
-  const imageFiles    = files.filter(f => /\.(png|jpe?g|webp|avif)$/i.test(f.name))
-
-  if (skeletonFiles.length === 0)
-    return { ok: false, error: 'Missing skeleton file (.json or .skel)' }
-  if (atlasFiles.length === 0)
-    return { ok: false, error: 'Missing atlas file (.atlas)' }
-  if (imageFiles.length === 0)
-    return { ok: false, error: 'Missing image files (.png / .jpg / .webp / .avif)' }
-
-  // Prefer .json over binary .skel
-  const jsonCandidates = skeletonFiles.filter(f => f.name.toLowerCase().endsWith('.json'))
-  const skelFile = jsonCandidates[0] ?? skeletonFiles[0]
-  const isJson   = skelFile.name.toLowerCase().endsWith('.json')
-
-  const atlasFile = atlasFiles[0]
-
-  const [skeletonBody, atlasBody, ...imageBodies] = await Promise.all([
-    isJson ? readFileAsText(skelFile) : readFileAsArrayBuffer(skelFile),
-    readFileAsText(atlasFile),
-    ...imageFiles.map(f => readFileAsDataURL(f)),
-  ])
-
-  const skeleton: SpineFile = {
-    filename: skelFile.name,
-    fileBody: skeletonBody,
-    type: isJson ? 'skeleton-json' : 'skeleton-skel',
-    mimeType: isJson ? 'application/json' : 'application/octet-stream',
-  }
-
-  const atlas: SpineFile = {
-    filename: atlasFile.name,
-    fileBody: atlasBody as string,
-    type: 'atlas',
-    mimeType: 'text/plain',
-  }
-
-  const images: SpineFile[] = imageFiles.map((f, i) => ({
-    filename: f.name,
-    fileBody: imageBodies[i] as string,
-    type: 'image',
-    mimeType: f.type || 'image/png',
-  }))
-
-  return { ok: true, fileSet: { skeleton, atlas, images } }
 }
 
 // ── Multi-spine grouping ──────────────────────────────────────────────────────
