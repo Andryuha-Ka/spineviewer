@@ -45,7 +45,7 @@
           <li><b>List loop</b> — with the track Loop on, a queue of several animations plays in a cycle; played entries stay in the list greyed out</li>
           <li><b>Speed</b> control: 0×–3× with fine slider</li>
           <li><b>Frame stepping</b> in 1/60 s steps — <kbd>←</kbd> <kbd>→</kbd> step the current track, the Anim tab <b>← 1f / 1f →</b> buttons step every running track</li>
-          <li><b>Toolbar track controls</b> — pick a track (0–11), set its animation, play/pause (▶) the track, toggle its Loop or clear it (✕) directly in the top toolbar; works for the active skeleton and for a placeholder child spine selected in the Spines tab</li>
+          <li><b>Toolbar track controls</b> — pick a skin (synced with Anim → Skins; a Composer mix shows as <i>Composite (N)</i>), pick a track (0–11), set its animation, play/pause (▶) the track, toggle its Loop or clear it (✕) directly in the top toolbar; works for the active skeleton and for a placeholder child spine selected in the Spines tab</li>
         </ul>
       </section>
 
@@ -186,6 +186,7 @@
             <span class="cl-ver">v1.3.11</span>
             <ul class="help-list">
               <li><b>List loop</b> — the track Loop on a queue of several animations cycles the whole list; played animations stay in the Anim tab list greyed out</li>
+              <li><b>Toolbar skin picker</b> — skin dropdown at the start of the toolbar track controls, synced both ways with the Anim tab Skins; picking a skin there leaves Skin Composer</li>
             </ul>
           </div>
           <div class="cl-entry">

@@ -8,6 +8,15 @@
 
 <template>
   <div class="track-controls">
+    <AnimationSelect
+      class="track-controls__skin"
+      :value="skinValue"
+      :animations="skeletonStore.skins"
+      :disabled="!skeletonStore.skins.length"
+      :clearable="false"
+      :placeholder="skeletonStore.skins.length ? 'Skin…' : 'No skins'"
+      @select="onSkinSelect"
+    />
     <n-select
       size="small"
       class="track-controls__track"
@@ -61,6 +70,7 @@ const emit = defineEmits<{
   setAnimation: [track: number, name: string, loop: boolean]
   setTrackLoop: [track: number, loop: boolean]
   clearTrack:   [track: number]
+  setSkins:     [names: string[]]
 }>()
 
 const skeletonStore  = useSkeletonStore()
@@ -85,6 +95,17 @@ const trackLoop = computed(() => playlistHead.value?.loop ?? liveTrack.value?.lo
 const trackPlaying = computed(() =>
   !!liveTrack.value && animationStore.isTrackPlaying(animationStore.currentTrack),
 )
+
+const skinValue = computed(() => {
+  const n = skeletonStore.activeSkins.length
+  return n > 1 ? `Composite (${n})` : skeletonStore.activeSkins[0] ?? null
+})
+
+function onSkinSelect(name: string) {
+  skeletonStore.activeSkins  = [name]
+  skeletonStore.composerMode = false
+  emit('setSkins', [name])
+}
 
 function renderTrackLabel(option: SelectOption): VNodeChild {
   const running = animationStore.tracks.some(t => t.trackIndex === option.value)
@@ -116,6 +137,7 @@ function onLoopChange(loop: boolean) {
   min-width: 0;
 }
 
+.track-controls__skin  { width: 140px; flex-shrink: 0; }
 .track-controls__track { width: 96px; flex-shrink: 0; }
 .track-controls__anim  { width: 220px; min-width: 0; }
 

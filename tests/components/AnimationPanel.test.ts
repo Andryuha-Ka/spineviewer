@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { nextTick } from 'vue'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AnimationPanel from '@/components/panels/AnimationPanel.vue'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
+import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import type { TrackState } from '@/core/types/ISpineAdapter'
 
 const LIST = [
@@ -66,5 +68,41 @@ describe('AnimationPanel track list', () => {
     await rows[0].findAll('button').find(b => b.text() === '✕')!.trigger('click')
     await rows[2].findAll('button').find(b => b.text() === '✕')!.trigger('click')
     expect(wrapper.emitted('removeQueueEntry')).toEqual([[0, 0], [0, 2]])
+  })
+})
+
+describe('AnimationPanel skins and Composer', () => {
+  let wrapper: VueWrapper
+  beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => wrapper.unmount())
+
+  async function composerWithRedHat() {
+    const skel = useSkeletonStore()
+    skel.populate({ animations: ['idle'], skins: ['red', 'hat', 'blue'], bones: [], slots: [], events: [] })
+    wrapper = mount(AnimationPanel)
+    skel.activeSkins = ['red', 'hat']
+    await nextTick()
+    return skel
+  }
+
+  it('turns Composer on for a composite and leaves it on a toolbar-style pick', async () => {
+    const skel = await composerWithRedHat()
+    expect(skel.composerMode).toBe(true)
+    skel.activeSkins = ['red']
+    skel.composerMode = false
+    await nextTick()
+    const radios = wrapper.findAll('.skin-row .n-radio')
+    expect(radios).toHaveLength(3)
+    expect(radios[0].classes()).toContain('n-radio--checked')
+    expect(wrapper.findAll('.skin-row .n-checkbox')).toHaveLength(0)
+  })
+
+  it('keeps Composer on when a checkbox is unchecked down to one skin', async () => {
+    const skel = await composerWithRedHat()
+    await wrapper.findAll('.skin-row')[1].trigger('click')
+    expect(skel.activeSkins).toEqual(['red'])
+    expect(skel.composerMode).toBe(true)
+    expect(wrapper.findAll('.skin-row .n-checkbox')).toHaveLength(3)
+    expect(wrapper.emitted('setSkins')).toEqual([[['red']]])
   })
 })

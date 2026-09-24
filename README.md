@@ -25,7 +25,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - **Speed control** 0×–3× with fine slider
 - **Frame stepping** in 1/60 s steps — `←` / `→` step the current track, the Anim tab `← 1f` / `1f →` buttons step every running track
 - Seek to any position
-- **Toolbar track controls** — Track selector (all 12 tracks), animation picker, per-track ▶/⏸, per-track Loop and ✕ clear right in the top toolbar; they drive the active skeleton or the selected placeholder child spine without switching to the Anim tab
+- **Toolbar track controls** — Skin picker (folder dropdown, synced with the Anim tab Skins; shows `Composite (N)` for a Skin Composer mix), Track selector (all 12 tracks), animation picker, per-track ▶/⏸, per-track Loop and ✕ clear right in the top toolbar; they drive the active skeleton or the selected placeholder child spine without switching to the Anim tab
 
 ### Animation Dropdown (Anim tab)
 - Animations and folders sorted **alphabetically**
@@ -217,6 +217,7 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 
 ### v1.3.11
 - **List loop** — the track Loop on a queue of several animations cycles the whole list; played animations stay in the Anim tab list greyed out; the Loop flag no longer flips as the list advances
+- **Toolbar skin picker** — skin dropdown at the start of the toolbar track controls, synced both ways with the Anim tab Skins; picking a skin there leaves Skin Composer
 
 ### v1.3.10
 - **Move a spine into a placeholder** — drag a skeleton row from the Spines list onto another skeleton's placeholder drop zone to make it a child spine; its animation and skins carry over

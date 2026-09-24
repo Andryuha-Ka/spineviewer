@@ -27,6 +27,8 @@ export const useSkeletonStore = defineStore('skeleton', () => {
   const freeBones    = ref<string[]>([])
   /** Currently applied skin names — synced by AnimationPanel, read by PreviewStage for state save */
   const activeSkins     = ref<string[]>([])
+  /** Anim tab shows Skin Composer checkboxes instead of radios */
+  const composerMode    = ref(false)
   const selectedBone    = ref<string | null>(null)
   const selectedSlot    = ref<string | null>(null)
   const syncSelection   = ref(true)
@@ -72,6 +74,7 @@ export const useSkeletonStore = defineStore('skeleton', () => {
     events.value       = []
     freeBones.value    = []
     activeSkins.value  = []
+    composerMode.value = false
     selectedBone.value = null
     selectedSlot.value = null
     _adapter = null
@@ -79,7 +82,7 @@ export const useSkeletonStore = defineStore('skeleton', () => {
 
   return {
     animations, skins, bones, slots, events, freeBones, isLoaded,
-    activeSkins,
+    activeSkins, composerMode,
     selectedBone, selectBone, selectedSlot, selectSlot, syncSelection,
     attachAdapter, detachAdapter, setBoneTransform, getBoneSetupTransform,
     populate, clear,

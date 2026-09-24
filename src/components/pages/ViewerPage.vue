@@ -25,6 +25,7 @@
         @set-animation="onSetAnimation"
         @set-track-loop="onSetTrackLoop"
         @clear-track="onClearTrack"
+        @set-skins="onSetSkins"
       />
       <n-button
         size="small"

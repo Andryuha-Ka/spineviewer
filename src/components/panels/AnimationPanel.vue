@@ -404,7 +404,7 @@ function isFlashing(name: string): boolean {
 }
 
 // ── Skins state ────────────────────────────────────────────────────────────
-const composerMode  = ref(false)
+const { composerMode } = storeToRefs(skeletonStore)
 const selectedSkin  = ref<string | null>(null)
 const composerSkins = ref(new Set<string>())
 
