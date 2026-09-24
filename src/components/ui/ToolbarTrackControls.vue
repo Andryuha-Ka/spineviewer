@@ -90,6 +90,7 @@ const trackAnimation = computed(() => liveTrack.value?.animationName ?? playlist
 
 // Loop for a track without animation — used for the next animation picked here.
 const emptyTrackLoop = ref(false)
+watch(() => animationStore.currentTrack, () => { emptyTrackLoop.value = false })
 const trackLoop = computed(() => playlistHead.value?.loop ?? liveTrack.value?.loop ?? emptyTrackLoop.value)
 
 const trackPlaying = computed(() =>

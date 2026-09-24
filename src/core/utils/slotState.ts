@@ -85,6 +85,20 @@ export function playlistPosition(length: number, queued: number, atEnd: boolean)
   return (length - 1 - queued + length) % length
 }
 
+export interface AutoStopTrackInfo {
+  isEnabled: (track: number) => boolean
+  isListLoop: (track: number) => boolean
+  listLength: (track: number) => number
+}
+
+/** True when no enabled track loops, cycles a list or has a queue, and every enabled track has reached its end. */
+export function shouldAutoStop(states: readonly TrackState[], info: AutoStopTrackInfo): boolean {
+  const enabled = states.filter(t => info.isEnabled(t.trackIndex))
+  if (enabled.some(t => t.loop || (info.isListLoop(t.trackIndex) && info.listLength(t.trackIndex) >= 2))) return false
+  if (enabled.some(t => t.queue.length > 0)) return false
+  return enabled.every(t => t.duration > 0 && t.time >= t.duration - 0.02)
+}
+
 /** Puts a saved slot back on an adapter that was mounted without it: enabled tracks, their queues and times. */
 export function replaySavedTracks(
   adapter: Pick<ISpineAdapter, 'setAnimation' | 'addAnimation' | 'seekTo'>,

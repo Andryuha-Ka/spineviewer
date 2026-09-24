@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { buildSlotSavedState, playlistPosition, playlistsOf, queueTrackList, rearmListLoops, replaySavedTracks, trackTimesOf } from '@/core/utils/slotState'
+import { buildSlotSavedState, playlistPosition, playlistsOf, queueTrackList, rearmListLoops, replaySavedTracks, shouldAutoStop, trackTimesOf } from '@/core/utils/slotState'
 import { makeFakeAdapter, track } from '../helpers/fakeAdapter'
 import type { TrackState } from '@/core/types/ISpineAdapter'
 
@@ -93,5 +93,35 @@ describe('slotState', () => {
     expect(playlistPosition(3, 0, false)).toBe(2)
     expect(playlistPosition(3, 3, false)).toBe(2)
     expect(playlistPosition(3, 0, true)).toBe(3)
+  })
+
+  describe('shouldAutoStop', () => {
+    const info = (disabled: number[] = [], lists: Record<number, number> = {}) => ({
+      isEnabled:  (t: number) => !disabled.includes(t),
+      isListLoop: (t: number) => (lists[t] ?? 0) > 0,
+      listLength: (t: number) => lists[t] ?? 0,
+    })
+    const ended = track(0, 'a', 2, false)
+
+    it('stops when a disabled non-looping track is still mid-animation', () => {
+      expect(shouldAutoStop([ended, track(1, 'b', 0.5, false)], info([1]))).toBe(true)
+    })
+
+    it('stops when only disabled tracks loop or cycle a list', () => {
+      expect(shouldAutoStop([ended, track(1, 'b', 0.5, true)], info([1]))).toBe(true)
+      expect(shouldAutoStop([ended, track(1, 'b', 0.5, false)], info([1], { 1: 3 }))).toBe(true)
+    })
+
+    it('does not stop while an enabled track cycles a list of two or more', () => {
+      expect(shouldAutoStop([track(0, 'a', 2, false)], info([], { 0: 2 }))).toBe(false)
+    })
+
+    it('stops when every track is disabled', () => {
+      expect(shouldAutoStop([track(0, 'a', 0.5, true)], info([0]))).toBe(true)
+    })
+
+    it('does not stop while an enabled track is mid-animation', () => {
+      expect(shouldAutoStop([ended, track(1, 'b', 0.5, false)], info())).toBe(false)
+    })
   })
 })

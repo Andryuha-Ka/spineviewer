@@ -133,6 +133,21 @@ describe('useViewerKeyboard', () => {
     expect(stage.clearTracks).toHaveBeenCalledTimes(1)
   })
 
+  it('leaves Ctrl / Meta / Alt combinations to the browser (B9)', () => {
+    const anim = useAnimationStore()
+    anim.tracks = [
+      { trackIndex: 0, animationName: 'a', time: 0, duration: 1, loop: false, timeScale: 1, queue: [] },
+    ]
+    press(document.body, 'KeyR', { ctrlKey: true })
+    press(document.body, 'KeyL', { metaKey: true })
+    press(document.body, 'Digit3', { altKey: true })
+    expect(stage.clearTracks).not.toHaveBeenCalled()
+    expect(stage.setTrackLoop).not.toHaveBeenCalled()
+    expect(anim.currentTrack).toBe(0)
+    press(document.body, 'KeyL', { shiftKey: true })
+    expect(stage.setTrackLoop).toHaveBeenCalledWith(0, true)
+  })
+
   it('L toggles the list Loop of a track with a list, not the live entry loop', () => {
     const anim = useAnimationStore()
     anim.tracks = [

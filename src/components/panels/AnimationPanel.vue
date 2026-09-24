@@ -453,6 +453,10 @@ function toggleComposerSkin(skin: string, checked: boolean) {
   const next = new Set(composerSkins.value)
   if (checked) next.add(skin)
   else next.delete(skin)
+  if (next.size === 0) {
+    const fallback = skeletonStore.skins.includes('default') ? 'default' : skeletonStore.skins[0]
+    if (fallback) next.add(fallback)
+  }
   composerSkins.value = next
   skeletonStore.activeSkins = [...next]
   emit('setSkins', [...next])

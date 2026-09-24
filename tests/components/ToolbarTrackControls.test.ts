@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import ToolbarTrackControls from '@/components/ui/ToolbarTrackControls.vue'
 import AnimationSelect from '@/components/ui/AnimationSelect.vue'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
+import { useAnimationStore } from '@/core/stores/useAnimationStore'
 
 describe('ToolbarTrackControls skin picker', () => {
   let wrapper: VueWrapper
@@ -45,5 +46,23 @@ describe('ToolbarTrackControls skin picker', () => {
     wrapper = mount(ToolbarTrackControls, { attachTo: document.body })
     expect(skinPicker().props('disabled')).toBe(true)
     expect(skinPicker().props('placeholder')).toBe('No skins')
+  })
+})
+
+describe('ToolbarTrackControls empty-track Loop', () => {
+  it('does not follow a track change', async () => {
+    setActivePinia(createPinia())
+    const skeleton = useSkeletonStore()
+    skeleton.animations = ['idle']
+    const anim = useAnimationStore()
+    anim.currentTrack = 3
+    const wrapper = mount(ToolbarTrackControls, { attachTo: document.body })
+    wrapper.findComponent({ name: 'Checkbox' }).vm.$emit('update:checked', true)
+    await wrapper.vm.$nextTick()
+    anim.currentTrack = 5
+    await wrapper.vm.$nextTick()
+    wrapper.findAllComponents(AnimationSelect)[1].vm.$emit('select', 'idle')
+    expect(wrapper.emitted('setAnimation')).toEqual([[5, 'idle', false]])
+    wrapper.unmount()
   })
 })

@@ -40,6 +40,7 @@ export function useViewerKeyboard(
     // isComposing=true means an IME/dead-key sequence is in progress — ignore to avoid
     // misfires when switching to a non-Latin keyboard layout (e.g. Ukrainian/CJK)
     if (e.isComposing || e.keyCode === 229) return
+    if (e.ctrlKey || e.metaKey || e.altKey) return
 
     // Capture phase: keep Space away from the focused control so it only toggles playback.
     if (e.code === 'Space' && isSpaceControl(el)) e.stopPropagation()

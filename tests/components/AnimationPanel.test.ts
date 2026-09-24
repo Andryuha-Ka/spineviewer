@@ -105,4 +105,29 @@ describe('AnimationPanel skins and Composer', () => {
     expect(wrapper.findAll('.skin-row .n-checkbox')).toHaveLength(3)
     expect(wrapper.emitted('setSkins')).toEqual([[['red']]])
   })
+
+  async function composerWithOnly(skins: string[], checked: string) {
+    const skel = useSkeletonStore()
+    skel.populate({ animations: ['idle'], skins, bones: [], slots: [], events: [] })
+    wrapper = mount(AnimationPanel)
+    skel.activeSkins = [checked, skins.find(s => s !== checked)!]
+    await nextTick()
+    await wrapper.findAll('.skin-row')[skins.indexOf(skins.find(s => s !== checked)!)].trigger('click')
+    return skel
+  }
+
+  it('falls back to default when the last checked skin is unchecked', async () => {
+    const skel = await composerWithOnly(['default', 'red', 'hat'], 'red')
+    await wrapper.findAll('.skin-row')[1].trigger('click')
+    expect(skel.activeSkins).toEqual(['default'])
+    expect(skel.composerMode).toBe(true)
+    expect(wrapper.emitted('setSkins')!.at(-1)).toEqual([['default']])
+  })
+
+  it('falls back to the first skin when there is no default', async () => {
+    const skel = await composerWithOnly(['red', 'hat', 'blue'], 'hat')
+    await wrapper.findAll('.skin-row')[1].trigger('click')
+    expect(skel.activeSkins).toEqual(['red'])
+    expect(wrapper.emitted('setSkins')!.at(-1)).toEqual([['red']])
+  })
 })

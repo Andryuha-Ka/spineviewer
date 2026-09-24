@@ -243,7 +243,7 @@ import { validateSpineFileSet } from '@/core/utils/spineValidator'
 import { spineVersionProblem } from '@/core/utils/versionDetector'
 import { useVersionStore } from '@/core/stores/useVersionStore'
 import type { SpineSlot } from '@/core/types/FileSet'
-import { buildSlotSavedState } from '@/core/utils/slotState'
+import { buildSlotSavedState, trackTimesOf } from '@/core/utils/slotState'
 import { SPINE_SLOT_MIME } from '@/core/composables/usePlaceholderActions'
 
 const fileLoaderStore    = useFileLoaderStore()
@@ -378,6 +378,7 @@ function onClone(id: string) {
       showPlaceholders:     viewerStore.showPlaceholders,
       disabledPlaceholders: viewerStore.disabledPlaceholders,
       slot:                 src,
+      trackTimes:           trackTimesOf(animationStore.tracks),
     }))
   }
 
