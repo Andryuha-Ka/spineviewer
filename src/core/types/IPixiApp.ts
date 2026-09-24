@@ -31,8 +31,8 @@ export interface IPixiApp {
   setBackground(color: number): void
   createProgressOverlay(w: number, h: number): IProgressOverlay
   getStats(): RendererStats
-  /** Extract the current rendered frame as an HTMLCanvasElement (handles preserveDrawingBuffer) */
-  extractFrame(): Promise<HTMLCanvasElement>
+  /** Render the visible canvas area at `scale` (capped to the GPU texture limit); `scale` in the result is the one used */
+  extractFrame(opts?: { scale?: number }): Promise<{ canvas: HTMLCanvasElement; scale: number } | null>
   /** Create a PIXI.Sprite from a data URL; anchor is set to (0.5, 0.5). Returns unknown to avoid version coupling. */
   createSprite(dataUrl: string): unknown
   /** Enable/disable sortable children on the stage root */

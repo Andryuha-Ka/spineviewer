@@ -244,6 +244,10 @@ export class Pixi7ProgressOverlay implements IProgressOverlay {
     return { trackIndex: track.trackIndex, pct }
   }
 
+  setVisible(visible: boolean): void {
+    this._container.visible = visible
+  }
+
   destroy(): void {
     for (const t of this._trackIdxTexts)   t.destroy()
     for (const t of this._trackNameTexts)  t.destroy()

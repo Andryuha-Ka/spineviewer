@@ -54,3 +54,28 @@ export async function buildSpriteSheet(
   }
   return sheet
 }
+
+const SCALES = [4, 2, 1] as const
+const SEQUENCE_BUDGET_BYTES = 1024 ** 3
+
+/** Largest of 4/2/1 not above `scale` whose output fits a `max`×`max` texture; never below 1. */
+export function fitScale(w: number, h: number, scale: number, max: number): number {
+  return SCALES.find(s => s <= scale && Math.ceil(w * s) <= max && Math.ceil(h * s) <= max) ?? 1
+}
+
+/** Largest of 4/2/1 not above `scale` keeping `frames` RGBA frames within 1 GB; never below 1. */
+export function fitSequenceScale(frames: number, w: number, h: number, scale: number): number {
+  return SCALES.find(s => s <= scale && frames * w * h * s * s * 4 <= SEQUENCE_BUDGET_BYTES) ?? 1
+}
+
+/** Copy of `canvas` drawn over a solid `color` (number = 0xRRGGBB). */
+export function withBackground(canvas: HTMLCanvasElement, color: number | string): HTMLCanvasElement {
+  const out = document.createElement('canvas')
+  out.width  = canvas.width
+  out.height = canvas.height
+  const ctx = out.getContext('2d')!
+  ctx.fillStyle = typeof color === 'number' ? `#${color.toString(16).padStart(6, '0')}` : color
+  ctx.fillRect(0, 0, out.width, out.height)
+  ctx.drawImage(canvas, 0, 0)
+  return out
+}

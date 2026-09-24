@@ -131,7 +131,8 @@ import type { TrackDisplayState, MarkerDisplay } from '@/core/types/IProgressOve
 import type { ISpineAdapter, AnimationEventMarker } from '@/core/types/ISpineAdapter'
 import type { FileSet, PHSpineEntry } from '@/core/types/FileSet'
 import { makeLoopState, computeNorm, resetLoopState } from '@/core/overlay/overlayMath'
-import { queueTrackList, rearmListLoops, playlistPosition } from '@/core/utils/slotState'
+import { queueTrackList, rearmListLoops, playlistPosition, shouldAutoStop } from '@/core/utils/slotState'
+import { fitSequenceScale } from '@/core/utils/exportUtils'
 
 const versionStore   = useVersionStore()
 const viewerStore    = useViewerStore()
@@ -405,12 +406,12 @@ onMounted(async () => {
           }
         }
 
-        if (animationStore.isPlaying && states.length > 0) {
-          const hasLoop  = states.some(t => t.loop || (animationStore.isTrackListLoop(t.trackIndex) && (animationStore.trackPlaylists[t.trackIndex]?.length ?? 0) >= 2))
-          const hasQueue = states.some(t => t.queue.length > 0)
-          if (!hasLoop && !hasQueue && states.every(t => t.duration > 0 && t.time >= t.duration - 0.02)) {
-            animationStore.stop()
-          }
+        if (animationStore.isPlaying && states.length > 0 && shouldAutoStop(states, {
+          isEnabled:  animationStore.isTrackEnabled,
+          isListLoop: animationStore.isTrackListLoop,
+          listLength: t => animationStore.trackPlaylists[t]?.length ?? 0,
+        })) {
+          animationStore.stop()
         }
 
         if (skeletonStore.selectedBone) inspectorStore.updateBones(uiAd.getBoneTransforms())
@@ -812,9 +813,24 @@ async function loadSpine(fileSet: FileSet, slotId?: string, resetViewport = true
 
 // ── Export helpers ────────────────────────────────────────────────────────────
 
-async function captureCurrentFrame(): Promise<HTMLCanvasElement | null> {
-  if (!pixiApp) return null
-  return pixiApp.extractFrame()
+type CaptureLimit = 'gpu' | 'memory' | null
+
+// overlay and placeholder labels stay out of exported frames
+async function withViewerOverlaysHidden<T>(fn: () => Promise<T>): Promise<T> {
+  progressOverlay?.setVisible(false)
+  onStage.adapter?.clearPlaceholderLabels()
+  try {
+    return await fn()
+  } finally {
+    progressOverlay?.setVisible(true)
+    applyPlaceholderLabels()
+  }
+}
+
+async function captureCurrentFrame(opts: { scale?: number } = {}): Promise<{ canvas: HTMLCanvasElement; scale: number } | null> {
+  const app = pixiApp
+  if (!app) return null
+  return withViewerOverlaysHidden(() => app.extractFrame(opts))
 }
 
 async function captureAnimFrames(
@@ -822,33 +838,43 @@ async function captureAnimFrames(
   frameCount: number,
   onFrame: (canvas: HTMLCanvasElement, index: number, total: number) => void,
   signal?: AbortSignal,
-): Promise<boolean> {
-  if (!pixiApp || !onStage.adapter) return false
+  opts: { scale?: number } = {},
+): Promise<{ scale: number; limit: CaptureLimit } | null> {
+  const app = pixiApp
+  const adapter = onStage.adapter
+  if (!app || !adapter) return null
   const entry = animationStore.tracks.find(t => t.trackIndex === track)
-  if (!entry || entry.duration <= 0) return false
+  if (!entry || entry.duration <= 0) return null
+
+  const requested = opts.scale ?? 1
+  const w = containerRef.value?.clientWidth ?? 0
+  const h = containerRef.value?.clientHeight ?? 0
+  let scale = fitSequenceScale(frameCount, w, h, requested)
+  let limit: CaptureLimit = scale < requested ? 'memory' : null
 
   const wasPlaying = animationStore.isPlaying
-  onStage.adapter.setTimeScale(0)
+  adapter.setTimeScale(0)
   const duration = entry.duration
 
   try {
-    for (let i = 0; i < frameCount; i++) {
-      if (signal?.aborted) return false
-      const t = frameCount === 1 ? 0 : (i / (frameCount - 1)) * duration
-      onStage.adapter.seekTo(track, t)
-      await new Promise<void>(r => requestAnimationFrame(() => r()))
-      if (signal?.aborted) return false
-      const frame = await pixiApp!.extractFrame()
-      onFrame(frame, i, frameCount)
-    }
+    return await withViewerOverlaysHidden(async () => {
+      for (let i = 0; i < frameCount; i++) {
+        if (signal?.aborted) return null
+        const t = frameCount === 1 ? 0 : (i / (frameCount - 1)) * duration
+        adapter.seekTo(track, t)
+        await new Promise<void>(r => requestAnimationFrame(() => r()))
+        if (signal?.aborted) return null
+        const frame = await app.extractFrame({ scale })
+        if (!frame) return null
+        if (frame.scale < scale) { scale = frame.scale; limit = 'gpu' }
+        onFrame(frame.canvas, i, frameCount)
+      }
+      return { scale, limit }
+    })
   } finally {
-    if (wasPlaying) {
-      onStage.adapter.setTimeScale(animationStore.speed)
-    }
-    onStage.adapter.seekTo(track, 0)
+    if (wasPlaying) adapter.setTimeScale(animationStore.speed)
+    adapter.seekTo(track, 0)
   }
-
-  return true
 }
 
 // pinned, parked-parent and inactive child adapters cycle their lists from their slot's saved state

@@ -10,6 +10,7 @@ import * as PIXI from 'pixi.js'
 import type { IPixiApp, PixiTicker, RendererStats } from '@/core/types/IPixiApp'
 import type { IProgressOverlay } from '@/core/types/IProgressOverlay'
 import { Pixi7ProgressOverlay } from './Pixi7ProgressOverlay'
+import { fitScale } from '@/core/utils/exportUtils'
 
 export class Pixi7App implements IPixiApp {
   private readonly _app: PIXI.Application
@@ -81,9 +82,23 @@ export class Pixi7App implements IPixiApp {
     return { drawCalls: this._lastDrawCalls }
   }
 
-  async extractFrame(): Promise<HTMLCanvasElement> {
+  async extractFrame(opts: { scale?: number } = {}): Promise<{ canvas: HTMLCanvasElement; scale: number } | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this._app.renderer as any).plugins.extract.canvas(this._app.stage) as HTMLCanvasElement
+    const renderer = this._app.renderer as any
+    const { width, height } = this._app.screen
+    const max = (renderer.gl?.getParameter(renderer.gl.MAX_TEXTURE_SIZE) as number | undefined) ?? 4096
+    const scale = fitScale(width, height, opts.scale ?? 1, max)
+    // plugins.extract.canvas(stage, frame) ignores a custom resolution, so render to a texture first
+    const rt = renderer.generateTexture(this._app.stage, {
+      region: new PIXI.Rectangle(0, 0, width, height),
+      resolution: scale,
+      multisample: renderer.multisample,
+    }) as PIXI.RenderTexture
+    try {
+      return { canvas: renderer.plugins.extract.canvas(rt) as HTMLCanvasElement, scale }
+    } finally {
+      rt.destroy(true)
+    }
   }
 
   createSprite(dataUrl: string): unknown {

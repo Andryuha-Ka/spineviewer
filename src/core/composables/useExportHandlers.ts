@@ -9,7 +9,8 @@
 import type { Ref } from 'vue'
 import { useExportStore } from '@/core/stores/useExportStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
-import { downloadBlob, downloadJson, canvasToBlob, buildSpriteSheet } from '@/core/utils/exportUtils'
+import { useViewerStore } from '@/core/stores/useViewerStore'
+import { downloadBlob, downloadJson, canvasToBlob, buildSpriteSheet, withBackground } from '@/core/utils/exportUtils'
 import type PreviewStage from '@/components/stage/PreviewStage.vue'
 
 interface GIFInstance {
@@ -32,14 +33,22 @@ export function useExportHandlers(
 } {
   const exportStore    = useExportStore()
   const animationStore = useAnimationStore()
+  const viewerStore    = useViewerStore()
+
+  function noteScale(used: number, limit: 'gpu' | 'memory' | null) {
+    if (limit && used < exportStore.scale) exportStore.notice = `Scale reduced to ${used}× (${limit === 'gpu' ? 'GPU' : 'memory'} limit)`
+  }
+  const fill = (canvas: HTMLCanvasElement, always = false) =>
+    always || exportStore.includeBackground ? withBackground(canvas, viewerStore.bgColor) : canvas
 
   async function onCapturePng() {
     if (!stageRef.value) return
     exportStore.start('png')
     try {
-      const canvas = await stageRef.value.captureCurrentFrame()
-      if (!canvas) { exportStore.fail('Nothing to capture'); return }
-      const blob = await canvasToBlob(canvas)
+      const frame = await stageRef.value.captureCurrentFrame({ scale: exportStore.scale })
+      if (!frame) { exportStore.fail('Nothing to capture'); return }
+      noteScale(frame.scale, 'gpu')
+      const blob = await canvasToBlob(fill(frame.canvas))
       downloadBlob(blob, 'spine-frame.png')
     } catch (e) {
       exportStore.fail(e instanceof Error ? e.message : 'Failed to capture PNG')
@@ -70,16 +79,18 @@ export function useExportHandlers(
     const signal = exportStore.start('sheet')
     try {
       const frames: HTMLCanvasElement[] = []
-      const ok = await stageRef.value.captureAnimFrames(
+      const res = await stageRef.value.captureAnimFrames(
         opts.track,
         opts.frameCount,
         (canvas, i, total) => {
-          frames.push(canvas)
+          frames.push(fill(canvas))
           exportStore.setProgress(((i + 1) / total) * 100)
         },
         signal,
+        { scale: exportStore.scale },
       )
-      if (!ok || signal.aborted) { exportStore.finish(); return }
+      if (!res || signal.aborted) { exportStore.finish(); return }
+      noteScale(res.scale, res.limit)
       const sheet = await buildSpriteSheet(frames, opts.cols)
       const blob  = await canvasToBlob(sheet)
       downloadBlob(blob, 'spine-sheet.png')
@@ -105,10 +116,11 @@ export function useExportHandlers(
       // Size is unknown until first frame — create GIF lazily
       let gif: GIFInstance | null = null
 
-      const ok = await stageRef.value.captureAnimFrames(
+      const res = await stageRef.value.captureAnimFrames(
         opts.track,
         frameCount,
-        (canvas, i, total) => {
+        (raw, i, total) => {
+          const canvas = fill(raw, true)
           if (!gif) {
             gif = new GIF({
               workers:      2,
@@ -124,10 +136,12 @@ export function useExportHandlers(
           exportStore.setProgress(Math.round(((i + 1) / total) * 70))
         },
         signal,
+        { scale: exportStore.scale },
       )
 
       // render() not called yet — just discard gif object and exit
-      if (!ok || signal.aborted || !gif) { exportStore.finish(); return }
+      if (!res || signal.aborted || !gif) { exportStore.finish(); return }
+      noteScale(res.scale, res.limit)
 
       await new Promise<void>((resolve) => {
         gif!.on('progress', (p: number) => exportStore.setProgress(70 + Math.round(p * 30)))

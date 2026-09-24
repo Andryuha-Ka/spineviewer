@@ -10,6 +10,7 @@ import * as PIXI from 'pixi8'
 import type { IPixiApp, PixiTicker, RendererStats } from '@/core/types/IPixiApp'
 import type { IProgressOverlay } from '@/core/types/IProgressOverlay'
 import { Pixi8ProgressOverlay } from './Pixi8ProgressOverlay'
+import { fitScale } from '@/core/utils/exportUtils'
 
 export class Pixi8App implements IPixiApp {
   private _frameDrawCalls = 0
@@ -83,9 +84,20 @@ export class Pixi8App implements IPixiApp {
     return { drawCalls: this._lastDrawCalls }
   }
 
-  async extractFrame(): Promise<HTMLCanvasElement> {
+  async extractFrame(opts: { scale?: number } = {}): Promise<{ canvas: HTMLCanvasElement; scale: number } | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (await (this._app.renderer as any).extract.canvas(this._app.stage)) as HTMLCanvasElement
+    const renderer = this._app.renderer as any
+    const { width, height } = this._app.screen
+    // ponytail: WebGL only; a WebGPU backend falls back to 4096
+    const max = (renderer.gl?.getParameter(renderer.gl.MAX_TEXTURE_SIZE) as number | undefined) ?? 4096
+    const scale = fitScale(width, height, opts.scale ?? 1, max)
+    const canvas = renderer.extract.canvas({
+      target: this._app.stage,
+      frame: new PIXI.Rectangle(0, 0, width, height),
+      resolution: scale,
+      antialias: true,
+    }) as HTMLCanvasElement
+    return { canvas, scale }
   }
 
   createSprite(dataUrl: string): unknown {

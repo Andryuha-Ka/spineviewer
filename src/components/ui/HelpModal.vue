@@ -99,7 +99,7 @@
           </div>
           <div class="tab-item">
             <span class="tab-badge">Export</span>
-            <span>PNG screenshot · Pose JSON · Sprite Sheet · Animated GIF</span>
+            <span>PNG screenshot · Pose JSON · Sprite Sheet · Animated GIF — visible canvas without overlays, Scale 1× / 2× / 4×, transparent or background colour</span>
           </div>
         </div>
       </section>
@@ -137,6 +137,7 @@
             <tr><td><kbd>0</kbd> – <kbd>9</kbd></td><td>Select track 0–9</td></tr>
           </tbody>
         </table>
+        <p class="help-p">Shortcuts are ignored while <kbd>Ctrl</kbd>, <kbd>Cmd</kbd> or <kbd>Alt</kbd> is held.</p>
       </section>
 
       <n-divider class="divider" />
@@ -182,6 +183,12 @@
       <section class="help-section">
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.12</span>
+            <ul class="help-list">
+              <li><b>Export quality</b> — PNG, sprite sheet and GIF capture the visible canvas without progress bars and labels, at 1× / 2× / 4× scale, transparent or on the background colour</li>
+            </ul>
+          </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.3.11</span>
             <ul class="help-list">

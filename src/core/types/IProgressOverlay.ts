@@ -48,6 +48,9 @@ export interface IProgressOverlay {
    */
   handleSeekDrag(localX: number, localY: number): { trackIndex: number; pct: number } | null
 
+  /** Show or hide the whole overlay (hidden while a frame is exported) */
+  setVisible(visible: boolean): void
+
   /** Remove container from stage and destroy PIXI objects */
   destroy(): void
 }

@@ -31,6 +31,36 @@
         </div>
       </div>
 
+      <div v-if="exportStore.notice" class="export-notice">
+        {{ exportStore.notice }}
+      </div>
+
+      <!-- ── Output ─────────────────────────────────────────── -->
+      <section class="section">
+        <label class="label">Output</label>
+        <div class="field-row">
+          <span class="field-label">Scale</span>
+          <n-radio-group
+            v-model:value="exportStore.scale"
+            size="small"
+            :disabled="exportStore.exporting"
+          >
+            <n-radio-button :value="1">1×</n-radio-button>
+            <n-radio-button :value="2">2×</n-radio-button>
+            <n-radio-button :value="4">4×</n-radio-button>
+          </n-radio-group>
+        </div>
+        <n-checkbox
+          v-model:checked="exportStore.includeBackground"
+          size="small"
+          :disabled="exportStore.exporting"
+        >
+          Background colour
+        </n-checkbox>
+      </section>
+
+      <div class="divider" />
+
       <!-- ── Screenshot ─────────────────────────────────────── -->
       <section class="section">
         <label class="label">Screenshot</label>
@@ -116,6 +146,7 @@
       <section class="section">
         <label class="label">GIF</label>
         <p class="hint">Records an animation loop as animated GIF</p>
+        <p class="hint">GIF always uses the background colour</p>
 
         <div class="field-row">
           <span class="field-label">Track</span>
@@ -321,6 +352,14 @@ const progressLabel = computed(() => {
   padding: 8px 10px;
   font-size: 0.7rem;
   color: #f87171;
+  border-bottom: 1px solid var(--c-border-dim);
+}
+
+/* ── Notice ── */
+.export-notice {
+  padding: 8px 10px;
+  font-size: 0.7rem;
+  color: #fbbf24;
   border-bottom: 1px solid var(--c-border-dim);
 }
 

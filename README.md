@@ -101,10 +101,14 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 ### Export
 | Format | Description |
 |--------|-------------|
-| **PNG** | Current frame screenshot |
+| **PNG** | Current frame of the visible canvas area (background image and pinned skeletons included, viewer overlays and labels left out) |
 | **Pose JSON** | Snapshot of all bone transforms |
-| **Sprite Sheet** | N-frame grid as a single PNG |
-| **GIF** | Animated GIF with configurable FPS and quality |
+| **Sprite Sheet** | N-frame grid as a single PNG, same content as PNG |
+| **GIF** | Animated GIF with configurable FPS and quality, always on the background colour |
+
+- **Scale 1× / 2× / 4×** — PNG, sprite sheet and GIF are rendered at that resolution (not upscaled); a too large result is reduced to the biggest scale the GPU or memory allows, and the Export tab says so
+- **Background colour** — PNG and sprite sheet are transparent unless this is ticked
+- Both settings are remembered between sessions
 
 ### Compare Mode
 
@@ -147,6 +151,8 @@ Side-by-side visual and structural comparison of two Spine skeletons. Accessible
 | `L` | Toggle loop on current track (loops the whole list when it holds several animations) |
 | `Shift+L` | Toggle loop on all tracks |
 | `0`–`9` | Select track 0–9 |
+
+Shortcuts are ignored while Ctrl, Cmd or Alt is held, so browser combinations like `Ctrl+R` work as usual.
 
 ---
 
@@ -214,6 +220,9 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 ---
 
 ## Changelog
+
+### v1.3.12
+- **Export quality** — PNG, sprite sheet and GIF capture the visible canvas without the progress bars and placeholder labels, at 1× / 2× / 4× scale, with a transparent or coloured background
 
 ### v1.3.11
 - **List loop** — the track Loop on a queue of several animations cycles the whole list; played animations stay in the Anim tab list greyed out; the Loop flag no longer flips as the list advances
