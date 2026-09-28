@@ -49,7 +49,7 @@ describe('slotState', () => {
   })
 
   it('replays enabled tracks with their queues and saved times', () => {
-    const adapter = { setAnimation: vi.fn(), addAnimation: vi.fn(), seekTo: vi.fn() }
+    const adapter = { animations: ['run', 'stop', 'blink'], setAnimation: vi.fn(), addAnimation: vi.fn(), seekTo: vi.fn() }
     replaySavedTracks(adapter, {
       trackPlaylists: { 0: [{ animationName: 'run', loop: true }, { animationName: 'stop', loop: false }], 1: [{ animationName: 'blink', loop: true }], 2: [] },
       trackEnabled: { 1: false },
@@ -58,6 +58,29 @@ describe('slotState', () => {
     expect(adapter.setAnimation.mock.calls).toEqual([[0, 'run', false]])
     expect(adapter.addAnimation.mock.calls).toEqual([[0, 'stop', false]])
     expect(adapter.seekTo.mock.calls).toEqual([[0, 0.3]])
+  })
+
+  it('replay skips animations the skeleton lacks and still plays the other tracks', () => {
+    const adapter = makeFakeAdapter([], ['transition/start', 'idle', 'fx'])
+    replaySavedTracks(adapter, {
+      trackPlaylists: {
+        0: [{ animationName: 'M/win', loop: true }],
+        1: [{ animationName: 'M/win', loop: true }, { animationName: 'idle', loop: false }, { animationName: 'fx', loop: false }],
+        2: [{ animationName: 'transition/start', loop: true }],
+      },
+      trackEnabled: { 0: true, 1: true, 2: true },
+      trackTimes: { 0: 0.5, 2: 0.25 },
+    })
+    expect(adapter.setAnimation.mock.calls).toEqual([[1, 'idle', false], [2, 'transition/start', true]])
+    expect(adapter.addAnimation.mock.calls).toEqual([[1, 'fx', false]])
+    expect(adapter.seekTo.mock.calls).toEqual([[2, 0.25]])
+  })
+
+  it('re-arm skips animations the skeleton lacks', () => {
+    const adapter = makeFakeAdapter([], ['a'])
+    const list = [{ animationName: 'a', loop: true }, { animationName: 'gone', loop: false }]
+    rearmListLoops(adapter, [track(0, 'a', 0.5, false)], { 0: list }, {})
+    expect(adapter.addAnimation.mock.calls).toEqual([[0, 'a', false]])
   })
 
   it('queues a single entry with its loop and a longer list non-looping', () => {

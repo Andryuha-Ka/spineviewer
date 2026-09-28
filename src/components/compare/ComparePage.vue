@@ -55,8 +55,8 @@ import { useExportStore } from '@/core/stores/useExportStore'
 // ── Props ──────────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
-  initLeftSlotIndex?:  number
-  initRightSlotIndex?: number
+  initLeftSlotId?:  string
+  initRightSlotId?: string
 }>()
 
 const emit = defineEmits<{ back: [] }>()
@@ -153,18 +153,10 @@ function onClickBack() {
 // ── Initialize slots from props ────────────────────────────────────────────────
 
 onMounted(() => {
-  if (props.initLeftSlotIndex !== undefined) {
-    const slot = fileLoaderStore.spineSlots[props.initLeftSlotIndex]
-    if (slot && !slot.error) {
-      compareStore.setLeft({ source: 'loaded', slotIndex: props.initLeftSlotIndex, label: slot.name })
-    }
-  }
-  if (props.initRightSlotIndex !== undefined) {
-    const slot = fileLoaderStore.spineSlots[props.initRightSlotIndex]
-    if (slot && !slot.error) {
-      compareStore.setRight({ source: 'loaded', slotIndex: props.initRightSlotIndex, label: slot.name })
-    }
-  }
+  const left = fileLoaderStore.spineSlots.find(s => s.id === props.initLeftSlotId)
+  if (left && !left.error) compareStore.setLeft({ source: 'loaded', slotId: left.id, label: left.name })
+  const right = fileLoaderStore.spineSlots.find(s => s.id === props.initRightSlotId)
+  if (right && !right.error) compareStore.setRight({ source: 'loaded', slotId: right.id, label: right.name })
 })
 
 </script>

@@ -113,6 +113,43 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
     }))
   }
 
+  function saveLeaving(effectiveOldId: string, fromId: string | null | undefined): void {
+    if (children.activeChildAdapter.value) {
+      if (fromId) children.saveChildState(fromId)
+      children.activeChildAdapter.value = null
+      const parentSs = fileLoaderStore.spineSlots.find(s => s.id === effectiveOldId)?.savedState
+      if (parentSs && onStage.adapter) {
+        fileLoaderStore.saveSlotState(effectiveOldId, {
+          ...parentSs,
+          trackTimes: trackTimesOf(onStage.adapter.getTrackStates()),
+          placeholderChildren: placeholderImagesStore.getSlotImages(effectiveOldId),
+        })
+      }
+    } else {
+      saveLeavingSlot(effectiveOldId, trackTimesOf(onStage.adapter?.getTrackStates() ?? []))
+    }
+  }
+
+  function unloadLeaving(effectiveOldId: string, newId: string): void {
+    if (!onStage.adapter) return
+    for (const action of placeholderImagesStore.peekActions()) {
+      if (action.type === 'move-child' && action.kind === 'image' && action.slotId === effectiveOldId && action.imageId) {
+        onStage.adapter.removeImageFromPlaceholder(action.phName, action.imageId)
+      }
+    }
+    if (slotSelectionStore.isPinned(effectiveOldId) || effectiveOldId === newId) {
+      mountedAdapters.set(effectiveOldId, onStage.adapter)
+      if (onStage.obj) mountedSpineObjects.set(effectiveOldId, onStage.obj as PixiSpriteObject)
+    } else {
+      children.destroyChildAdaptersForSlot(effectiveOldId)
+      onStage.adapter.destroy()
+      mountedAdapters.delete(effectiveOldId)
+      mountedSpineObjects.delete(effectiveOldId)
+    }
+    onStage.adapter = null
+    onStage.obj = null
+  }
+
   function isChildMounted(childSlotId: string): boolean {
     for (const meta of children.childAdapterMeta.values()) {
       if (meta.childSlotId === childSlotId) return true
@@ -148,23 +185,18 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
             return
           }
 
-          if (!children.activeChildAdapter.value && onStage.adapter && effectiveOldId) {
+          const parentId = newSlot.parentSlotId
+          if (effectiveOldId && effectiveOldId !== parentId && onStage.adapter) {
+            saveLeaving(effectiveOldId, _fromId)
+            unloadLeaving(effectiveOldId, newId)
+          } else if (!children.activeChildAdapter.value && onStage.adapter && effectiveOldId) {
             saveLeavingSlot(effectiveOldId, trackTimesOf(onStage.adapter.getTrackStates()))
-            if (effectiveOldId !== newSlot.parentSlotId) {
-              if (slotSelectionStore.isPinned(effectiveOldId)) {
-                mountedAdapters.set(effectiveOldId, onStage.adapter)
-                if (onStage.obj) mountedSpineObjects.set(effectiveOldId, onStage.obj as PixiSpriteObject)
-              } else {
-                children.destroyChildAdaptersForSlot(effectiveOldId)
-                onStage.adapter.destroy()
-                mountedAdapters.delete(effectiveOldId)
-                mountedSpineObjects.delete(effectiveOldId)
-              }
-              onStage.adapter = null
-              onStage.obj = null
-            }
-          } else if (children.activeChildAdapter.value && prevSlot?.parentSlotId && oldId) {
-            children.saveChildState(oldId)
+          } else if (children.activeChildAdapter.value && prevSlot?.parentSlotId && _fromId) {
+            children.saveChildState(_fromId)
+          }
+          if (!onStage.adapter && mountedAdapters.has(parentId)) {
+            onStage.adapter = mountedAdapters.get(parentId)!
+            onStage.obj = mountedSpineObjects.get(parentId) ?? null
           }
 
           children.activeChildAdapter.value = childAdapterRef
@@ -210,47 +242,15 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
           await nextTick()
           _suppressAnimPlay = false
           childAdapterRef.setTimeScale((childSs?.wasPlaying ?? false) ? (childSs?.speed ?? 1) : 0)
+          applyPlaceholderLabels()
+          await drainPlaceholderActions()
           return
         }
 
-        // Step 1: Save state of leaving slot
+        // Step 1: Save state of leaving slot; Step 2: park or destroy old adapter
         if (effectiveOldId) {
-          if (children.activeChildAdapter.value) {
-            if (oldId) children.saveChildState(oldId)
-            children.activeChildAdapter.value = null
-            const parentSs = fileLoaderStore.spineSlots.find(s => s.id === effectiveOldId)?.savedState
-            if (parentSs && onStage.adapter) {
-              fileLoaderStore.saveSlotState(effectiveOldId, {
-                ...parentSs,
-                trackTimes: trackTimesOf(onStage.adapter.getTrackStates()),
-                placeholderChildren: placeholderImagesStore.getSlotImages(effectiveOldId),
-              })
-            }
-          } else {
-            saveLeavingSlot(effectiveOldId, trackTimesOf(onStage.adapter?.getTrackStates() ?? []))
-          }
-        }
-
-        // Step 2: Park or destroy old adapter
-        if (effectiveOldId && onStage.adapter) {
-          for (const action of placeholderImagesStore.peekActions()) {
-            if (action.type === 'move-child' && action.kind === 'image' && action.slotId === effectiveOldId && action.imageId) {
-              onStage.adapter.removeImageFromPlaceholder(action.phName, action.imageId)
-            }
-          }
-        }
-        if (effectiveOldId && onStage.adapter) {
-          if (slotSelectionStore.isPinned(effectiveOldId) || effectiveOldId === newId) {
-            mountedAdapters.set(effectiveOldId, onStage.adapter)
-            if (onStage.obj) mountedSpineObjects.set(effectiveOldId, onStage.obj as PixiSpriteObject)
-          } else {
-            children.destroyChildAdaptersForSlot(effectiveOldId)
-            onStage.adapter.destroy()
-            mountedAdapters.delete(effectiveOldId)
-            mountedSpineObjects.delete(effectiveOldId)
-          }
-          onStage.adapter = null
-          onStage.obj = null
+          saveLeaving(effectiveOldId, _fromId)
+          unloadLeaving(effectiveOldId, newId)
         }
 
         // Step 3: Clear stores
@@ -459,6 +459,7 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
             const adapter = await createSpineAdapter(
               versionStore.pixiVersion!,
               versionStore.spineVersion!,
+              slot.fileSet,
             )
             await adapter.load(slot.fileSet)
             adapter.mount(pixiApp.stage)

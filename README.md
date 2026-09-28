@@ -163,6 +163,8 @@ Shortcuts are ignored while Ctrl, Cmd or Alt is held, so browser combinations li
 | Pixi 7 | Spine 3.8, 4.0, 4.1 |
 | Pixi 8 | Spine 4.2 |
 
+Spine 3.8, 4.0 and 4.1 skeletons can be mixed in one Pixi 7 session; Spine 4.2 needs Pixi 8.
+
 ---
 
 ## Getting Started
@@ -220,6 +222,9 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 ---
 
 ## Changelog
+
+### v1.3.13
+- **Mixed Spine versions** — 3.8, 4.0 and 4.1 skeletons open together in one Pixi 7 session, each on its own runtime (also as child spines and in Compare); the toolbar shows the active skeleton's version
 
 ### v1.3.12
 - **Export quality** — PNG, sprite sheet and GIF capture the visible canvas without the progress bars and placeholder labels, at 1× / 2× / 4× scale, with a transparent or coloured background

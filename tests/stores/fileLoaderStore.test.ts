@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useFileLoaderStore, SPINE_SLOTS_LIMIT } from '@/core/stores/useFileLoaderStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
+import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import type { FileSet, PHChildEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 
 const FILESET: FileSet = {
@@ -98,5 +99,24 @@ describe('useFileLoaderStore.cloneSlot (N9)', () => {
     expect(loader.spineSlots).toHaveLength(SPINE_SLOTS_LIMIT)
     expect(ph.getPlaceholderSpineEntries(clone.id, 'placeholder_1')).toEqual([])
     expect(ph.getPlaceholderImages(clone.id, 'placeholder_1')).toHaveLength(1)
+  })
+})
+
+describe('useFileLoaderStore.removeSlot (B11)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('falls back to the first top-level slot without errors', () => {
+    const loader = useFileLoaderStore()
+    const sel = useSlotSelectionStore()
+    loader.setSlots([
+      slot('gone'),
+      slot('kid', { parentSlotId: 'gone' }),
+      slot('broken', { error: 'unmatched' }),
+      slot('invalid', { validationErrors: ['missing image'] }),
+      slot('ok'),
+    ], '4.1')
+    sel.activeSlotId = 'gone'
+    loader.removeSlot('gone')
+    expect(sel.activeSlotId).toBe('ok')
   })
 })

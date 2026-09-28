@@ -145,10 +145,10 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
   }
 
   /** @internal Consumed exclusively by PreviewStage to flush pending canvas mutations. */
-  function drainActions(): PHChildAction[] {
-    const copy = _pendingActions.value.slice()
-    _pendingActions.value = []
-    return copy
+  function drainActions(keep?: (a: PHChildAction) => boolean): PHChildAction[] {
+    const all = _pendingActions.value
+    _pendingActions.value = keep ? all.filter(keep) : []
+    return keep ? all.filter(a => !keep(a)) : all.slice()
   }
 
   /** @internal Read-only peek used by PreviewStage ticker to detect pending work. */

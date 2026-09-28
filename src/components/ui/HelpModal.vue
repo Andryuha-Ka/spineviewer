@@ -116,7 +116,7 @@
           <li><b>Viewport sync</b> (⊞) — mirrors pan and zoom between canvases</li>
           <li><b>Animation / Skin sync</b> — changes on one side auto-apply the same name to the other when sync is on</li>
           <li><b>Diff panel</b> — runs automatically on load; shows Bones · Slots · Skins · Animations · Events · Constraints</li>
-          <li><b>Reskin Overview</b> — animation presence + duration delta, skin diff, event timing diff, placeholder parameter changes; severity badges: 🔴 critical · 🟠 non-critical</li>
+          <li><b>Reskin Overview</b> — animation presence + duration delta, skin diff, event timing diff, placeholder presence; severity badges: 🔴 critical · 🟠 non-critical</li>
           <li><b>Placeholder labels</b> — <code>ph</code> checkbox per canvas; individual checkboxes for each placeholder (only non-removed ones shown)</li>
           <li>Diff panel position (left / right / bottom) is persisted</li>
         </ul>
@@ -154,6 +154,7 @@
             <tr><td>Pixi 8</td><td>Spine 4.2</td></tr>
           </tbody>
         </table>
+        <p class="help-p">Spine 3.8, 4.0 and 4.1 skeletons can be mixed in one Pixi 7 session; Spine 4.2 needs Pixi 8.</p>
       </section>
 
       <n-divider class="divider" />
@@ -183,6 +184,12 @@
       <section class="help-section">
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.13</span>
+            <ul class="help-list">
+              <li><b>Mixed Spine versions</b> — 3.8, 4.0 and 4.1 skeletons open together in one Pixi 7 session, each on its own runtime (also as child spines and in Compare); the toolbar shows the active skeleton's version</li>
+            </ul>
+          </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.3.12</span>
             <ul class="help-list">

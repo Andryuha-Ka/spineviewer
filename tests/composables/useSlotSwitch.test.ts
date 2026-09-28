@@ -246,6 +246,59 @@ describe('useSlotSwitch', () => {
     expect(hs.loaded).toEqual([])
   })
 
+  function addChildTo(parentId: string, kidId: string, entryId: string) {
+    useFileLoaderStore().addSlot(slot(kidId, { parentSlotId: parentId }))
+    usePlaceholderImagesStore().setSlotImages(parentId, { p: [{
+      kind: 'spine', imageId: entryId, childSlotId: kidId, fileName: kidId, fileSet: FILESET,
+      syncEnabled: true, posX: 0, posY: 0, scale: 1,
+    }] })
+  }
+
+  async function mountKid(parent: ISpineAdapter, parentId: string) {
+    await hs.children.mountChildAdapter(parent, parentId, 'p', usePlaceholderImagesStore().getPlaceholderSpineEntries(parentId, 'p')[0])
+    return created.at(-1)!
+  }
+
+  it.each([false, true])('activating a child of pinned A from X puts A on stage and unloads X (C25, X pinned: %s)', async (xPinned) => {
+    const a = await loadA()
+    useSlotSelectionStore().setPinned('a', true)
+    addChild()
+    const kid = await mountKid(a, 'a')
+    if (xPinned) useSlotSelectionStore().setPinned('b', true)
+    await activate('b')
+    const b = hs.loaded[0].adapter
+    hs.drain.mockClear()
+
+    await activate('kid')
+    expect(hs.onStage.adapter).toBe(a)
+    expect(hs.children.activeChildAdapter.value).toBe(kid)
+    expect(b.destroy).toHaveBeenCalledTimes(xPinned ? 0 : 1)
+    expect(hs.mountedAdapters.has('b')).toBe(xPinned)
+    expect(hs.drain).toHaveBeenCalled()
+  })
+
+  it('activating a child of pinned A from a child of B saves and unloads B with its children (O7)', async () => {
+    const a = await loadA()
+    useSlotSelectionStore().setPinned('a', true)
+    addChildTo('a', 'kidA', 'eA')
+    const kidA = await mountKid(a, 'a')
+    await activate('b')
+    const b = hs.loaded[0].adapter
+    b.tracks = [track(0, 'run', 0.5)]
+    addChildTo('b', 'kidB', 'eB')
+    const kidB = await mountKid(b, 'b')
+    await activate('kidB')
+    expect(hs.onStage.adapter).toBe(b)
+
+    await activate('kidA')
+    expect(useFileLoaderStore().spineSlots.find(s => s.id === 'b')!.savedState?.trackTimes).toEqual({ 0: 0.5 })
+    expect(b.destroy).toHaveBeenCalledTimes(1)
+    expect(kidB.destroy).toHaveBeenCalledTimes(1)
+    expect(hs.mountedAdapters.has('b')).toBe(false)
+    expect(hs.onStage.adapter).toBe(a)
+    expect(hs.children.activeChildAdapter.value).toBe(kidA)
+  })
+
   it('pinning a non-active slot mounts it with its saved playlists and live images', async () => {
     await loadA()
     useFileLoaderStore().saveSlotState('b', saved({

@@ -10,12 +10,15 @@ import { defineStore } from 'pinia'
 import type { FileSet } from '@/core/types/FileSet'
 import type { SpineDiff } from '@/core/utils/spineCompare'
 import { groupSpineFiles } from '@/core/utils/fileLoader'
+import { spineVersionProblem } from '@/core/utils/versionDetector'
+import { validateSpineFileSet } from '@/core/utils/spineValidator'
+import { useVersionStore } from '@/core/stores/useVersionStore'
 
 // ── Slot types ─────────────────────────────────────────────────────────────────
 
 export interface SpineSlotRef {
   source: 'loaded'
-  slotIndex: number
+  slotId: string
   label: string
 }
 
@@ -53,6 +56,8 @@ export const useCompareStore = defineStore('compare', () => {
 
   const selectedHighlight = ref<{ name: string; kind: 'bone' | 'slot' } | null>(null)
 
+  const sourceError = ref<{ left: string | null; right: string | null }>({ left: null, right: null })
+
   // --- Persistence watchers ---
   watch(syncEnabled,  v => localStorage.setItem('svp:compare:syncEnabled', String(v)))
   watch(syncViewport, v => localStorage.setItem('svp:compare:syncViewport', String(v)))
@@ -63,6 +68,7 @@ export const useCompareStore = defineStore('compare', () => {
 
   function setLeft(slot: CompareSlot) {
     leftSlot.value   = slot
+    sourceError.value.left = null
     diff.value       = null
     diffStatus.value = 'idle'
     diffError.value  = null
@@ -70,27 +76,35 @@ export const useCompareStore = defineStore('compare', () => {
 
   function setRight(slot: CompareSlot) {
     rightSlot.value  = slot
+    sourceError.value.right = null
     diff.value       = null
     diffStatus.value = 'idle'
     diffError.value  = null
   }
 
-  /** Classify + store files loaded directly into a compare slot (not from loaderStore). */
-  async function loadDirect(side: 'left' | 'right', files: File[]): Promise<{ error: string | null }> {
+  /** Classify, check and store files loaded directly into a compare slot (not from loaderStore). */
+  async function loadDirect(side: 'left' | 'right', files: File[]): Promise<void> {
+    sourceError.value[side] = null
+    const fail = (msg: string) => { sourceError.value[side] = msg }
+
     const result = await groupSpineFiles(files)
-    if (result.globalError) return { error: result.globalError }
+    if (result.globalError) return fail(result.globalError)
 
-    const first = result.slots.find(s => !s.error && s.fileSet)
-    if (!first?.fileSet) return { error: 'No valid Spine files found' }
+    const fileSet = result.slots.find(s => !s.error && s.fileSet)?.fileSet
+    if (!fileSet) return fail('No valid Spine files found')
 
-    const slot: CompareFileSet = {
-      source: 'direct',
-      fileSet: first.fileSet,
-      label: first.fileSet.skeleton.filename,
-    }
+    const selected = useVersionStore().spineVersion
+    if (!selected) return fail('Select a Spine version first')
+
+    const versionProblem = spineVersionProblem(fileSet, selected)
+    if (versionProblem) return fail(versionProblem)
+
+    const errors = validateSpineFileSet(fileSet)
+    if (errors.length > 0) return fail(errors.join('\n'))
+
+    const slot: CompareFileSet = { source: 'direct', fileSet, label: fileSet.skeleton.filename }
     if (side === 'left') setLeft(slot)
     else setRight(slot)
-    return { error: null }
   }
 
   function setPanelPos(pos: 'left' | 'right' | 'bottom') {
@@ -123,6 +137,7 @@ export const useCompareStore = defineStore('compare', () => {
     diffStatus.value        = 'idle'
     diffError.value         = null
     selectedHighlight.value = null
+    sourceError.value       = { left: null, right: null }
   }
 
   return {
@@ -135,6 +150,7 @@ export const useCompareStore = defineStore('compare', () => {
     diff,
     diffStatus,
     diffError,
+    sourceError,
     setLeft,
     setRight,
     loadDirect,

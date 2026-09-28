@@ -65,6 +65,15 @@ describe('useChildAdapters', () => {
     expect(child.setTimeScale).toHaveBeenLastCalledWith(2)
   })
 
+  it('creates the child adapter for the child slot FileSet (C37)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const childSet = { skeleton: { filename: 'c.skel' }, atlas: {}, images: [] } as any
+    useFileLoaderStore().spineSlots.find(s => s.id === 'child')!.fileSet = childSet
+    await useChildAdapters().mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    const { createSpineAdapter } = await import('@/core/AdapterFactory')
+    expect(createSpineAdapter).toHaveBeenLastCalledWith(8, '4.2', childSet)
+  })
+
   it('dedupes concurrent mounts of one entry', async () => {
     const children = useChildAdapters()
     const parent = makeFakeAdapter()
@@ -122,11 +131,55 @@ describe('useChildAdapters', () => {
     const children = useChildAdapters()
     await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
     useSlotSelectionStore().setActiveSlot('child')
+    children.activeChildAdapter.value = created[0]
     const list = [{ animationName: 'x', loop: true }, { animationName: 'y', loop: false }]
     useAnimationStore().setTrackPlaylist(0, list)
     created[0].tracks = [track(0, 'y', 0.1)]
     children.destroyChildAdaptersForSlot('parent')
     expect(useFileLoaderStore().spineSlots.find(s => s.id === 'child')!.savedState!.trackPlaylists).toEqual({ 0: list })
+  })
+
+  it('snapshot ignores the store while it still holds the parent (C35)', async () => {
+    const own = [{ animationName: 'blink', loop: true }]
+    useFileLoaderStore().saveSlotState('child', saved({ trackPlaylists: { 2: own }, trackEnabled: { 2: true } }))
+    const children = useChildAdapters()
+    await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    // the child is selected but the slot watcher has not swapped the stores yet
+    useSlotSelectionStore().setActiveSlot('child')
+    useAnimationStore().setTrackPlaylist(0, [{ animationName: 'win', loop: true }])
+    children.destroyChildAdaptersForSlot('parent')
+    expect(useFileLoaderStore().spineSlots.find(s => s.id === 'child')!.savedState!.trackPlaylists).toEqual({ 2: own })
+  })
+
+  it('saveChildState writes only the child the stores hold (C35)', async () => {
+    const loader = useFileLoaderStore()
+    loader.setSlots([
+      { id: 'parent', name: 'p', fileSet: FILESET },
+      { id: 'child', name: 'c', fileSet: FILESET, parentSlotId: 'parent' },
+      { id: 'other', name: 'o', fileSet: FILESET, parentSlotId: 'parent' },
+    ], '4.2')
+    const children = useChildAdapters()
+    await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    children.activeChildAdapter.value = created[0]
+    useAnimationStore().setTrackPlaylist(0, [{ animationName: 'idle', loop: true }])
+
+    children.saveChildState('other')
+    expect(loader.spineSlots.find(s => s.id === 'other')!.savedState).toBeUndefined()
+    children.saveChildState('child')
+    expect(loader.spineSlots.find(s => s.id === 'child')!.savedState!.trackPlaylists).toEqual({ 0: [{ animationName: 'idle', loop: true }] })
+  })
+
+  it('remount resumes the known tracks when the saved list names a foreign animation (C35)', async () => {
+    useFileLoaderStore().saveSlotState('child', saved({
+      trackPlaylists: { 0: [{ animationName: 'M/win', loop: true }], 2: [{ animationName: 'blink', loop: true }] },
+      trackEnabled: { 0: true, 2: true },
+      selectedSkins: ['gold'],
+    }))
+    const children = useChildAdapters()
+    await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    expect(created[0].setAnimation.mock.calls).toEqual([[2, 'blink', true]])
+    expect(created[0].setSkins).toHaveBeenCalledWith(['gold'])
+    expect(created[0].setTimeScale).toHaveBeenLastCalledWith(1.5)
   })
 
   it('reparents a mounted child into a destination placeholder without reloading', async () => {

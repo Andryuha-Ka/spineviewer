@@ -79,3 +79,29 @@ describe('placeholder store cleanup (C16)', () => {
     expect(useSlotSelectionStore().activeSlotId).toBeNull()
   })
 })
+
+describe('placeholder action drain', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  function queue() {
+    const ph = usePlaceholderImagesStore()
+    ph.addSpineChild('a', 'p', spineEntry('e1', 'c1'))
+    ph.addSpineChild('b', 'p', spineEntry('e2', 'c2'))
+    ph.addSpineChild('a', 'p', spineEntry('e3', 'c3'))
+    return ph
+  }
+
+  it('keeps the actions the predicate accepts queued, in order', () => {
+    const ph = queue()
+    const drained = ph.drainActions(a => a.slotId === 'a')
+    expect(drained.map(a => 'imageId' in a && a.imageId)).toEqual(['e2'])
+    expect(ph.peekActions().map(a => 'imageId' in a && a.imageId)).toEqual(['e1', 'e3'])
+    expect(ph.drainActions().map(a => 'imageId' in a && a.imageId)).toEqual(['e1', 'e3'])
+  })
+
+  it('drains everything without a predicate', () => {
+    const ph = queue()
+    expect(ph.drainActions().map(a => 'imageId' in a && a.imageId)).toEqual(['e1', 'e2', 'e3'])
+    expect(ph.hasPendingActions).toBe(false)
+  })
+})

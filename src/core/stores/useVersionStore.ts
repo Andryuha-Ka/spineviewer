@@ -13,7 +13,7 @@ export type SpineVersion = '3.8' | '4.0' | '4.1' | '4.2'
 
 const STORAGE_KEY = 'svp-version'
 
-const spineOptionsMap: Record<PixiVersion, SpineVersion[]> = {
+export const spineOptionsMap: Record<PixiVersion, SpineVersion[]> = {
   7: ['3.8', '4.0', '4.1'],
   8: ['4.2'], // @esotericsoftware/spine-pixi-v8 only has 4.2.x releases
 }

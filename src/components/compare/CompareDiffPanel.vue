@@ -201,23 +201,6 @@
                   <span class="ph-name">{{ ph.name }}</span>
                   <span class="ph-status-label">{{ ph.status.toUpperCase() }}</span>
                 </div>
-                <div
-                  v-for="param in ph.params.filter(p => p.changed || !diffsOnly)"
-                  :key="`${ph.name}::${param.key}`"
-                  class="ph-param"
-                  :class="{ 'ph-param--critical': param.critical }"
-                >
-                  <span class="ph-param-key">{{ param.key }}</span>
-                  <template v-if="param.changed">
-                    <span class="ph-param-val ph-param-val--a">{{ param.valueA }}</span>
-                    <span class="ph-param-arrow">→</span>
-                    <span class="ph-param-val ph-param-val--b">{{ param.valueB }}</span>
-                    <span v-if="param.critical" class="ph-critical-badge">⚠ critical</span>
-                  </template>
-                  <template v-else>
-                    <span class="ph-param-val ph-param-val--eq">{{ param.valueA }}</span>
-                  </template>
-                </div>
               </template>
             </template>
 
@@ -475,7 +458,6 @@ function statusIcon(status: PlaceholderDiff['status']): string {
   switch (status) {
     case 'added':   return '+'
     case 'removed': return '−'
-    case 'changed': return '~'
     default:        return '✓'
   }
 }
@@ -908,7 +890,6 @@ function onPhClick(ph: PlaceholderDiff) {
 
 .ph-item--added    { background: rgba(74, 222, 128, 0.05); }
 .ph-item--removed  { background: rgba(248, 113, 113, 0.05); }
-.ph-item--changed  { background: rgba(245, 158, 11, 0.05); }
 .ph-item--clickable { cursor: pointer; }
 .ph-item--clickable:hover { background: var(--c-raised); }
 .ph-item--selected  { background: rgba(124, 106, 245, 0.12) !important; outline: 1px solid rgba(124, 106, 245, 0.4); outline-offset: -1px; }
@@ -921,7 +902,6 @@ function onPhClick(ph: PlaceholderDiff) {
 
 .ph-item--added   .ph-status-icon { color: #4ade80; }
 .ph-item--removed .ph-status-icon { color: #f87171; }
-.ph-item--changed .ph-status-icon { color: #f59e0b; }
 .ph-item--equal   .ph-status-icon { color: #4ade80; }
 
 .ph-kind { color: var(--c-text-ghost); font-size: 0.72rem; }
@@ -931,33 +911,6 @@ function onPhClick(ph: PlaceholderDiff) {
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--c-text-ghost);
-  flex-shrink: 0;
-}
-
-.ph-param {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 1px 10px 1px 26px;
-  font-size: 0.72rem;
-  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
-}
-
-.ph-param--critical { background: rgba(245, 158, 11, 0.07); }
-
-.ph-param-key    { color: var(--c-text-ghost); min-width: 80px; }
-.ph-param-val    { font-size: 0.72rem; white-space: nowrap; }
-.ph-param-val--a  { color: #f87171; }
-.ph-param-val--eq { color: var(--c-text-muted); }
-.ph-param-val--b { color: #4ade80; }
-.ph-param-arrow  { color: var(--c-text-ghost); flex-shrink: 0; }
-.ph-critical-badge {
-  font-size: 0.62rem;
-  font-weight: 600;
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.1);
-  border-radius: 3px;
-  padding: 1px 5px;
   flex-shrink: 0;
 }
 </style>

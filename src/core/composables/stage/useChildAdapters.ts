@@ -42,9 +42,19 @@ export function useChildAdapters() {
   const childAdapterMeta = new Map<string, ChildAdapterMeta>()
   const activeChildAdapter = shallowRef<ISpineAdapter | null>(null)
 
+  /** The UI stores hold this child only while its adapter is the active one. */
+  function storeHoldsChild(childSlotId: string): boolean {
+    const active = activeChildAdapter.value
+    if (!active) return false
+    for (const [entryId, meta] of childAdapterMeta) {
+      if (meta.childSlotId === childSlotId && childAdapters.get(entryId) === active) return true
+    }
+    return false
+  }
+
   function saveChildState(childSlotId: string): void {
     const childSlot = fileLoaderStore.spineSlots.find(s => s.id === childSlotId)
-    if (!childSlot) return
+    if (!childSlot || !storeHoldsChild(childSlotId)) return
     fileLoaderStore.saveSlotState(childSlotId, buildSlotSavedState({
       playback:             animationStore,
       activeSkins:          skeletonStore.activeSkins,
@@ -62,7 +72,7 @@ export function useChildAdapters() {
     if (!childSlot) return
     const states = adapter.getTrackStates()
     const prev = childSlot.savedState
-    const trackPlaylists = slotSelectionStore.activeSlotId === childSlotId
+    const trackPlaylists = activeChildAdapter.value === adapter
       ? Object.fromEntries(Object.entries(animationStore.trackPlaylists).map(([t, l]) => [t, l.map(e => ({ ...e }))]))
       : prev && Object.values(prev.trackPlaylists).some(l => l.length > 0)
         ? prev.trackPlaylists
@@ -173,7 +183,7 @@ export function useChildAdapters() {
       const _existingInPh = [...childAdapterMeta.values()].filter(
         m => m.parentSlotId === parentSlotId && m.phName === phName,
       ).length
-      const childAdapter = await createSpineAdapter(versionStore.pixiVersion!, versionStore.spineVersion!)
+      const childAdapter = await createSpineAdapter(versionStore.pixiVersion!, versionStore.spineVersion!, childSlotForLoad.fileSet)
       await childAdapter.load(childSlotForLoad.fileSet)
       childAdapter.mount(phContainer)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

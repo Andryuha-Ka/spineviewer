@@ -7,6 +7,7 @@
  */
 
 import type { FileSet } from '@/core/types/FileSet'
+import { spineOptionsMap, type PixiVersion, type SpineVersion } from '@/core/stores/useVersionStore'
 
 /** Supported Spine major.minor versions */
 const KNOWN_VERSIONS = ['3.8', '4.0', '4.1', '4.2'] as const
@@ -50,20 +51,31 @@ export function detectSpineVersionFromSkel(buffer: ArrayBuffer): string {
 }
 
 /**
- * Returns true if the detected version is compatible with the user's selection.
+ * Returns true if the detected version runs on the same Pixi major as the user's selection.
  * Unknown version is always considered compatible (give it a chance to load).
  */
 export function isCompatible(detected: string, selected: string): boolean {
   if (detected === 'unknown') return true
-  return detected === selected
+  return Object.values(spineOptionsMap).some(list =>
+    list.includes(detected as SpineVersion) && list.includes(selected as SpineVersion))
 }
 
-/** Mismatch message when the file set's skeleton cannot be loaded by the session's Spine runtime, else null. */
-export function spineVersionProblem(fileSet: FileSet, sessionVersion: string): string | null {
-  const { type, fileBody, filename } = fileSet.skeleton
-  const detected = type === 'skeleton-json'
+export function detectFileSetVersion(fileSet: FileSet): string {
+  const { type, fileBody } = fileSet.skeleton
+  return type === 'skeleton-json'
     ? detectSpineVersion(fileBody as string)
     : detectSpineVersionFromSkel(fileBody as ArrayBuffer)
+}
+
+/** The set's own Spine version when the Pixi version has a runtime for it, else the selected one. */
+export function runtimeSpineVersion(fileSet: FileSet, pixi: PixiVersion, selected: SpineVersion): SpineVersion {
+  const own = detectFileSetVersion(fileSet) as SpineVersion
+  return spineOptionsMap[pixi].includes(own) ? own : selected
+}
+
+/** Mismatch message when the file set's skeleton cannot be loaded by the session's Pixi version, else null. */
+export function spineVersionProblem(fileSet: FileSet, sessionVersion: string): string | null {
+  const detected = detectFileSetVersion(fileSet)
   if (isCompatible(detected, sessionVersion)) return null
-  return `Spine version mismatch: ${filename} is ${detected}, viewer is set to ${sessionVersion}`
+  return `Spine version mismatch: ${fileSet.skeleton.filename} is ${detected}, viewer is set to ${sessionVersion}`
 }

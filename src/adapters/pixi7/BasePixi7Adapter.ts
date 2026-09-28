@@ -265,15 +265,19 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     if (!this._spine) return []
     // pixi-spine uses yDown=true: bone.matrix.ty is negated (Pixi Y-down space).
     // Negate Y to return Spine Y-up coordinates, consistent with Spine42Adapter.
+    // Rotation and scale come from b.matrix: the 3.8 getWorldScaleX/Y mix the matrix columns.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return this._spine.skeleton.bones.map((b: any) => ({
-      name: b.data.name,
-      x: b.worldX ?? 0,
-      y: -(b.worldY ?? 0),
-      rotation: b.worldRotation ?? 0,
-      scaleX: b.scaleX ?? b.worldScaleX ?? 1,
-      scaleY: b.scaleY ?? b.worldScaleY ?? 1,
-    }))
+    return this._spine.skeleton.bones.map((b: any) => {
+      const m = b.matrix
+      return {
+        name: b.data.name,
+        x: b.worldX ?? 0,
+        y: -(b.worldY ?? 0),
+        rotation: -Math.atan2(m.b, m.a) * 180 / Math.PI,
+        scaleX: Math.hypot(m.a, m.b),
+        scaleY: Math.hypot(m.c, m.d),
+      }
+    })
   }
 
   getActiveAttachments(): AttachmentInfo[] {

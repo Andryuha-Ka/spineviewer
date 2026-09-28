@@ -11,7 +11,7 @@
     <header class="toolbar">
       <button class="back-btn" @click="onClickBack">← Back</button>
       <span class="version-tag">
-        Pixi {{ versionStore.pixiVersion }} · Spine {{ versionStore.spineVersion }}
+        Pixi {{ versionStore.pixiVersion }} · Spine {{ activeSpineVersion }}
       </span>
       <span v-if="slotSelectionStore.activeSlot?.fileSet" class="spine-name-tag" :class="`spine-name-tag--${slotSelectionStore.activeSlot.fileSet.skeleton.type}`">
         <span
@@ -37,7 +37,7 @@
       <n-button
         size="small"
         class="compare-toolbar-btn"
-        @click="emit('open-compare', { left: fileLoaderStore.spineSlots.findIndex(s => s.id === slotSelectionStore.activeSlotId) })"
+        @click="emit('open-compare', { left: slotSelectionStore.activeSlotId ?? undefined })"
         title="Open Compare mode"
       >⇄ Compare</n-button>
       <SettingsPopover />
@@ -137,11 +137,11 @@ import { useExportStore } from '@/core/stores/useExportStore'
 import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
 import { groupSpineFiles, readFileAsDataURL } from '@/core/utils/fileLoader'
 import { validateSpineFileSet } from '@/core/utils/spineValidator'
-import { spineVersionProblem } from '@/core/utils/versionDetector'
+import { runtimeSpineVersion, spineVersionProblem } from '@/core/utils/versionDetector'
 
 const emit = defineEmits<{
   back:           []
-  'open-compare': [payload?: { left?: number }]
+  'open-compare': [payload?: { left?: string }]
 }>()
 
 const versionStore     = useVersionStore()
@@ -153,6 +153,11 @@ const slotUIStore        = useSlotUIStore()
 const exportStore      = useExportStore()
 const backgroundStore  = useBackgroundStore()
 const stageRef         = ref<InstanceType<typeof PreviewStage> | null>(null)
+const activeSpineVersion = computed(() => {
+  const fileSet = slotSelectionStore.activeSlot?.fileSet
+  const { pixiVersion: pixi, spineVersion: selected } = versionStore
+  return fileSet && pixi && selected ? runtimeSpineVersion(fileSet, pixi, selected) : selected
+})
 const activeTab        = ref<'spines' | 'animation' | 'inspector' | 'bones' | 'atlas' | 'perf' | 'compl' | 'export'>('animation')
 
 // Auto-switch to Spines tab when background is first loaded

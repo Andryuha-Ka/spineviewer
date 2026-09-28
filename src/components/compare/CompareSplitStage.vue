@@ -64,8 +64,7 @@ function resolveFileSet(slot: typeof compareStore.leftSlot): FileSet | null {
   if (!slot) return null
   if (slot.source === 'direct') return slot.fileSet
   // source === 'loaded'
-  const spineSlot = fileLoaderStore.spineSlots[slot.slotIndex]
-  return spineSlot?.fileSet ?? null
+  return fileLoaderStore.spineSlots.find(s => s.id === slot.slotId)?.fileSet ?? null
 }
 
 const leftFileSet  = computed(() => resolveFileSet(compareStore.leftSlot))
@@ -142,18 +141,13 @@ function stopSyncTicker() {
   syncTickerFn = null
 }
 
-// Start sync after both slots are mounted
-onMounted(() => {
-  setTimeout(startSyncTicker, 500) // brief delay to let canvas slots initialize
-})
-
 onUnmounted(() => {
   stopSyncTicker()
 })
 
-// Re-attach ticker when master side changes or sync toggled
+// Re-attach ticker when master side changes, sync toggled or a canvas app appears
 watch(
-  () => [compareStore.masterSide, compareStore.syncEnabled] as const,
+  () => [compareStore.masterSide, compareStore.syncEnabled, leftSlotRef.value?.pixiApp, rightSlotRef.value?.pixiApp] as const,
   () => startSyncTicker(),
 )
 

@@ -21,8 +21,8 @@
     />
     <ComparePage
       v-else-if="page === 'compare'"
-      :init-left-slot-index="compareInitLeft"
-      :init-right-slot-index="compareInitRight"
+      :init-left-slot-id="compareInitLeft"
+      :init-right-slot-id="compareInitRight"
       @back="page = fromPage"
     />
   </n-config-provider>
@@ -38,10 +38,10 @@ import { useSettingsStore } from '@/core/stores/useSettingsStore'
 const settingsStore = useSettingsStore()
 const page     = ref<'picker' | 'viewer' | 'compare'>('picker')
 const fromPage = ref<'picker' | 'viewer'>('picker')
-const compareInitLeft  = ref<number | undefined>(undefined)
-const compareInitRight = ref<number | undefined>(undefined)
+const compareInitLeft  = ref<string | undefined>(undefined)
+const compareInitRight = ref<string | undefined>(undefined)
 
-function onOpenCompare(payload?: { left?: number; right?: number }) {
+function onOpenCompare(payload?: { left?: string; right?: string }) {
   fromPage.value         = page.value as 'picker' | 'viewer'
   compareInitLeft.value  = payload?.left
   compareInitRight.value = payload?.right

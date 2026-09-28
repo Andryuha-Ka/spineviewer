@@ -54,20 +54,27 @@ export function buildSlotSavedState(input: SlotSnapshotInput): SpineSlotSavedSta
   return state
 }
 
-/** Runtime chain for one track's list: a single entry keeps its loop, a longer list is queued non-looping and cycled by `rearmListLoops`. */
+/** Entries the skeleton has — a saved list can name an animation this skeleton lacks. */
+function playable(adapter: Pick<ISpineAdapter, 'animations'>, list: readonly TrackQueueEntry[]): TrackQueueEntry[] {
+  return list.filter(e => adapter.animations.includes(e.animationName))
+}
+
+/** Runtime chain for one track's list: a single entry keeps its loop, a longer list is queued non-looping and cycled by `rearmListLoops`. Unknown animations are skipped. */
 export function queueTrackList(
-  adapter: Pick<ISpineAdapter, 'setAnimation' | 'addAnimation'>,
+  adapter: Pick<ISpineAdapter, 'animations' | 'setAnimation' | 'addAnimation'>,
   track: number,
   playlist: readonly TrackQueueEntry[],
-): void {
-  if (playlist.length === 0) return
-  adapter.setAnimation(track, playlist[0].animationName, playlist.length === 1 ? playlist[0].loop : false)
-  for (let i = 1; i < playlist.length; i++) adapter.addAnimation(track, playlist[i].animationName, false)
+): boolean {
+  const list = playable(adapter, playlist)
+  if (list.length === 0) return false
+  adapter.setAnimation(track, list[0].animationName, list.length === 1 ? list[0].loop : false)
+  for (let i = 1; i < list.length; i++) adapter.addAnimation(track, list[i].animationName, false)
+  return true
 }
 
 /** Queues the whole list again on every enabled list-looping track whose last entry is playing. */
 export function rearmListLoops(
-  adapter: Pick<ISpineAdapter, 'addAnimation'>,
+  adapter: Pick<ISpineAdapter, 'animations' | 'addAnimation'>,
   states: readonly TrackState[],
   playlists: Record<number, TrackQueueEntry[]>,
   enabled: Record<number, boolean>,
@@ -75,7 +82,7 @@ export function rearmListLoops(
   for (const ts of states) {
     const list = playlists[ts.trackIndex]
     if (!list || list.length < 2 || !list[0].loop || enabled[ts.trackIndex] === false || ts.queue.length > 0) continue
-    for (const e of list) adapter.addAnimation(ts.trackIndex, e.animationName, false)
+    for (const e of playable(adapter, list)) adapter.addAnimation(ts.trackIndex, e.animationName, false)
   }
 }
 
@@ -101,13 +108,12 @@ export function shouldAutoStop(states: readonly TrackState[], info: AutoStopTrac
 
 /** Puts a saved slot back on an adapter that was mounted without it: enabled tracks, their queues and times. */
 export function replaySavedTracks(
-  adapter: Pick<ISpineAdapter, 'setAnimation' | 'addAnimation' | 'seekTo'>,
+  adapter: Pick<ISpineAdapter, 'animations' | 'setAnimation' | 'addAnimation' | 'seekTo'>,
   state: Pick<SpineSlotSavedState, 'trackPlaylists' | 'trackEnabled' | 'trackTimes'>,
 ): void {
   for (const [idxStr, playlist] of Object.entries(state.trackPlaylists)) {
     const track = Number(idxStr)
-    if (playlist.length === 0 || state.trackEnabled[track] === false) continue
-    queueTrackList(adapter, track, playlist)
+    if (state.trackEnabled[track] === false || !queueTrackList(adapter, track, playlist)) continue
     const time = state.trackTimes?.[track]
     if (time !== undefined) adapter.seekTo(track, time)
   }

@@ -9,6 +9,8 @@
 import type { IPixiApp } from './types/IPixiApp'
 import type { ISpineAdapter } from './types/ISpineAdapter'
 import type { PixiVersion, SpineVersion } from './stores/useVersionStore'
+import type { FileSet } from './types/FileSet'
+import { runtimeSpineVersion } from './utils/versionDetector'
 
 /**
  * Dynamically imports and creates a Pixi application for the given version.
@@ -40,8 +42,9 @@ export async function createPixiApp(
 export async function createSpineAdapter(
   pixiVersion: PixiVersion,
   spineVersion: SpineVersion,
+  fileSet: FileSet,
 ): Promise<ISpineAdapter> {
-  const key = `${pixiVersion}-${spineVersion}` as const
+  const key = `${pixiVersion}-${runtimeSpineVersion(fileSet, pixiVersion, spineVersion)}` as const
 
   const loaders: Record<string, () => Promise<{ default: new () => ISpineAdapter }>> = {
     '7-3.8': () => import('@/adapters/pixi7/spine38/Spine38Adapter'),

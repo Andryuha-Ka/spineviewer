@@ -7,10 +7,14 @@
  */
 
 import { nextTick } from 'vue'
-import { useFileLoaderStore, SPINE_SLOTS_LIMIT } from '@/core/stores/useFileLoaderStore'
+import { useFileLoaderStore, SPINE_SLOTS_LIMIT, cloneSavedState } from '@/core/stores/useFileLoaderStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import { useVersionStore } from '@/core/stores/useVersionStore'
+import { useAnimationStore } from '@/core/stores/useAnimationStore'
+import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
+import { useViewerStore } from '@/core/stores/useViewerStore'
+import { buildSlotSavedState, trackTimesOf } from '@/core/utils/slotState'
 import { groupSpineFiles } from '@/core/utils/fileLoader'
 import { spineVersionProblem } from '@/core/utils/versionDetector'
 import type { FileSet, PHSpineEntry, SpineSlot } from '@/core/types/FileSet'
@@ -37,8 +41,11 @@ export function usePlaceholderActions() {
   const slotSelectionStore = useSlotSelectionStore()
   const phImagesStore      = usePlaceholderImagesStore()
   const versionStore       = useVersionStore()
+  const animationStore     = useAnimationStore()
+  const skeletonStore      = useSkeletonStore()
+  const viewerStore        = useViewerStore()
 
-  /** A child spine is loaded by the session's runtime, so its skeleton must match the selected Spine version. */
+  /** A child spine runs on its own version's runtime; only a version of the other Pixi major is refused. */
   function childVersionProblem(fileSet: FileSet): string | null {
     const globalVersion = versionStore.spineVersion
     if (!globalVersion) return 'Select a Spine version before adding child spines'
@@ -222,8 +229,25 @@ export function usePlaceholderActions() {
     if (fileLoaderStore.spineSlots.length >= SPINE_SLOTS_LIMIT) return
     const srcSlot = fileLoaderStore.spineSlots.find(s => s.id === entry.childSlotId)
     if (!srcSlot?.fileSet) return
+    if (srcSlot.id === slotSelectionStore.activeSlotId) {
+      fileLoaderStore.saveSlotState(srcSlot.id, buildSlotSavedState({
+        playback:             animationStore,
+        activeSkins:          skeletonStore.activeSkins,
+        showPlaceholders:     viewerStore.showPlaceholders,
+        disabledPlaceholders: viewerStore.disabledPlaceholders,
+        slot:                 srcSlot,
+        trackTimes:           trackTimesOf(animationStore.tracks),
+      }))
+    }
     const newChildId = `slot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    fileLoaderStore.addSlot({ id: newChildId, name: entry.fileName, fileSet: srcSlot.fileSet, parentSlotId: slotId, syncEnabled: false })
+    fileLoaderStore.addSlot({
+      id: newChildId,
+      name: entry.fileName,
+      fileSet: srcSlot.fileSet,
+      parentSlotId: slotId,
+      syncEnabled: false,
+      savedState: srcSlot.savedState ? cloneSavedState(srcSlot.savedState) : undefined,
+    })
     phImagesStore.cloneSpineChild(slotId, phName, entry.imageId, newChildId)
   }
 

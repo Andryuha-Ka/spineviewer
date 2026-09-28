@@ -17,7 +17,7 @@ function newSlotId(): string {
 }
 
 // placeholderChildren is rebuilt by cloneSlot; it may hold FileSet ArrayBuffers that JSON cannot copy.
-function cloneSavedState(state: SpineSlotSavedState): SpineSlotSavedState {
+export function cloneSavedState(state: SpineSlotSavedState): SpineSlotSavedState {
   const rest = { ...state }
   delete rest.placeholderChildren
   return JSON.parse(JSON.stringify(rest))
@@ -147,7 +147,7 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
     spineSlots.value.splice(idx, 1)
     placeholderStore.clearSlotImages(id)
     if (selectionStore.activeSlotId === id) {
-      const next = spineSlots.value.find(s => !s.error)
+      const next = spineSlots.value.find(s => !s.parentSlotId && !s.error && !s.validationErrors?.length)
       selectionStore.activeSlotId = next?.id ?? null
     }
     // Unpin removed slot — only reassign if the slot was actually pinned to avoid

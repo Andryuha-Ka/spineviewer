@@ -8,8 +8,11 @@ export interface FakeSpineObject {
   scale: { value: number; set(v: number): void }
 }
 
+/** Animation names the fake skeleton has unless a test passes its own. */
+export const FAKE_ANIMATIONS = ['idle', 'run', 'stop', 'win', 'blink', 'wave', 'off', 'a', 'b', 'c', 'x', 'y']
+
 /** In-memory ISpineAdapter: records calls, keeps a track list and placeholder containers. */
-export function makeFakeAdapter(tracks: TrackState[] = []) {
+export function makeFakeAdapter(tracks: TrackState[] = [], animations: string[] = FAKE_ANIMATIONS) {
   const spineObj: FakeSpineObject = {
     x: 0, y: 0, zIndex: 0,
     scale: { value: 1, set(v: number) { this.value = v } },
@@ -23,7 +26,7 @@ export function makeFakeAdapter(tracks: TrackState[] = []) {
     return containers.get(ph)!
   }
   const adapter = {
-    animations: [] as string[],
+    animations: [...animations],
     skins: [] as string[],
     bones: [], slots: [], events: [],
     tracks,

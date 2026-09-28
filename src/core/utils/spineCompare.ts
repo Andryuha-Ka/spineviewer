@@ -24,19 +24,10 @@ export type SpineData = SpineJsonData | SpineRuntimeData
 
 // ── Output types ───────────────────────────────────────────────────────────────
 
-export interface PlaceholderParam {
-  key: string
-  valueA?: string
-  valueB?: string
-  changed: boolean
-  critical: boolean
-}
-
 export interface PlaceholderDiff {
   name: string
   kind: 'bone' | 'slot' | 'attachment'
-  status: 'added' | 'removed' | 'changed' | 'equal'
-  params: PlaceholderParam[]
+  status: 'added' | 'removed' | 'equal'
 }
 
 export interface DiffItem {
@@ -214,19 +205,15 @@ function getJsonConstraints(raw: AnyRecord, type: 'ik' | 'transform' | 'path'): 
 
 function getAnimationDuration(anim: AnyRecord): number {
   let max = 0
-  const checkFrames = (frames: unknown) => {
-    if (!Array.isArray(frames) || frames.length === 0) return
-    const last = frames[frames.length - 1]
-    if (last && typeof last.time === 'number' && last.time > max) max = last.time
+  const walk = (node: unknown) => {
+    if (Array.isArray(node)) {
+      const last = node[node.length - 1]
+      if (last && typeof last.time === 'number' && last.time > max) max = last.time
+    } else if (node && typeof node === 'object') {
+      for (const v of Object.values(node)) walk(v)
+    }
   }
-  for (const boneTimelines of Object.values(anim.bones ?? {})) {
-    for (const frames of Object.values(boneTimelines as AnyRecord)) checkFrames(frames)
-  }
-  for (const slotTimelines of Object.values(anim.slots ?? {})) {
-    for (const frames of Object.values(slotTimelines as AnyRecord)) checkFrames(frames)
-  }
-  checkFrames(anim.events)
-  checkFrames(anim.deform ? Object.values(anim.deform).flatMap(s => Object.values(s as AnyRecord).flatMap(a => Object.values(a as AnyRecord))) : [])
+  walk(anim)
   return Math.round(max * 1000) / 1000
 }
 
@@ -643,121 +630,43 @@ function compareEventsRuntime(adapterA: ISpineAdapter, adapterB: ISpineAdapter):
 
 // ── Placeholder extraction ─────────────────────────────────────────────────────
 
-interface RawBoneEntry  { name: string; parent?: string }
-interface RawSlotEntry  { name: string; bone: string; blend?: string }
-interface RawAttachment { slotName: string; name: string; blend?: string }
-
-function collectPlaceholderNames(data: SpineData): {
-  bones:       RawBoneEntry[]
-  slots:       RawSlotEntry[]
-  attachments: RawAttachment[]
-} {
-  const bones:       RawBoneEntry[]  = []
-  const slots:       RawSlotEntry[]  = []
-  const attachments: RawAttachment[] = []
-
-  if (data.source === 'json') {
-    const raw = data.raw as AnyRecord
-    for (const b of getJsonBones(raw)) {
-      if (PLACEHOLDER_RE.test(b.name)) bones.push({ name: b.name, parent: b.parent })
-    }
-    for (const s of getJsonSlots(raw)) {
-      if (PLACEHOLDER_RE.test(s.name)) slots.push({ name: s.name, bone: s.bone, blend: s.blend })
-    }
-    for (const skin of getJsonSkins(raw)) {
-      for (const [slotName, atts] of Object.entries((skin.attachments ?? {}) as AnyRecord)) {
-        for (const attName of Object.keys(atts as AnyRecord)) {
-          if (PLACEHOLDER_RE.test(attName)) {
-            const attData = (atts as AnyRecord)[attName] as AnyRecord
-            attachments.push({ slotName, name: attName, blend: attData?.blend })
-          }
-        }
-      }
-    }
-  } else {
-    for (const b of data.adapter.bones) {
-      if (PLACEHOLDER_RE.test(b.name)) bones.push({ name: b.name, parent: b.parent ?? undefined })
-    }
-    for (const s of data.adapter.slots) {
-      if (PLACEHOLDER_RE.test(s.name)) slots.push({ name: s.name, bone: s.bone, blend: blendName(s.blendMode) })
+function collectPlaceholderNames(data: SpineData): { bones: string[]; slots: string[]; attachments: string[] } {
+  const isPh = (n: string) => PLACEHOLDER_RE.test(n)
+  if (data.source !== 'json') {
+    return {
+      bones:       data.adapter.bones.map(b => b.name).filter(isPh),
+      slots:       data.adapter.slots.map(s => s.name).filter(isPh),
+      attachments: [],
     }
   }
-
-  return { bones, slots, attachments }
+  const raw = data.raw as AnyRecord
+  const attachments: string[] = []
+  for (const skin of getJsonSkins(raw)) {
+    for (const [slotName, atts] of Object.entries((skin.attachments ?? {}) as AnyRecord)) {
+      for (const attName of Object.keys(atts as AnyRecord)) {
+        if (isPh(attName)) attachments.push(`${slotName}::${attName}`)
+      }
+    }
+  }
+  return {
+    bones: getJsonBones(raw).map(b => b.name as string).filter(isPh),
+    slots: getJsonSlots(raw).map(s => s.name as string).filter(isPh),
+    attachments,
+  }
 }
 
 function extractPlaceholders(dataA: SpineData, dataB: SpineData): PlaceholderDiff[] {
   const pA = collectPlaceholderNames(dataA)
   const pB = collectPlaceholderNames(dataB)
   const result: PlaceholderDiff[] = []
-
-  // Bones
-  const boneNamesA = new Map(pA.bones.map(b => [b.name, b]))
-  const boneNamesB = new Map(pB.bones.map(b => [b.name, b]))
-  const allBoneNames = [...new Set([...boneNamesA.keys(), ...boneNamesB.keys()])]
-  for (const name of allBoneNames) {
-    const a = boneNamesA.get(name)
-    const b = boneNamesB.get(name)
-    if (!a) { result.push({ name, kind: 'bone', status: 'added', params: [] }); continue }
-    if (!b) { result.push({ name, kind: 'bone', status: 'removed', params: [] }); continue }
-    const params: PlaceholderParam[] = []
-    const parentChanged = a.parent !== b.parent
-    params.push({ key: 'parent', valueA: a.parent ?? '—', valueB: b.parent ?? '—', changed: parentChanged, critical: parentChanged })
-    const changed = params.some(p => p.changed)
-    result.push({ name, kind: 'bone', status: changed ? 'changed' : 'equal', params })
+  for (const kind of ['bone', 'slot', 'attachment'] as const) {
+    const a = new Set(pA[`${kind}s`])
+    const b = new Set(pB[`${kind}s`])
+    for (const key of new Set([...a, ...b])) {
+      const name = kind === 'attachment' ? key.slice(key.indexOf('::') + 2) : key
+      result.push({ name, kind, status: !a.has(key) ? 'added' : !b.has(key) ? 'removed' : 'equal' })
+    }
   }
-
-  // Slots
-  const slotNamesA = new Map(pA.slots.map(s => [s.name, s]))
-  const slotNamesB = new Map(pB.slots.map(s => [s.name, s]))
-  const slotOrderA = new Map((dataA.source === 'json' ? getJsonSlots(dataA.raw as AnyRecord) : dataA.adapter.slots).map((s, i) => [s.name as string, i]))
-  const slotOrderB = new Map((dataB.source === 'json' ? getJsonSlots(dataB.raw as AnyRecord) : dataB.adapter.slots).map((s, i) => [s.name as string, i]))
-  const allSlotNames = [...new Set([...slotNamesA.keys(), ...slotNamesB.keys()])]
-
-  for (const name of allSlotNames) {
-    const a = slotNamesA.get(name)
-    const b = slotNamesB.get(name)
-    if (!a) { result.push({ name, kind: 'slot', status: 'added', params: [] }); continue }
-    if (!b) { result.push({ name, kind: 'slot', status: 'removed', params: [] }); continue }
-
-    const params: PlaceholderParam[] = []
-    const boneChanged = a.bone !== b.bone
-    params.push({ key: 'bone', valueA: a.bone, valueB: b.bone, changed: boneChanged, critical: boneChanged })
-
-    const blA = blendName(a.blend ?? 'normal')
-    const blB = blendName(b.blend ?? 'normal')
-    const blendChanged = blA !== blB
-    params.push({ key: 'blend', valueA: blA, valueB: blB, changed: blendChanged, critical: blendChanged })
-
-    const oA = slotOrderA.get(name) ?? 0
-    const oB = slotOrderB.get(name) ?? 0
-    const orderShift = Math.abs(oA - oB)
-    const orderCritical = orderShift > 2
-    params.push({ key: 'drawOrder', valueA: String(oA), valueB: String(oB), changed: oA !== oB, critical: orderCritical })
-
-    const changed = params.some(p => p.changed)
-    result.push({ name, kind: 'slot', status: changed ? 'changed' : 'equal', params })
-  }
-
-  // Attachments
-  const attNamesA = new Map(pA.attachments.map(a => [`${a.slotName}::${a.name}`, a]))
-  const attNamesB = new Map(pB.attachments.map(a => [`${a.slotName}::${a.name}`, a]))
-  const allAttKeys = [...new Set([...attNamesA.keys(), ...attNamesB.keys()])]
-  for (const key of allAttKeys) {
-    const a = attNamesA.get(key)
-    const b = attNamesB.get(key)
-    const displayName = a?.name ?? b?.name ?? key
-    if (!a) { result.push({ name: displayName, kind: 'attachment', status: 'added', params: [] }); continue }
-    if (!b) { result.push({ name: displayName, kind: 'attachment', status: 'removed', params: [] }); continue }
-    const blA = blendName(a.blend ?? 'normal')
-    const blB = blendName(b.blend ?? 'normal')
-    const blendChanged = blA !== blB
-    const params: PlaceholderParam[] = [
-      { key: 'blend', valueA: blA, valueB: blB, changed: blendChanged, critical: blendChanged },
-    ]
-    result.push({ name: displayName, kind: 'attachment', status: blendChanged ? 'changed' : 'equal', params })
-  }
-
   return result
 }
 

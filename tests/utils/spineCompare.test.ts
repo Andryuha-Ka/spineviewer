@@ -45,3 +45,53 @@ describe('compareSpines (JSON)', () => {
     await expect(compareSpines(json(base), { source: 'runtime', adapter: {} as any })).rejects.toThrow()
   })
 })
+
+describe('compareSpines JSON duration', () => {
+  const durOf = async (anim: Record<string, unknown>) => {
+    const raw = { ...base, animations: { a: anim } }
+    const diff = await compareSpines(json(raw), json(raw))
+    return diff.animTable[0].durA
+  }
+  const frames = (t: number) => [{ time: 0 }, { time: t }]
+
+  it('counts every timeline type', async () => {
+    expect(await durOf({ drawOrder: frames(1.5) })).toBe(1.5)
+    expect(await durOf({ ik: { leg: frames(1.25) } })).toBe(1.25)
+    expect(await durOf({ physics: { hair: { wind: frames(1.75) } } })).toBe(1.75)
+    expect(await durOf({ deform: { default: { body: { body: frames(2.2) } } } })).toBe(2.2)
+    expect(await durOf({ attachments: { default: { body: { body: { deform: frames(2.3) } } } } })).toBe(2.3)
+    expect(await durOf({ attachments: { default: { body: { body: { sequence: frames(2.4) } } } } })).toBe(2.4)
+  })
+
+  it('takes a later draw-order key over earlier bone keys', async () => {
+    expect(await durOf({ bones: { body: { rotate: frames(1) } }, drawOrder: frames(2.5) })).toBe(2.5)
+  })
+})
+
+describe('compareSpines placeholders', () => {
+  it('compares by name only', async () => {
+    const a = structuredClone(base) as Record<string, unknown> & typeof base
+    a.bones.push({ name: 'placeholder_bone', parent: 'root' })
+    a.slots.push({ name: 'x', bone: 'root' } as never, { name: 'placeholder_hat', bone: 'root' } as never, { name: 'placeholder_bag', bone: 'root' } as never)
+    const b = structuredClone(base) as Record<string, unknown> & typeof base
+    b.bones.push({ name: 'placeholder_bone', parent: 'body' })
+    b.slots.push({ name: 'placeholder_hat', bone: 'body', blend: 'additive' } as never, { name: 'placeholder_cape', bone: 'root' } as never)
+    const diff = await compareSpines(json(a), json(b))
+
+    const byName = Object.fromEntries(diff.placeholders.map(p => [p.name, p]))
+    expect(byName.placeholder_bone).toEqual({ name: 'placeholder_bone', kind: 'bone', status: 'equal' })
+    expect(byName.placeholder_hat).toEqual({ name: 'placeholder_hat', kind: 'slot', status: 'equal' })
+    expect(byName.placeholder_bag.status).toBe('removed')
+    expect(byName.placeholder_cape.status).toBe('added')
+    expect(diff.placeholders.filter(p => p.status !== 'equal')).toHaveLength(2)
+  })
+
+  it('ignores attachment blend', async () => {
+    const withAtt = (blend: string) => ({
+      ...base,
+      skins: [{ name: 'default', attachments: { body: { placeholder_att: { blend } } } }],
+    })
+    const diff = await compareSpines(json(withAtt('normal')), json(withAtt('additive')))
+    expect(diff.placeholders).toEqual([{ name: 'placeholder_att', kind: 'attachment', status: 'equal' }])
+  })
+})

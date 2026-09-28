@@ -40,8 +40,8 @@
     </div>
 
     <!-- Error state -->
-    <div v-if="loadError" class="error-overlay">
-      <span class="error-text">{{ loadError }}</span>
+    <div v-if="compareStore.sourceError[side] ?? loadError" class="error-overlay">
+      <span class="error-text">{{ compareStore.sourceError[side] ?? loadError }}</span>
     </div>
 
     <!-- Bone crosshair highlight -->
@@ -382,7 +382,7 @@ async function loadFileSet(fileSet: FileSet) {
 
   try {
     if (!versionStore.pixiVersion || !versionStore.spineVersion) return
-    const newAdapter = await createSpineAdapter(versionStore.pixiVersion, versionStore.spineVersion)
+    const newAdapter = await createSpineAdapter(versionStore.pixiVersion, versionStore.spineVersion, fileSet)
     await newAdapter.load(fileSet)
     newAdapter.mount(pixiAppInst.stage)
     adapterInst   = newAdapter
@@ -646,8 +646,7 @@ async function onDrop(e: DragEvent) {
   if (!e.dataTransfer) return
   const files = Array.from(e.dataTransfer.files)
   if (files.length === 0) return
-  const { error } = await compareStore.loadDirect(props.side, files)
-  if (error) loadError.value = error
+  await compareStore.loadDirect(props.side, files)
 }
 </script>
 
@@ -705,7 +704,7 @@ async function onDrop(e: DragEvent) {
 }
 
 .loading-text { color: rgba(255,255,255,0.4); }
-.error-text   { color: #f87171; }
+.error-text   { color: #f87171; white-space: pre-line; text-align: center; }
 
 .overlay-tl {
   position: absolute;

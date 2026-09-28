@@ -65,8 +65,7 @@ export function usePanAndDrag(
   function getOverlayHoverTrackIndex() { return _overlayHoverTrackIndex }
 
   function onWheel(e: WheelEvent) {
-    const spineObj = getSpineObj()
-    if (!spineObj || !containerRef.value) return
+    if (!containerRef.value) return
     e.preventDefault()
 
     const rect = containerRef.value.getBoundingClientRect()

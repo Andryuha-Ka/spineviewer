@@ -278,9 +278,9 @@ export default class Spine42Adapter implements ISpineAdapter {
       name: b.data.name,
       x: b.worldX,
       y: -b.worldY,
-      rotation: b.arotation,
-      scaleX: b.ascaleX,
-      scaleY: b.ascaleY,
+      rotation: -b.getWorldRotationX(),
+      scaleX: b.getWorldScaleX(),
+      scaleY: b.getWorldScaleY(),
     }))
   }
 

@@ -68,6 +68,7 @@ export class Pixi7ProgressOverlay implements IProgressOverlay {
   private _stageW: number
   private _stageH: number
   private _currentTrackCount = 0
+  private _hasDC = false
   private _currentTracks: TrackDisplayState[] = []
   private _seekLockedTrackRowIndex = -1   // row index locked during drag
 
@@ -101,6 +102,7 @@ export class Pixi7ProgressOverlay implements IProgressOverlay {
     this._currentTracks = tracks
 
     const hasDC = dcBuckets.some(v => v !== null)
+    this._hasDC = hasDC
     const totalH = overlayTotalHeight(tracks.length, hasDC)
     const overlayTop = stageH - totalH
 
@@ -224,8 +226,7 @@ export class Pixi7ProgressOverlay implements IProgressOverlay {
   }
 
   handleSeekClick(localX: number, localY: number): { trackIndex: number; pct: number } | null {
-    const hasDC = true   // conservative: always treat DC zone as present for hit-test
-    const hit = hitTestOverlay(localX, localY, this._stageW, this._stageH, this._currentTrackCount, hasDC)
+    const hit = hitTestOverlay(localX, localY, this._stageW, this._stageH, this._currentTrackCount, this._hasDC)
     if (!hit.inOverlay || hit.trackRowIndex < 0) return null
     const track = this._currentTracks[hit.trackRowIndex]
     if (!track) return null

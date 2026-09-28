@@ -265,7 +265,7 @@ import HelpModal from '@/components/ui/HelpModal.vue'
 
 const emit = defineEmits<{
   open:           []
-  'open-compare': [payload: { left?: number; right?: number }]
+  'open-compare': [payload: { left?: string; right?: string }]
 }>()
 
 const appVersion = __APP_VERSION__

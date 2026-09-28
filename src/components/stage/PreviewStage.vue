@@ -266,15 +266,19 @@ const slotSwitch = useSlotSwitch({
 
 // ── Drain placeholder actions ──────────────────────────────────────────────────
 // While a child spine is active, onStage.adapter still belongs to its parent slot.
-function adapterForSlot(slotId: string): ISpineAdapter | null {
+function isOnStageSlot(slotId: string): boolean {
   const active = slotSelectionStore.activeSlot
-  if (slotId === active?.id || slotId === active?.parentSlotId) return onStage.adapter
-  return mountedAdapters.get(slotId) ?? null
+  return slotId === active?.id || slotId === active?.parentSlotId
+}
+
+function adapterForSlot(slotId: string): ISpineAdapter | null {
+  return mountedAdapters.get(slotId) ?? (isOnStageSlot(slotId) ? onStage.adapter : null)
 }
 
 async function drainPlaceholderActions() {
-  if (!onStage.adapter) return
-  const actions = placeholderImagesStore.drainActions()
+  // actions for the slot still loading on stage stay queued for the drain after the switch
+  const waiting = (id: string) => isOnStageSlot(id) && !adapterForSlot(id)
+  const actions = placeholderImagesStore.drainActions(a => waiting(a.slotId) || (a.type === 'move-child' && waiting(a.dstSlotId)))
   for (const action of actions) {
     if (action.type === 'reorder-child') {
       const adapter = adapterForSlot(action.slotId)
@@ -744,6 +748,7 @@ async function loadSpine(fileSet: FileSet, slotId?: string, resetViewport = true
     onStage.adapter = await createSpineAdapter(
       versionStore.pixiVersion!,
       versionStore.spineVersion!,
+      fileSet,
     )
     await onStage.adapter.load(fileSet)
 

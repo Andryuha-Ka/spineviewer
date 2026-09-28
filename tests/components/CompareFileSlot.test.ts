@@ -23,7 +23,7 @@ describe('CompareFileSlot (B4)', () => {
     expect(wrapper.findAll('.dropdown-item-name').map(n => n.text())).toEqual(['Y', 'Z'])
     await pick().trigger('click')
 
-    expect(useCompareStore().leftSlot).toMatchObject({ source: 'loaded', slotIndex: 2, label: 'Z' })
+    expect(useCompareStore().leftSlot).toMatchObject({ source: 'loaded', slotId: 'z', label: 'Z' })
 
     await wrapper.find('.slot-btn').trigger('click')
     expect(pick().classes()).toContain('dropdown-item--active')

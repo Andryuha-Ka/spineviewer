@@ -25,11 +25,11 @@
       <template v-if="fileLoaderStore.spineSlots.length > 0">
         <div class="dropdown-group-label">Loaded spines</div>
         <button
-          v-for="{ slot, index } in loadedOptions"
+          v-for="slot in loadedOptions"
           :key="slot.id"
           class="dropdown-item"
-          :class="{ 'dropdown-item--active': isActiveLoaded(index) }"
-          @click="selectLoaded(index, slot.name)"
+          :class="{ 'dropdown-item--active': isActiveLoaded(slot.id) }"
+          @click="selectLoaded(slot.id, slot.name)"
         >
           <span class="dropdown-item-name">{{ slot.name }}</span>
         </button>
@@ -83,7 +83,6 @@ const fileLoaderStore = useFileLoaderStore()
 
 const isOpen      = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
-const loadError    = ref<string | null>(null)
 
 const currentSlot = computed(() =>
   props.side === 'left' ? compareStore.leftSlot : compareStore.rightSlot,
@@ -94,22 +93,17 @@ const currentLabel = computed(() => {
   return currentSlot.value.label
 })
 
-// Real session index, so selection survives entries hidden by the error filter
-const loadedOptions = computed(() =>
-  fileLoaderStore.spineSlots
-    .map((slot, index) => ({ slot, index }))
-    .filter(o => !o.slot.error),
-)
+const loadedOptions = computed(() => fileLoaderStore.spineSlots.filter(s => !s.error))
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function isActiveLoaded(index: number): boolean {
+function isActiveLoaded(id: string): boolean {
   const slot = currentSlot.value
-  return slot?.source === 'loaded' && slot.slotIndex === index
+  return slot?.source === 'loaded' && slot.slotId === id
 }
 
-function selectLoaded(index: number, name: string) {
-  const slotRef: SpineSlotRef = { source: 'loaded', slotIndex: index, label: name }
+function selectLoaded(id: string, name: string) {
+  const slotRef: SpineSlotRef = { source: 'loaded', slotId: id, label: name }
   if (props.side === 'left') compareStore.setLeft(slotRef)
   else compareStore.setRight(slotRef)
   isOpen.value = false
@@ -131,9 +125,7 @@ async function onFileInput(e: Event) {
   if (!input.files || input.files.length === 0) return
   const files = Array.from(input.files)
   input.value = ''
-  loadError.value = null
-  const { error } = await compareStore.loadDirect(props.side, files)
-  if (error) loadError.value = error
+  await compareStore.loadDirect(props.side, files)
 }
 
 // ── Click-outside directive (simple) ──────────────────────────────────────────

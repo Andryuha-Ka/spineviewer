@@ -6,6 +6,8 @@ import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import { useVersionStore } from '@/core/stores/useVersionStore'
+import { useAnimationStore } from '@/core/stores/useAnimationStore'
+import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import type { FileSet, PHChildEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 
 // binary skeleton header: hash, then the editor version string
@@ -68,12 +70,21 @@ describe('usePlaceholderActions', () => {
       expect(loader.spineSlots.find(s => s.id === 'b')?.parentSlotId).toBe('a')
     })
 
-    it('refuses a spine the session runtime cannot load (3.8 skeleton in a 4.1 session)', async () => {
+    it('adds a 3.8 child in a 4.1 session (C37)', async () => {
       const loader = useFileLoaderStore()
       const old: FileSet = { ...FILESET, skeleton: { ...FILESET.skeleton, filename: 'anticipationEffect.skel', fileBody: skel('3.8.99') } }
       loader.setSlots([slot('a'), slot('b', { fileSet: old })], '4.1')
       await usePlaceholderActions().moveSlotIntoPlaceholder('b', 'a', 'placeholder_1')
-      expect(window.alert).toHaveBeenCalledWith('Spine version mismatch: anticipationEffect.skel is 3.8, viewer is set to 4.1')
+      expect(window.alert).not.toHaveBeenCalled()
+      expect(loader.spineSlots.find(s => s.id === 'b')?.parentSlotId).toBe('a')
+    })
+
+    it('refuses a spine that needs the other Pixi version (4.2 skeleton in a 4.1 session)', async () => {
+      const loader = useFileLoaderStore()
+      const v42: FileSet = { ...FILESET, skeleton: { ...FILESET.skeleton, filename: 'new.skel', fileBody: skel('4.2.40') } }
+      loader.setSlots([slot('a'), slot('b', { fileSet: v42 })], '4.1')
+      await usePlaceholderActions().moveSlotIntoPlaceholder('b', 'a', 'placeholder_1')
+      expect(window.alert).toHaveBeenCalledWith('Spine version mismatch: new.skel is 4.2, viewer is set to 4.1')
       expect(loader.spineSlots.find(s => s.id === 'b')?.parentSlotId).toBeUndefined()
       expect(usePlaceholderImagesStore().getPlaceholderSpineEntries('a', 'placeholder_1')).toEqual([])
     })
@@ -173,6 +184,36 @@ describe('usePlaceholderActions', () => {
       expect(entries).toHaveLength(2)
       const clone = loader.spineSlots.find(s => s.id === entries[1].childSlotId)!
       expect(clone).toMatchObject({ parentSlotId: 'a', syncEnabled: false })
+    })
+
+    it('clones an inactive child with a separate copy of its saved state (B14)', () => {
+      const loader = useFileLoaderStore()
+      const ph = usePlaceholderImagesStore()
+      const src = { ...saved(), selectedSkins: ['gold'], placeholderChildren: { p: [image('i1')] } }
+      loader.setSlots([slot('a'), slot('kid', { parentSlotId: 'a', savedState: src })], '4.2')
+      ph.setSlotImages('a', { p: [spine('e1', 'kid')] })
+      usePlaceholderActions().cloneSpineChild('a', 'p', ph.getPlaceholderSpineEntries('a', 'p')[0])
+      const cloneId = ph.getPlaceholderSpineEntries('a', 'p')[1].childSlotId
+      const clone = loader.spineSlots.find(s => s.id === cloneId)!
+      expect(clone).toMatchObject({ syncEnabled: false, indPosX: 0, indPosY: 0 })
+      expect(clone.savedState).toMatchObject({ trackPlaylists: src.trackPlaylists, selectedSkins: ['gold'] })
+      expect(clone.savedState!.placeholderChildren).toBeUndefined()
+      expect(clone.savedState).not.toBe(src)
+      expect(clone.savedState!.trackPlaylists).not.toBe(src.trackPlaylists)
+    })
+
+    it('captures live track times of an active child before cloning it (B14)', () => {
+      const loader = useFileLoaderStore()
+      const ph = usePlaceholderImagesStore()
+      loader.setSlots([slot('a'), slot('kid', { parentSlotId: 'a' })], '4.2')
+      ph.setSlotImages('a', { p: [spine('e1', 'kid')] })
+      useSlotSelectionStore().activeSlotId = 'kid'
+      useAnimationStore().tracks = [{ trackIndex: 0, animationName: 'run', time: 1.25, duration: 2, loop: true, timeScale: 1, queue: [] }]
+      useSkeletonStore().activeSkins = ['blue']
+      usePlaceholderActions().cloneSpineChild('a', 'p', ph.getPlaceholderSpineEntries('a', 'p')[0])
+      expect(loader.spineSlots.find(s => s.id === 'kid')!.savedState).toMatchObject({ trackTimes: { 0: 1.25 }, selectedSkins: ['blue'] })
+      const cloneId = ph.getPlaceholderSpineEntries('a', 'p')[1].childSlotId
+      expect(loader.spineSlots.find(s => s.id === cloneId)!.savedState).toMatchObject({ trackTimes: { 0: 1.25 }, selectedSkins: ['blue'] })
     })
 
     it('toggles sync on both the entry and the child slot', () => {

@@ -9,7 +9,7 @@
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useVersionStore, type SpineVersion } from '@/core/stores/useVersionStore'
 import { groupSpineFiles, getFilesFromDataTransfer } from '@/core/utils/fileLoader'
-import { detectSpineVersion, detectSpineVersionFromSkel } from '@/core/utils/versionDetector'
+import { detectSpineVersion, detectSpineVersionFromSkel, spineVersionProblem } from '@/core/utils/versionDetector'
 import { validateSpineFileSet } from '@/core/utils/spineValidator'
 import {
   saveSession,
@@ -21,7 +21,7 @@ import type { SpineFileType } from '@/core/types/FileSet'
 
 type EmitFn = {
   (event: 'open'): void
-  (event: 'open-compare', payload: { left?: number; right?: number }): void
+  (event: 'open-compare', payload: { left?: string; right?: string }): void
 }
 
 export const TYPE_LABELS: Record<SpineFileType, string> = {
@@ -86,9 +86,12 @@ export function useFilePickerLogic(emit: EmitFn, onHistorySaved?: () => void) {
         : detectSpineVersionFromSkel(skeleton.fileBody as ArrayBuffer)
     }
 
+    const runtimeVersion = version && ['3.8', '4.0', '4.1', '4.2'].includes(version) ? version : null
     for (const slot of result.slots) {
       if (slot.fileSet) {
         const errs = validateSpineFileSet(slot.fileSet)
+        const versionProblem = runtimeVersion && spineVersionProblem(slot.fileSet, runtimeVersion)
+        if (versionProblem) errs.push(versionProblem)
         if (errs.length > 0) slot.validationErrors = errs
       }
     }
@@ -172,13 +175,11 @@ export function useFilePickerLogic(emit: EmitFn, onHistorySaved?: () => void) {
   }
 
   function onOpenCompare(): void {
-    const slots = fileLoaderStore.spineSlots
-      .map((s, i) => ({ s, i }))
-      .filter(({ s }) => !s.error && !(s.validationErrors?.length))
+    const slots = fileLoaderStore.spineSlots.filter(s => !s.error && !(s.validationErrors?.length))
     if (slots.length >= 2) {
-      emit('open-compare', { left: slots[0].i, right: slots[1].i })
+      emit('open-compare', { left: slots[0].id, right: slots[1].id })
     } else if (slots.length === 1) {
-      emit('open-compare', { left: slots[0].i })
+      emit('open-compare', { left: slots[0].id })
     } else {
       emit('open-compare', {})
     }
