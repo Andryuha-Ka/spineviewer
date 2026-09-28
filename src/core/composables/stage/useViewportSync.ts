@@ -10,7 +10,6 @@ import type { ISpineAdapter } from '@/core/types/ISpineAdapter'
 import type { PixiSpriteObject } from '@/core/types/PixiSpriteObject'
 import { useViewerStore } from '@/core/stores/useViewerStore'
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
-import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useInspectorStore } from '@/core/stores/useInspectorStore'
 import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
@@ -21,19 +20,16 @@ import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
  * position/zIndex directly onto Pixi display objects.
  *
  * @param mountedSpineObjects - shared Map keyed by slotId; mutated in-place by applyViewport
- * @param getBgSprite         - returns current background sprite (or null)
  * @param getLayerSprites     - image layer sprites keyed by layer id
  * @param getUiAdapter        - returns the active UI adapter (child or main)
  */
 export function useViewportSync(
   mountedSpineObjects: Map<string, PixiSpriteObject>,
-  getBgSprite: () => PixiSpriteObject | null,
   getLayerSprites: () => Map<string, PixiSpriteObject>,
   getUiAdapter: () => ISpineAdapter | null,
 ) {
   const viewerStore    = useViewerStore()
   const fileLoaderStore = useFileLoaderStore()
-  const backgroundStore = useBackgroundStore()
   const skeletonStore  = useSkeletonStore()
   const inspectorStore = useInspectorStore()
   const layersStore    = useImageLayersStore()
@@ -74,22 +70,16 @@ export function useViewportSync(
       obj.y = y + (slot?.indPosY ?? 0) * z
       obj.scale.set(z * (slot?.indZoom ?? 1))
     }
-    const bgSprite = getBgSprite()
-    if (bgSprite) {
-      if (backgroundStore.syncEnabled) {
-        bgSprite.x = x + backgroundStore.posX * z
-        bgSprite.y = y + backgroundStore.posY * z
-        bgSprite.scale.set(z * backgroundStore.zoom)
-      } else {
-        bgSprite.x = baseX.value + backgroundStore.posX
-        bgSprite.y = baseY.value + backgroundStore.posY
-        bgSprite.scale.set(backgroundStore.zoom)
-      }
-    }
     const layerSprites = getLayerSprites()
     for (const l of layersStore.layers) {
       const sprite = layerSprites.get(l.id)
       if (!sprite) continue
+      if (l.background && !l.syncEnabled) {
+        sprite.x = baseX.value + l.posX
+        sprite.y = baseY.value + l.posY
+        sprite.scale.set(l.scale)
+        continue
+      }
       sprite.x = x + l.posX * z
       sprite.y = y + l.posY * z
       sprite.scale.set(z * l.scale)
@@ -97,13 +87,11 @@ export function useViewportSync(
   }
 
   function syncZOrder(): void {
-    const rows = layersStore.stackRows
+    const rows = layersStore.rows
     const n = rows.length
     const layerSprites = getLayerSprites()
     rows.forEach((row, i) => {
-      const obj = row.kind === 'bg' ? getBgSprite()
-        : row.kind === 'layer' ? layerSprites.get(row.id)
-        : mountedSpineObjects.get(row.id)
+      const obj = row.kind === 'layer' ? layerSprites.get(row.id) : mountedSpineObjects.get(row.id)
       if (obj) obj.zIndex = n - i
     })
   }

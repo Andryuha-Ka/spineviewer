@@ -197,7 +197,7 @@ describe('useChildAdapters', () => {
     expect(children.childAdapterMeta.get('e1')).toMatchObject({ parentSlotId: 'other', phName: 'placeholder_2' })
   })
 
-  it('orderPlaceholderChildren sets zIndex = list index for images and child spines (D2)', async () => {
+  it('orderPlaceholderChildren gives the top row the highest zIndex (D1)', async () => {
     const children = useChildAdapters()
     const parent = makeFakeAdapter()
     usePlaceholderImagesStore().setSlotImages('parent', { p: [image('img1'), entry('e1', 'child'), image('img2')] })
@@ -206,7 +206,7 @@ describe('useChildAdapters', () => {
     parent.setImageZIndex.mockClear()
 
     children.orderPlaceholderChildren(parent, 'parent', 'p')
-    expect(parent.setImageZIndex.mock.calls).toEqual([['img1', 0], ['img2', 2]])
+    expect(parent.setImageZIndex.mock.calls).toEqual([['img1', 2], ['img2', 0]])
     expect(created[0].spineObj.zIndex).toBe(1)
   })
 
@@ -216,13 +216,13 @@ describe('useChildAdapters', () => {
     expect(created[0].spineObj.zIndex).toBe(1)
   })
 
-  it('a child moved into a placeholder holding two images gets zIndex 2', async () => {
+  it('a child moved last into a placeholder holding two images gets zIndex 0', async () => {
     const children = useChildAdapters()
     await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
     usePlaceholderImagesStore().setSlotImages('other', { q: [image('img1'), image('img2'), entry('e1', 'child')] })
     const dst = makeFakeAdapter()
     children.moveChildAdapter('e1', dst, 'other', 'q')
-    expect(created[0].spineObj.zIndex).toBe(2)
-    expect(dst.setImageZIndex.mock.calls).toEqual([['img1', 0], ['img2', 1]])
+    expect(created[0].spineObj.zIndex).toBe(0)
+    expect(dst.setImageZIndex.mock.calls).toEqual([['img1', 2], ['img2', 1]])
   })
 })

@@ -116,7 +116,6 @@ import { useProfilerStore }   from '@/core/stores/useProfilerStore'
 import { useComplexityStore } from '@/core/stores/useComplexityStore'
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
-import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 import { useChildAdapters } from '@/core/composables/stage/useChildAdapters'
@@ -146,12 +145,10 @@ const profilerStore   = useProfilerStore()
 const complexityStore = useComplexityStore()
 const fileLoaderStore         = useFileLoaderStore()
 const slotSelectionStore      = useSlotSelectionStore()
-const backgroundStore         = useBackgroundStore()
 const placeholderImagesStore  = usePlaceholderImagesStore()
 const layersStore             = useImageLayersStore()
 
 // ── Mutable adapter/state references ─────────────────────────────────────────
-let bgSprite: PixiSpriteObject | null = null
 const layerSprites = new Map<string, PixiSpriteObject>()
 let pixiApp: IPixiApp | null = null
 // the active top-level slot on stage (the parent while a child spine is active)
@@ -207,7 +204,7 @@ const seekDrag = useSeekDrag(
   () => {},
 )
 
-const viewport = useViewportSync(mountedSpineObjects, () => bgSprite, () => layerSprites, _uiAdapter)
+const viewport = useViewportSync(mountedSpineObjects, () => layerSprites, _uiAdapter)
 const { baseX, baseY, originScreenX, originScreenY, selectedBonePos, selectedSlotRect, applyViewport, syncZOrder, updateSelectedSlotRect } = viewport
 
 const panDrag = usePanAndDrag(
@@ -498,51 +495,6 @@ onMounted(async () => {
     )
 
     watchStage(
-      () => backgroundStore.image,
-      (img) => {
-        if (bgSprite) {
-          pixiApp!.removeFromStage(bgSprite)
-          bgSprite.destroy?.({ texture: true })
-          bgSprite = null
-        }
-        if (img) {
-          bgSprite = pixiApp!.createSprite(img.dataUrl) as PixiSpriteObject
-          pixiApp!.addToStage(bgSprite)
-          applyViewport()
-          syncZOrder()
-        }
-      },
-    )
-
-    watchStage(
-      () => backgroundStore.syncEnabled,
-      (newSync, oldSync) => {
-        if (oldSync !== undefined && newSync !== oldSync) {
-          if (oldSync && !newSync) {
-            backgroundStore.setTransform(
-              viewerStore.posX + backgroundStore.posX * viewerStore.zoom,
-              viewerStore.posY + backgroundStore.posY * viewerStore.zoom,
-              viewerStore.zoom * backgroundStore.zoom,
-            )
-          } else if (!oldSync && newSync) {
-            const z = viewerStore.zoom > 0 ? viewerStore.zoom : 1
-            backgroundStore.setTransform(
-              (backgroundStore.posX - viewerStore.posX) / z,
-              (backgroundStore.posY - viewerStore.posY) / z,
-              backgroundStore.zoom / z,
-            )
-          }
-        }
-        applyViewport()
-      },
-    )
-
-    watchStage(
-      () => [backgroundStore.posX, backgroundStore.posY, backgroundStore.zoom],
-      () => { if (bgSprite) applyViewport() },
-    )
-
-    watchStage(
       () => layersStore.layers.map(l => l.id).join(),
       () => {
         const ids = new Set(layersStore.layers.map(l => l.id))
@@ -564,7 +516,7 @@ onMounted(async () => {
     )
 
     watchStage(
-      () => layersStore.layers.map(l => [l.posX, l.posY, l.scale]),
+      () => layersStore.layers.map(l => [l.posX, l.posY, l.scale, l.background, l.syncEnabled]),
       () => applyViewport(),
     )
 
@@ -674,7 +626,7 @@ onMounted(async () => {
     slotSwitch.start(watchStage)
 
     watchStage(
-      () => layersStore.stackRows.map(r => r.kind === 'bg' ? 'bg' : r.id).join(),
+      () => layersStore.rows.map(r => r.id).join(),
       () => syncZOrder(),
     )
 
@@ -696,11 +648,6 @@ onUnmounted(() => {
   containerRef.value?.removeEventListener('wheel', onWheel)
   seekDrag.cleanup()
   onStage.obj = null
-  if (bgSprite) {
-    bgSprite.destroy?.({ texture: true })
-    bgSprite = null
-  }
-  backgroundStore.clearAll()
   for (const sprite of layerSprites.values()) sprite.destroy?.({ texture: true })
   layerSprites.clear()
   layersStore.clear()

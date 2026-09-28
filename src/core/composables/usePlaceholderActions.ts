@@ -184,7 +184,7 @@ export function usePlaceholderActions() {
   /** Turns an image layer into the last image of a placeholder. */
   function demoteLayer(layerId: string, dstSlotId: string, phName: string): void {
     const layer = layersStore.layers.find(l => l.id === layerId)
-    if (!layer) return
+    if (!layer || layer.background) return
     phImagesStore.addImageData(dstSlotId, phName, { fileName: layer.name, dataURL: layer.dataUrl, scale: layer.scale })
     layersStore.removeLayer(layerId)
     activateDestination(dstSlotId)
@@ -220,7 +220,6 @@ export function usePlaceholderActions() {
       slotSelectionStore.setActiveSlot(dstSlotId)
       await nextTick()
     }
-    layersStore.detachTopLevel(slotId)
     slot.parentSlotId = dstSlotId
     slot.syncEnabled  = true
     slot.indPosX      = 0

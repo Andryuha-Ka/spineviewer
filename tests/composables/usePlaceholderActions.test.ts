@@ -9,7 +9,6 @@ import { useVersionStore } from '@/core/stores/useVersionStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
-import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
 import type { FileSet, PHChildEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 
 // binary skeleton header: hash, then the editor version string
@@ -229,15 +228,6 @@ describe('usePlaceholderActions', () => {
     })
   })
 
-  it('moveSlotIntoPlaceholder decrements listIndex for a skeleton above the background', async () => {
-    useFileLoaderStore().setSlots([slot('a'), slot('b'), slot('c')], '4.2')
-    const bg = useBackgroundStore()
-    bg.set({ dataUrl: 'data:bg', width: 1, height: 1 })
-    bg.setListIndex(2)
-    await usePlaceholderActions().moveSlotIntoPlaceholder('a', 'c', 'p')
-    expect(bg.listIndex).toBe(1)
-  })
-
   it('reorders a mixed placeholder across kinds (A1)', async () => {
     const loader = useFileLoaderStore()
     const ph = usePlaceholderImagesStore()
@@ -307,6 +297,19 @@ describe('usePlaceholderActions', () => {
       expect(ph.peekActions()).toContainEqual({ type: 'add', slotId: 'b', phName: 'q', imageId: entry.imageId, dataURL: 'data:l' })
       expect(layers.layers).toEqual([])
       expect(sel.activeSlotId).toBe('b')
+    })
+
+    it('demoteLayer ignores the background layer', () => {
+      const ph = usePlaceholderImagesStore()
+      const layers = useImageLayersStore()
+      useFileLoaderStore().setSlots([slot('a'), slot('b')], '4.2')
+      const id = layers.addLayer({ name: 'bg.png', dataUrl: 'data:bg', scale: 1, background: true })
+
+      usePlaceholderActions().demoteLayer(id, 'b', 'q')
+
+      expect(layers.layers.map(l => l.id)).toEqual([id])
+      expect(ph.getPlaceholderImages('b', 'q')).toEqual([])
+      expect(ph.peekActions().some(a => a.type === 'add')).toBe(false)
     })
 
     it('demoteLayer does not activate a pinned destination', () => {

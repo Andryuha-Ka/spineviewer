@@ -163,6 +163,15 @@ describe('useSlotSwitch', () => {
     expect(hs.slotSwitch.takePendingSeekTimes()).toBeNull()
   })
 
+  it('restore orders placeholder images with the top row in front (D1)', async () => {
+    await loadA()
+    usePlaceholderImagesStore().setSlotImages('b', { p: [image('i1'), image('i2')] })
+
+    await activate('b')
+    const b = hs.loaded[0].adapter
+    expect(b.setImageZIndex.mock.calls).toEqual([['i1', 1], ['i2', 0]])
+  })
+
   it('parks a pinned slot and reuses it without reloading (5a)', async () => {
     const a = await loadA()
     useSlotSelectionStore().setPinned('a', true)

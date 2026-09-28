@@ -98,6 +98,7 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
         adapter.addImageToPlaceholder(phName, entry.dataURL, entry.imageId)
         adapter.setImageTransform(entry.imageId, entry.posX ?? 0, entry.posY ?? 0, entry.scale ?? 1)
       }
+      children.orderPlaceholderChildren(adapter, slotId, phName)
     }
   }
 

@@ -37,7 +37,7 @@
       <n-button
         size="small"
         class="compare-toolbar-btn"
-        @click="emit('open-compare', { left: slotSelectionStore.activeSlotId ?? undefined })"
+        @click="emit('open-compare', { left: slotSelectionStore.activeSlot?.parentSlotId ?? slotSelectionStore.activeSlotId ?? undefined })"
         title="Open Compare mode"
       >⇄ Compare</n-button>
       <SettingsPopover />
@@ -134,7 +134,7 @@ import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { useSlotUIStore } from '@/core/stores/useSlotUIStore'
 import { useExportStore } from '@/core/stores/useExportStore'
-import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
+import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 import { groupSpineFiles, readFileAsDataURL } from '@/core/utils/fileLoader'
 import { validateSpineFileSet } from '@/core/utils/spineValidator'
 import { runtimeSpineVersion, spineVersionProblem } from '@/core/utils/versionDetector'
@@ -151,7 +151,7 @@ const fileLoaderStore    = useFileLoaderStore()
 const slotSelectionStore = useSlotSelectionStore()
 const slotUIStore        = useSlotUIStore()
 const exportStore      = useExportStore()
-const backgroundStore  = useBackgroundStore()
+const layersStore      = useImageLayersStore()
 const stageRef         = ref<InstanceType<typeof PreviewStage> | null>(null)
 const activeSpineVersion = computed(() => {
   const fileSet = slotSelectionStore.activeSlot?.fileSet
@@ -159,12 +159,6 @@ const activeSpineVersion = computed(() => {
   return fileSet && pixi && selected ? runtimeSpineVersion(fileSet, pixi, selected) : selected
 })
 const activeTab        = ref<'spines' | 'animation' | 'inspector' | 'bones' | 'atlas' | 'perf' | 'compl' | 'export'>('animation')
-
-// Auto-switch to Spines tab when background is first loaded
-watch(
-  () => backgroundStore.isLoaded,
-  (loaded) => { if (loaded) activeTab.value = 'spines' },
-)
 
 // Auto-pin active slot when it gets its first animation track and globalPinEnabled is on.
 // Lives here (not SpinesPanel) so it stays active even when Spines tab is not open.
@@ -185,7 +179,6 @@ function onClickBack() {
   animationStore.reset()
   fileLoaderStore.clear()
   exportStore.finish()
-  backgroundStore.clearAll()
   emit('back')
 }
 
@@ -201,15 +194,8 @@ async function onCanvasDrop(e: DragEvent) {
   if (!hasSpine && hasImages) {
     const imgFile = files.find(f => imageExts.test(f.name))!
     const dataUrl = await readFileAsDataURL(imgFile)
-    const img = new Image()
-    img.src = dataUrl
-    await new Promise<void>(r => { img.onload = () => r() })
-    if (backgroundStore.isLoaded) {
-      const ok = window.confirm('Replace current background image?')
-      if (!ok) return
-    }
-    backgroundStore.set({ dataUrl, width: img.naturalWidth, height: img.naturalHeight })
-    backgroundStore.setListIndex(fileLoaderStore.spineSlots.length)
+    layersStore.addLayer({ name: imgFile.name, dataUrl, scale: 1, background: true })
+    activeTab.value = 'spines'
     return
   }
 

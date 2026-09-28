@@ -8,7 +8,7 @@
 
 import { defineStore } from 'pinia'
 import { useFileLoaderStore } from './useFileLoaderStore'
-import { useBackgroundStore } from './useBackgroundStore'
+import { useViewerStore } from './useViewerStore'
 import { usePlaceholderImagesStore } from './usePlaceholderImagesStore'
 
 export interface ImageLayer {
@@ -19,6 +19,7 @@ export interface ImageLayer {
   posY: number
   scale: number
   syncEnabled: boolean
+  background: boolean
 }
 
 export interface LayerRow {
@@ -26,15 +27,13 @@ export interface LayerRow {
   id: string
 }
 
-export type StackRow = LayerRow | { kind: 'bg' }
-
 export const useImageLayersStore = defineStore('image-layers', () => {
   const layers = ref<ImageLayer[]>([])
   const rowOrder = ref<string[]>([])
   const activeLayerId = ref<string | null>(null)
 
   const fileLoaderStore = useFileLoaderStore()
-  const backgroundStore = useBackgroundStore()
+  const viewerStore = useViewerStore()
   const placeholderImagesStore = usePlaceholderImagesStore()
 
   // ── Query ─────────────────────────────────────────────────────────────────────
@@ -49,33 +48,49 @@ export const useImageLayersStore = defineStore('image-layers', () => {
     }
     const placed = new Set(result.map(r => r.id))
     for (const id of slotIds) if (!placed.has(id)) result.push({ kind: 'slot', id })
+    const bg = result.findIndex(r => r.kind === 'layer' && findLayer(r.id)?.background)
+    if (bg >= 0) result.push(...result.splice(bg, 1))
     return result
   })
-
-  const stackRows = computed<StackRow[]>(() => {
-    const result: StackRow[] = [...rows.value]
-    if (!backgroundStore.isLoaded) return result
-    let slotIdx = 0
-    const at = result.findIndex(r => r.kind === 'slot' && slotIdx++ === backgroundStore.listIndex)
-    result.splice(at < 0 ? result.length : at, 0, { kind: 'bg' })
-    return result
-  })
-
-  function slotIndex(list: LayerRow[], id: string): number {
-    return list.filter(r => r.kind === 'slot').findIndex(r => r.id === id)
-  }
 
   function findLayer(id: string): ImageLayer | undefined {
     return layers.value.find(l => l.id === id)
   }
 
   // ── Mutation ──────────────────────────────────────────────────────────────────
-  function addLayer(src: { name: string; dataUrl: string; scale: number }): string {
+  const isScreen = (l: ImageLayer) => l.background && !l.syncEnabled
+
+  function setFlags(l: ImageLayer, background: boolean, sync: boolean): void {
+    const was = isScreen(l)
+    l.background = background
+    l.syncEnabled = sync
+    const now = isScreen(l)
+    if (was === now) return
+    const { posX, posY, zoom } = viewerStore
+    if (now) {
+      l.posX = posX + l.posX * zoom
+      l.posY = posY + l.posY * zoom
+      l.scale = zoom * l.scale
+    } else {
+      const z = zoom > 0 ? zoom : 1
+      l.posX = (l.posX - posX) / z
+      l.posY = (l.posY - posY) / z
+      l.scale = l.scale / z
+    }
+  }
+
+  function addLayer(src: { name: string; dataUrl: string; scale: number; background?: boolean }): string {
     const id = crypto.randomUUID()
     const keys = rows.value.map(r => r.id)
-    layers.value.push({ id, name: src.name, dataUrl: src.dataUrl, posX: 0, posY: 0, scale: src.scale, syncEnabled: true })
+    layers.value.push({ id, name: src.name, dataUrl: src.dataUrl, posX: 0, posY: 0, scale: src.scale, syncEnabled: true, background: false })
     rowOrder.value = [...keys, id]
+    if (src.background) setBackground(id)
     return id
+  }
+
+  function setBackground(id: string | null): void {
+    rowOrder.value = rows.value.map(r => r.id)
+    for (const l of layers.value) setFlags(l, l.id === id, l.syncEnabled)
   }
 
   function removeLayer(id: string): void {
@@ -93,27 +108,25 @@ export const useImageLayersStore = defineStore('image-layers', () => {
 
   function setSync(id: string, v: boolean): void {
     const layer = findLayer(id)
-    if (layer) layer.syncEnabled = v
+    if (layer) setFlags(layer, layer.background, v)
   }
 
   function setAllSync(v: boolean): void {
-    for (const l of layers.value) l.syncEnabled = v
+    for (const l of layers.value) if (!l.background) l.syncEnabled = v
   }
 
   function setActive(id: string | null): void {
     activeLayerId.value = id
     if (id === null) return
-    backgroundStore.setActive(false)
     placeholderImagesStore.setActiveImage(null)
   }
 
   function deactivateItems(): void {
-    backgroundStore.setActive(false)
     activeLayerId.value = null
   }
 
   function placeRow(key: string, targetKey: string, where: 'before' | 'after'): void {
-    if (key === targetKey) return
+    if (key === targetKey || findLayer(key)?.background) return
     const before = rows.value
     const moved = before.find(r => r.id === key)
     if (!moved) return
@@ -123,18 +136,6 @@ export const useImageLayersStore = defineStore('image-layers', () => {
     next.splice(where === 'before' ? t : t + 1, 0, moved)
     rowOrder.value = next.map(r => r.id)
     fileLoaderStore.setTopLevelOrder(next.filter(r => r.kind === 'slot').map(r => r.id))
-    if (moved.kind !== 'slot' || !backgroundStore.isLoaded) return
-    const bg = backgroundStore.listIndex
-    const srcTop = slotIndex(before, key)
-    const dstTop = slotIndex(next, key)
-    if (srcTop < bg && bg <= dstTop) backgroundStore.setListIndex(bg - 1)
-    else if (dstTop < bg && bg <= srcTop) backgroundStore.setListIndex(bg + 1)
-  }
-
-  function detachTopLevel(slotId: string): void {
-    if (!backgroundStore.isLoaded) return
-    const srcTop = slotIndex(rows.value, slotId)
-    if (srcTop >= 0 && srcTop < backgroundStore.listIndex) backgroundStore.setListIndex(backgroundStore.listIndex - 1)
   }
 
   function clear(): void {
@@ -149,9 +150,9 @@ export const useImageLayersStore = defineStore('image-layers', () => {
     activeLayerId,
     // Query
     rows,
-    stackRows,
     // Mutation
     addLayer,
+    setBackground,
     removeLayer,
     setTransform,
     setSync,
@@ -159,7 +160,6 @@ export const useImageLayersStore = defineStore('image-layers', () => {
     setActive,
     deactivateItems,
     placeRow,
-    detachTopLevel,
     clear,
   }
 })

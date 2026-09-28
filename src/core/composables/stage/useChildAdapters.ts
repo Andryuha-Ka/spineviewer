@@ -144,12 +144,14 @@ export function useChildAdapters() {
 
   /** zIndex of every image and child spine in a placeholder = its list index. */
   function orderPlaceholderChildren(parentAdapter: ISpineAdapter, slotId: string, phName: string): void {
-    placeholderImagesStore.getPlaceholderImages(slotId, phName).forEach((e, i) => {
-      if (e.kind === 'image') parentAdapter.setImageZIndex(e.imageId, i)
+    const list = placeholderImagesStore.getPlaceholderImages(slotId, phName)
+    list.forEach((e, i) => {
+      const z = list.length - 1 - i
+      if (e.kind === 'image') parentAdapter.setImageZIndex(e.imageId, z)
       else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const obj = childAdapters.get(e.imageId)?.getSpineObject() as any
-        if (obj) obj.zIndex = i
+        if (obj) obj.zIndex = z
       }
     })
   }

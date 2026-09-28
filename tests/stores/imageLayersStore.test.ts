@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
-import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
+import { useViewerStore } from '@/core/stores/useViewerStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import type { SpineSlot } from '@/core/types/FileSet'
 
@@ -14,14 +14,16 @@ function seed(ids: string[]) {
 }
 
 const keys = () => useImageLayersStore().rows.map(r => r.id)
-const stack = () => useImageLayersStore().stackRows.map(r => (r.kind === 'bg' ? 'BG' : r.id))
 const topIds = () => useFileLoaderStore().spineSlots.filter(s => !s.parentSlotId).map(s => s.id)
+const addBg = (name = 'bg.png') => useImageLayersStore().addLayer({ name, dataUrl: 'data:bg', scale: 1, background: true })
+const layer = (id: string) => useImageLayersStore().layers.find(l => l.id === id)!
+const flagged = () => useImageLayersStore().layers.filter(l => l.background).map(l => l.id)
 
-function loadBg(listIndex: number) {
-  const bg = useBackgroundStore()
-  bg.set({ dataUrl: 'data:bg', width: 1, height: 1 })
-  bg.setListIndex(listIndex)
-  return bg
+function setViewer(zoom: number, posX: number, posY: number) {
+  const v = useViewerStore()
+  v.zoom = zoom
+  v.posX = posX
+  v.posY = posY
 }
 
 describe('useImageLayersStore.rows', () => {
@@ -55,24 +57,106 @@ describe('useImageLayersStore.rows', () => {
   })
 })
 
-describe('useImageLayersStore.stackRows', () => {
+describe('useImageLayersStore background layer', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('has no background row without a background', () => {
-    seed(['a', 'b'])
-    expect(stack()).toEqual(['a', 'b'])
+  it('addLayer with background is the last row, flagged, synced at the origin with scale 1', () => {
+    seed(['a'])
+    const bg = addBg()
+    expect(keys()).toEqual(['a', bg])
+    expect(layer(bg)).toMatchObject({ background: true, syncEnabled: true, posX: 0, posY: 0, scale: 1 })
   })
 
-  it('puts the background before slot listIndex, below layers in that gap, or at the end', () => {
-    const layers = seed(['a', 'b'])
+  it('keeps the background last when a slot or a normal layer is added', () => {
+    const layers = seed(['a'])
+    const bg = addBg()
+    useFileLoaderStore().addSlot(slot('b'))
     const hat = layers.addLayer({ name: 'hat.png', dataUrl: 'data:h', scale: 1 })
-    layers.placeRow(hat, 'b', 'before')
-    const bg = loadBg(1)
-    expect(stack()).toEqual(['a', hat, 'BG', 'b'])
-    bg.setListIndex(0)
-    expect(stack()).toEqual(['BG', 'a', hat, 'b'])
-    bg.setListIndex(5)
-    expect(stack()).toEqual(['a', hat, 'b', 'BG'])
+    expect(keys()).toEqual(['a', 'b', hat, bg])
+  })
+
+  it('a second background leaves the first unflagged directly above it', () => {
+    seed(['a'])
+    const first = addBg('one.png')
+    const second = addBg('two.png')
+    expect(keys()).toEqual(['a', first, second])
+    expect(flagged()).toEqual([second])
+  })
+
+  it('a desynced old background is converted to the scene model when replaced', () => {
+    const layers = seed(['a'])
+    const first = addBg()
+    setViewer(2, 10, 5)
+    layers.setSync(first, false)
+    layers.setTransform(first, 30, 25, 4)
+    addBg('two.png')
+    expect(layer(first)).toMatchObject({ background: false, syncEnabled: false, posX: 10, posY: 10, scale: 2 })
+  })
+
+  it('setBackground on a middle row moves it last and the old background stays in place', () => {
+    const layers = seed(['a', 'b'])
+    const x = layers.addLayer({ name: 'x.png', dataUrl: 'data:x', scale: 1 })
+    layers.placeRow(x, 'b', 'before')
+    const oldBg = addBg()
+    expect(keys()).toEqual(['a', x, 'b', oldBg])
+    layers.setBackground(x)
+    expect(keys()).toEqual(['a', 'b', oldBg, x])
+    expect(flagged()).toEqual([x])
+  })
+
+  it('setBackground(null) keeps the former background last and unflagged', () => {
+    const layers = seed(['a'])
+    const bg = addBg()
+    layers.setBackground(null)
+    expect(keys()).toEqual(['a', bg])
+    expect(flagged()).toEqual([])
+  })
+
+  it('setSync on the background converts between scene and screen without moving it', () => {
+    const layers = seed(['a'])
+    const bg = addBg()
+    layers.setTransform(bg, 3, 4, 1.5)
+    setViewer(2, 10, 5)
+    layers.setSync(bg, false)
+    expect(layer(bg)).toMatchObject({ posX: 10 + 3 * 2, posY: 5 + 4 * 2, scale: 2 * 1.5 })
+    layers.setSync(bg, true)
+    expect(layer(bg)).toMatchObject({ posX: 3, posY: 4, scale: 1.5 })
+  })
+
+  it('setSync on a normal layer never converts', () => {
+    const layers = seed(['a'])
+    const hat = layers.addLayer({ name: 'hat.png', dataUrl: 'data:h', scale: 1 })
+    layers.setTransform(hat, 3, 4, 1.5)
+    setViewer(2, 10, 5)
+    layers.setSync(hat, false)
+    expect(layer(hat)).toMatchObject({ syncEnabled: false, posX: 3, posY: 4, scale: 1.5 })
+  })
+
+  it('checking a desynced normal layer and unchecking a desynced background both convert', () => {
+    const layers = seed(['a'])
+    const hat = layers.addLayer({ name: 'hat.png', dataUrl: 'data:h', scale: 1 })
+    layers.setTransform(hat, 3, 4, 1.5)
+    layers.setSync(hat, false)
+    setViewer(2, 10, 5)
+    layers.setBackground(hat)
+    expect(layer(hat)).toMatchObject({ background: true, posX: 16, posY: 13, scale: 3 })
+    layers.setBackground(null)
+    expect(layer(hat)).toMatchObject({ background: false, posX: 3, posY: 4, scale: 1.5 })
+  })
+
+  it('setAllSync skips the background layer', () => {
+    const layers = seed(['a'])
+    const hat = layers.addLayer({ name: 'hat.png', dataUrl: 'data:h', scale: 1 })
+    const bg = addBg()
+    layers.setAllSync(false)
+    expect(layer(hat).syncEnabled).toBe(false)
+    expect(layer(bg).syncEnabled).toBe(true)
+  })
+
+  it('removing the background leaves no flagged layer', () => {
+    const layers = seed(['a'])
+    layers.removeLayer(addBg())
+    expect(flagged()).toEqual([])
   })
 })
 
@@ -82,31 +166,25 @@ describe('useImageLayersStore mutations', () => {
   it('addLayer creates a synced layer at the origin with the given scale, at the bottom', () => {
     const layers = seed(['a'])
     const id = layers.addLayer({ name: 'hat.png', dataUrl: 'data:h', scale: 2 })
-    expect(layers.layers).toEqual([{ id, name: 'hat.png', dataUrl: 'data:h', posX: 0, posY: 0, scale: 2, syncEnabled: true }])
+    expect(layers.layers).toEqual([{ id, name: 'hat.png', dataUrl: 'data:h', posX: 0, posY: 0, scale: 2, syncEnabled: true, background: false }])
     expect(keys()).toEqual(['a', id])
   })
 
-  it('setActive clears the Background and the active placeholder image', () => {
+  it('setActive on the background layer clears the active placeholder image', () => {
     const layers = seed(['a'])
-    const id = layers.addLayer({ name: 'hat.png', dataUrl: 'data:h', scale: 1 })
-    const bg = useBackgroundStore()
+    const id = addBg()
     const ph = usePlaceholderImagesStore()
-    bg.setActive(true)
     ph.setActiveImage('img-1')
     layers.setActive(id)
     expect(layers.activeLayerId).toBe(id)
-    expect(bg.isActive).toBe(false)
     expect(ph.activeImageId).toBeNull()
   })
 
-  it('deactivateItems clears the Background and the layer', () => {
+  it('deactivateItems clears an active background layer', () => {
     const layers = seed(['a'])
-    const id = layers.addLayer({ name: 'hat.png', dataUrl: 'data:h', scale: 1 })
-    layers.setActive(id)
-    useBackgroundStore().setActive(true)
+    layers.setActive(addBg())
     layers.deactivateItems()
     expect(layers.activeLayerId).toBeNull()
-    expect(useBackgroundStore().isActive).toBe(false)
   })
 
   it('setTransform, setSync, setAllSync and removeLayer', () => {
@@ -149,26 +227,28 @@ describe('useImageLayersStore.placeRow', () => {
     expect(topIds()).toEqual(['a', 'b', 'c'])
   })
 
-  it('shifts listIndex when a skeleton crosses the background, both ways', () => {
-    const layers = seed(['a', 'b', 'c'])
-    const bg = loadBg(1)
-    layers.placeRow('c', 'a', 'before')
-    expect(stack()).toEqual(['c', 'a', 'BG', 'b'])
-    layers.placeRow('c', 'b', 'after')
-    expect(stack()).toEqual(['a', 'BG', 'b', 'c'])
-    layers.placeRow('a', 'b', 'after')
-    expect(stack()).toEqual(['BG', 'b', 'a', 'c'])
-    layers.placeRow('c', 'a', 'before')
-    expect(bg.listIndex).toBe(0)
+  it('a row dropped on the background, either half, lands directly above it', () => {
+    const layers = seed(['a', 'b'])
+    const bg = addBg()
+    layers.placeRow('a', bg, 'after')
+    expect(keys()).toEqual(['b', 'a', bg])
+    expect(topIds()).toEqual(['b', 'a'])
+    layers.placeRow('b', bg, 'before')
+    expect(keys()).toEqual(['a', 'b', bg])
   })
 
-  it('moving a layer leaves listIndex and the slot order', () => {
+  it('ignores moving the background row', () => {
+    const layers = seed(['a', 'b'])
+    const bg = addBg()
+    layers.placeRow(bg, 'a', 'before')
+    expect(keys()).toEqual(['a', 'b', bg])
+  })
+
+  it('moving a layer leaves the slot order', () => {
     const layers = seed(['a', 'b'])
     const hat = layers.addLayer({ name: 'hat.png', dataUrl: 'data:h', scale: 1 })
-    const bg = loadBg(1)
     layers.placeRow(hat, 'a', 'before')
     expect(keys()).toEqual([hat, 'a', 'b'])
-    expect(bg.listIndex).toBe(1)
     expect(topIds()).toEqual(['a', 'b'])
   })
 
@@ -177,18 +257,5 @@ describe('useImageLayersStore.placeRow', () => {
     layers.placeRow('zz', 'a', 'before')
     layers.placeRow('a', 'zz', 'before')
     expect(keys()).toEqual(['a', 'b'])
-  })
-})
-
-describe('useImageLayersStore.detachTopLevel', () => {
-  beforeEach(() => setActivePinia(createPinia()))
-
-  it('decrements listIndex for a skeleton above the background, leaves it for one below', () => {
-    const layers = seed(['a', 'b', 'c'])
-    const bg = loadBg(2)
-    layers.detachTopLevel('c')
-    expect(bg.listIndex).toBe(2)
-    layers.detachTopLevel('a')
-    expect(bg.listIndex).toBe(1)
   })
 })
