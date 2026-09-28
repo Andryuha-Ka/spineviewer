@@ -29,4 +29,17 @@ describe('CompareFileSlot (B4)', () => {
     expect(pick().classes()).toContain('dropdown-item--active')
     wrapper.unmount()
   })
+
+  it('lists neither child spines nor sets with validation errors', async () => {
+    useFileLoaderStore().spineSlots = [
+      { id: 'x', name: 'X', validationErrors: ['Region not found in atlas'] },
+      { id: 'y', name: 'Y' },
+      { id: 'gem', name: 'gem', parentSlotId: 'y' },
+    ]
+    const wrapper = mount(CompareFileSlot, { props: { side: 'left' }, attachTo: document.body })
+
+    await wrapper.find('.slot-btn').trigger('click')
+    expect(wrapper.findAll('.dropdown-item-name').map(n => n.text())).toEqual(['Y'])
+    wrapper.unmount()
+  })
 })

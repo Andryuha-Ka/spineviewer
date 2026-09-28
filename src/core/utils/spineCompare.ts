@@ -28,6 +28,7 @@ export interface PlaceholderDiff {
   name: string
   kind: 'bone' | 'slot' | 'attachment'
   status: 'added' | 'removed' | 'equal'
+  slot?: string
 }
 
 export interface DiffItem {
@@ -282,6 +283,24 @@ function compareBonesJson(rawA: AnyRecord, rawB: AnyRecord): DiffSection {
   }
 }
 
+function lcsNames(a: string[], b: string[]): Set<string> {
+  const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0))
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
+    }
+  }
+  const out = new Set<string>()
+  let i = 0
+  let j = 0
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { out.add(a[i]); i++; j++ }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) i++
+    else j++
+  }
+  return out
+}
+
 function compareSlotsJson(rawA: AnyRecord, rawB: AnyRecord): DiffSection {
   const slotsA = getJsonSlots(rawA)
   const slotsB = getJsonSlots(rawB)
@@ -290,6 +309,9 @@ function compareSlotsJson(rawA: AnyRecord, rawB: AnyRecord): DiffSection {
   const allNames = [...new Set([...mapA.keys(), ...mapB.keys()])]
   const orderMapA = new Map(slotsA.map((s, i) => [s.name as string, i]))
   const orderMapB = new Map(slotsB.map((s, i) => [s.name as string, i]))
+  const sharedA = slotsA.map(s => s.name as string).filter(n => mapB.has(n))
+  const sharedB = slotsB.map(s => s.name as string).filter(n => mapA.has(n))
+  const inOrder = lcsNames(sharedA, sharedB)
 
   const items: DiffItem[] = allNames.map(name => {
     const a = mapA.get(name)
@@ -309,7 +331,7 @@ function compareSlotsJson(rawA: AnyRecord, rawB: AnyRecord): DiffSection {
     // draw order
     const orderA = orderMapA.get(name) ?? 0
     const orderB = orderMapB.get(name) ?? 0
-    if (orderA !== orderB) children.push({ key: 'drawOrder', status: 'changed', valueA: String(orderA), valueB: String(orderB) })
+    if (!inOrder.has(name)) children.push({ key: 'drawOrder', status: 'changed', valueA: String(orderA), valueB: String(orderB) })
 
     return {
       key:      name,
@@ -663,8 +685,10 @@ function extractPlaceholders(dataA: SpineData, dataB: SpineData): PlaceholderDif
     const a = new Set(pA[`${kind}s`])
     const b = new Set(pB[`${kind}s`])
     for (const key of new Set([...a, ...b])) {
-      const name = kind === 'attachment' ? key.slice(key.indexOf('::') + 2) : key
-      result.push({ name, kind, status: !a.has(key) ? 'added' : !b.has(key) ? 'removed' : 'equal' })
+      const status = !a.has(key) ? 'added' : !b.has(key) ? 'removed' : 'equal'
+      if (kind !== 'attachment') { result.push({ name: key, kind, status }); continue }
+      const sep = key.indexOf('::')
+      result.push({ name: key.slice(sep + 2), kind, status, slot: key.slice(0, sep) })
     }
   }
   return result

@@ -56,6 +56,9 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - **Placeholder images** — expand a skeleton row (▶) to reveal its placeholder slots; drop PNG/JPG/WebP images onto a slot to attach them as child sprites at the placeholder's origin; multiple images per slot; each removable individually; click a thumbnail to **activate** it; disable the sync toggle (🔗) on an image to move it by dragging or scale it with the scroll wheel independently; transform saved per skeleton
 - **Placeholder spines** — drop a spine skeleton file onto a placeholder slot to attach it as a live child spine that renders and animates inside the container; click its sprite on canvas to activate it and control animation, skins, and tracks independently; disable sync (🔗) to reposition and scale it freely
 - **Move a spine into a placeholder** — drag a skeleton row by its 6-dot handle onto another skeleton's placeholder drop zone: it becomes a child spine of that placeholder and keeps its animation and skins (a skeleton whose own placeholders hold images or spines cannot be moved)
+- **Placeholder stacking** — images and child spines of a placeholder stack in list order (a later row renders in front); drag a row of either kind onto another to reorder them, and the canvas follows at once, also on pinned skeletons
+- **Child spine to top level** — drag a child spine row onto the Spines list to make it a normal skeleton at that position (upper or lower half of the target row); it keeps its animation, starts synced at the scene origin and becomes active
+- **Image layers** — drag a placeholder image onto the Spines list to make it an image layer: its own row (thumbnail, name, 🔗 sync, ✕) ordered and stacked together with the skeletons; click the row to activate it, then with sync off drag and scroll to move and scale only the layer; layers appear in PNG, sprite sheet and GIF exports and are discarded when you leave the viewer; drop a layer row on a placeholder drop zone to put it back as a placeholder image
 - **Drop zone** at the bottom of the Spines tab — drop image files (PNG / JPG / WebP / AVIF) to add a background image, or drop spine file sets to add new skeletons with automatic version detection and validation
 
 ### Background Image
@@ -216,12 +219,17 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 - **Pin** a skeleton (📌 button) to keep it visible on stage while you browse others
 - **Sync toggle** (🔗) — disable to move/zoom the active skeleton independently; hold Shift to move the global scene
 - **Clone** the active skeleton via the clone button in the Spines tab
-- **Drag a skeleton onto a placeholder** of another skeleton to turn it into a child spine
+- **Drag a skeleton onto a placeholder** of another skeleton to turn it into a child spine; drag a child spine or a placeholder image back onto the list to make it a top-level skeleton or an image layer
 - **Drop zone** at the bottom of the Spines tab — drop images for background or spine files to add more skeletons
 
 ---
 
 ## Changelog
+
+### v1.3.14
+- **Placeholder stacking** — images and child spines of a placeholder stack in list order; drag rows of either kind onto each other to reorder; the canvas follows at once, also on pinned skeletons
+- **Child spine to top level** — drag a child spine row onto the Spines list to make it a normal skeleton at that position; it keeps its animation and becomes active
+- **Image layers** — drag a placeholder image onto the Spines list to make it an image layer: its own row with sync and ✕, ordered and stacked with skeletons, moved and scaled when desynced, included in exports; drop a layer on a placeholder zone to put it back
 
 ### v1.3.13
 - **Mixed Spine versions** — 3.8, 4.0 and 4.1 skeletons open together in one Pixi 7 session, each on its own runtime (also as child spines and in Compare); the toolbar shows the active skeleton's version

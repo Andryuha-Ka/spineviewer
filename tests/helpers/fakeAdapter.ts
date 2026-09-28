@@ -52,6 +52,7 @@ export function makeFakeAdapter(tracks: TrackState[] = [], animations: string[] 
     addImageToPlaceholder:      vi.fn(),
     removeImageFromPlaceholder: vi.fn(),
     setImageTransform:          vi.fn(),
+    setImageZIndex:             vi.fn(),
     spineObj,
     containers,
   }

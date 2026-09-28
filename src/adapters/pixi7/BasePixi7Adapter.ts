@@ -52,8 +52,8 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     needsTick: boolean
   }> = []
   private _phImages: Map<string, PIXI.Sprite> = new Map() // imageId → Sprite
-  // Dedicated containers added directly to slotContainers[idx] for child spine mounting.
-  // Kept separate from the deep image-target so findDeepestTarget never descends into them.
+  // One container per placeholder for images and child spines, under the slot's deepest target.
+  // Marked __phSpine so findDeepestTarget never descends into them.
   private _phChildContainers: Map<string, PIXI.Container> = new Map() // phName → Container
 
   // ── Load ────────────────────────────────────────────────────────────────────
@@ -555,12 +555,8 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
   addImageToPlaceholder(placeholderName: string, dataURL: string, imageId: string): void {
     if (!this._spine) return
     if (this._phImages.has(imageId)) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const slotIdx = (this._spine.skeleton.slots as any[]).findIndex((s: any) => s.data.name === placeholderName)
-    if (slotIdx === -1) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const container = (this._spine as any).slotContainers?.[slotIdx]
-    if (!container) return
+    const target = this.getPlaceholderContainer(placeholderName) as PIXI.Container | null
+    if (!target) return
     // Create a non-cached texture so destroying one sprite's texture
     // cannot affect sprites in other (e.g. pinned) adapters that use the same dataURL.
     const img = new Image()
@@ -574,8 +570,6 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     // Mark as a user-added image so findDeepestTarget skips traversal into it
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(sprite as any).__phImage = true
-    const target = findDeepestTarget(container)
-    target.sortableChildren = true
     sprite.zIndex = target.children.length
     target.addChild(sprite)
     this._phImages.set(imageId, sprite)
@@ -655,7 +649,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     const slotCont = containers?.[slotIdx]
     if (!slotCont) return null
 
-    // Use a dedicated container at the same level as image sprites (findDeepestTarget result).
+    // One container per placeholder, shared by images and child spines.
     // Marked __phSpine=true so findDeepestTarget never descends into it — prevents crashes
     // and label misplacement in tickPlaceholderLabels when the child spine's internal tree
     // would otherwise be traversed.

@@ -15,12 +15,13 @@ import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
+import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 import { hitTestOverlay } from '@/core/overlay/overlayMath'
 import { resetLoopState } from '@/core/overlay/overlayMath'
 import type { IProgressOverlay } from '@/core/types/IProgressOverlay'
 import type { TrackLoopState } from '@/core/overlay/overlayMath'
 
-type PanTarget = 'global' | 'background' | 'slot' | 'image'
+type PanTarget = 'global' | 'background' | 'slot' | 'image' | 'layer'
 type Matrix = { a: number; b: number; c: number; d: number; tx: number; ty: number }
 
 /**
@@ -52,6 +53,12 @@ export function usePanAndDrag(
   const fileLoaderStore        = useFileLoaderStore()
   const placeholderImagesStore = usePlaceholderImagesStore()
   const animationStore         = useAnimationStore()
+  const layersStore            = useImageLayersStore()
+
+  function desyncedActiveLayer() {
+    const l = layersStore.layers.find(x => x.id === layersStore.activeLayerId)
+    return l && !l.syncEnabled ? l : null
+  }
 
   const isPanning = ref(false)
   let panStart = {
@@ -130,6 +137,15 @@ export function usePanAndDrag(
       const newPosY = cursorLocalY - spriteLocalY * newScale
       placeholderImagesStore.updateImageTransform(ctx.slotId, ctx.phName, aid, newPosX, newPosY, newScale)
       spineAdapter?.setImageTransform(aid, newPosX, newPosY, newScale)
+    } else if (desyncedActiveLayer()) {
+      const layer = desyncedActiveLayer()!
+      const newScale = Math.min(20, Math.max(0.05, layer.scale * dz))
+      if (newScale === layer.scale) return
+      const pX = (mx - baseX - viewerStore.posX) / viewerStore.zoom
+      const pY = (my - baseY - viewerStore.posY) / viewerStore.zoom
+      const qX = (pX - layer.posX) / layer.scale
+      const qY = (pY - layer.posY) / layer.scale
+      layersStore.setTransform(layer.id, pX - qX * newScale, pY - qY * newScale, newScale)
     } else if (activeSlot?.parentSlotId && activeSlot.syncEnabled === false) {
       const curZoom = activeSlot.indZoom ?? 1
       const curPosX = activeSlot.indPosX ?? 0
@@ -256,8 +272,8 @@ export function usePanAndDrag(
 
       // Priority 2b — click on a child spine in a placeholder.
       // Selection: topmost visual child wins (highest zIndex).
-      // zIndex is assigned per-placeholder at mount time (0, 1, 2…) and matches sortableChildren
-      // render order. Tiebreaker for equal zIndex: active child is preferred.
+      // Child zIndex = its index in the placeholder's mixed image/spine list (sortableChildren render order).
+      // Tiebreaker for equal zIndex: active child is preferred.
       if (!_imageHitOnActiveSlot) {
         const _activeChildSlotId = slotSelectionStore.activeSlot?.parentSlotId
           ? slotSelectionStore.activeSlotId
@@ -284,7 +300,7 @@ export function usePanAndDrag(
           const meta = _p2bMeta
           const childSlot = fileLoaderStore.spineSlots.find(s => s.id === meta.childSlotId)
           slotSelectionStore.setActiveSlot(meta.childSlotId)
-          backgroundStore.setActive(false)
+          layersStore.deactivateItems()
           if (childSlot && childSlot.syncEnabled === false) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const wt = (meta.phContainer as any)?.worldTransform
@@ -314,7 +330,7 @@ export function usePanAndDrag(
           const parentSlotId = slotSelectionStore.activeSlot?.parentSlotId
           if (parentSlotId) {
             slotSelectionStore.setActiveSlot(parentSlotId)
-            backgroundStore.setActive(false)
+            layersStore.deactivateItems()
             const parentSlot = fileLoaderStore.spineSlots.find(s => s.id === parentSlotId)
             if (parentSlot?.syncEnabled === false) {
               panTarget = 'slot'
@@ -379,6 +395,10 @@ export function usePanAndDrag(
     } else if (backgroundStore.isActive && !backgroundStore.syncEnabled) {
       panTarget = 'background'
       panStart = { x: e.clientX, y: e.clientY, px: backgroundStore.posX, py: backgroundStore.posY, imageId: '', imageMatrix: null }
+    } else if (!_imageHitOnActiveSlot && desyncedActiveLayer()) {
+      const layer = desyncedActiveLayer()!
+      panTarget = 'layer'
+      panStart = { x: e.clientX, y: e.clientY, px: layer.posX, py: layer.posY, imageId: layer.id, imageMatrix: null }
     } else {
       const aid = placeholderImagesStore.activeImageId
       const imgCtx = aid ? placeholderImagesStore.getChildContext(aid) : null
@@ -426,6 +446,11 @@ export function usePanAndDrag(
 
     if (panTarget === 'background') {
       backgroundStore.setTransform(panStart.px + dx, panStart.py + dy, backgroundStore.zoom)
+    } else if (panTarget === 'layer') {
+      const layer = layersStore.layers.find(l => l.id === panStart.imageId)
+      if (!layer) return
+      const gz = viewerStore.zoom > 0 ? viewerStore.zoom : 1
+      layersStore.setTransform(layer.id, panStart.px + dx / gz, panStart.py + dy / gz, layer.scale)
     } else if (panTarget === 'image') {
       const m = panStart.imageMatrix
       if (!m) return

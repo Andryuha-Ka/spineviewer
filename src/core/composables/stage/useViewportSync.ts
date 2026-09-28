@@ -13,6 +13,7 @@ import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useInspectorStore } from '@/core/stores/useInspectorStore'
+import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 
 /**
  * Manages viewport position state (baseX/Y) and derived overlays (origin cross,
@@ -21,11 +22,13 @@ import { useInspectorStore } from '@/core/stores/useInspectorStore'
  *
  * @param mountedSpineObjects - shared Map keyed by slotId; mutated in-place by applyViewport
  * @param getBgSprite         - returns current background sprite (or null)
+ * @param getLayerSprites     - image layer sprites keyed by layer id
  * @param getUiAdapter        - returns the active UI adapter (child or main)
  */
 export function useViewportSync(
   mountedSpineObjects: Map<string, PixiSpriteObject>,
   getBgSprite: () => PixiSpriteObject | null,
+  getLayerSprites: () => Map<string, PixiSpriteObject>,
   getUiAdapter: () => ISpineAdapter | null,
 ) {
   const viewerStore    = useViewerStore()
@@ -33,6 +36,7 @@ export function useViewportSync(
   const backgroundStore = useBackgroundStore()
   const skeletonStore  = useSkeletonStore()
   const inspectorStore = useInspectorStore()
+  const layersStore    = useImageLayersStore()
 
   const baseX = ref(0)
   const baseY = ref(0)
@@ -82,25 +86,26 @@ export function useViewportSync(
         bgSprite.scale.set(backgroundStore.zoom)
       }
     }
+    const layerSprites = getLayerSprites()
+    for (const l of layersStore.layers) {
+      const sprite = layerSprites.get(l.id)
+      if (!sprite) continue
+      sprite.x = x + l.posX * z
+      sprite.y = y + l.posY * z
+      sprite.scale.set(z * l.scale)
+    }
   }
 
   function syncZOrder(): void {
-    // child slots live inside placeholders; the list and backgroundStore.listIndex count top-level slots only
-    const slots = fileLoaderStore.spineSlots.filter(s => !s.parentSlotId)
-    const n = slots.length
-    const bgListIdx = Math.max(0, Math.min(n, backgroundStore.listIndex))
-
-    slots.forEach((slot, spineArrIdx) => {
-      const obj = mountedSpineObjects.get(slot.id)
-      if (!obj) return
-      const mergedPos = spineArrIdx < bgListIdx ? spineArrIdx : spineArrIdx + 1
-      obj.zIndex = n - mergedPos
+    const rows = layersStore.stackRows
+    const n = rows.length
+    const layerSprites = getLayerSprites()
+    rows.forEach((row, i) => {
+      const obj = row.kind === 'bg' ? getBgSprite()
+        : row.kind === 'layer' ? layerSprites.get(row.id)
+        : mountedSpineObjects.get(row.id)
+      if (obj) obj.zIndex = n - i
     })
-
-    const bgSprite = getBgSprite()
-    if (bgSprite) {
-      bgSprite.zIndex = n - bgListIdx
-    }
   }
 
   function updateSelectedSlotRect(): void {

@@ -39,15 +39,15 @@
             :class="{
               'ph-image-entry--active':   entry.imageId === phImagesStore.activeImageId,
               'ph-image-entry--dragging': entry.imageId === draggingPhImageId,
-              'ph-image-entry--drag-over': entry.imageId === dragOverPhImageId && entry.imageId !== draggingPhImageId,
+              'ph-image-entry--drag-over': entry.imageId === dragOverEntryId && entry.imageId !== draggingPhImageId,
             }"
             draggable="true"
             @click.stop="emit('thumbClick', spineSlot.id, entry.imageId)"
             @dragstart.stop="onPhImageDragStart($event, entry.imageId, spineSlot.id, ph.name)"
             @dragend.stop="onPhImageDragEnd"
-            @dragover.prevent.stop="dragOverPhImageId = entry.imageId"
-            @dragleave.stop="dragOverPhImageId = null"
-            @drop.prevent.stop="onPhImageEntryDrop($event, spineSlot.id, ph.name, entry.imageId)"
+            @dragover.prevent.stop="dragOverEntryId = entry.imageId"
+            @dragleave.stop="dragOverEntryId = null"
+            @drop.prevent.stop="onEntryDrop($event, spineSlot.id, ph.name, entry.imageId)"
           >
             <span
               class="ph-image-drag-handle"
@@ -101,15 +101,15 @@
             :class="{
               'ph-spine-entry--active':    slotSelectionStore.activeSlotId === entry.childSlotId,
               'ph-spine-entry--dragging':  entry.imageId === draggingPhSpineId,
-              'ph-spine-entry--drag-over': entry.imageId === dragOverPhSpineId && entry.imageId !== draggingPhSpineId,
+              'ph-spine-entry--drag-over': entry.imageId === dragOverEntryId && entry.imageId !== draggingPhSpineId,
             }"
             draggable="true"
             @click.stop="slotSelectionStore.setActiveSlot(entry.childSlotId)"
             @dragstart.stop="onPhSpineDragStart($event, entry.imageId, spineSlot.id, ph.name)"
             @dragend.stop="onPhSpineDragEnd"
-            @dragover.prevent.stop="dragOverPhSpineId = entry.imageId"
-            @dragleave.stop="dragOverPhSpineId = null"
-            @drop.prevent.stop="onPhSpineEntryDrop($event, spineSlot.id, ph.name, entry.imageId)"
+            @dragover.prevent.stop="dragOverEntryId = entry.imageId"
+            @dragleave.stop="dragOverEntryId = null"
+            @drop.prevent.stop="onEntryDrop($event, spineSlot.id, ph.name, entry.imageId)"
           >
             <span class="ph-image-drag-handle" title="Drag to reorder or move to another placeholder">
               <svg width="6" height="10" viewBox="0 0 6 10" fill="currentColor">
@@ -165,7 +165,7 @@
 import { useFileLoaderStore, SPINE_SLOTS_LIMIT, PH_PENDING_SENTINEL } from '@/core/stores/useFileLoaderStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
-import { usePlaceholderActions, SPINE_SLOT_MIME, type PlaceholderChildRef } from '@/core/composables/usePlaceholderActions'
+import { usePlaceholderActions, SPINE_SLOT_MIME, PH_IMAGE_MIME, PH_SPINE_MIME, IMAGE_LAYER_MIME, type PlaceholderChildRef } from '@/core/composables/usePlaceholderActions'
 import type { SpineSlot } from '@/core/types/FileSet'
 
 defineProps<{ spineSlot: SpineSlot }>()
@@ -178,9 +178,6 @@ const fileLoaderStore    = useFileLoaderStore()
 const slotSelectionStore = useSlotSelectionStore()
 const phImagesStore      = usePlaceholderImagesStore()
 const actions            = usePlaceholderActions()
-
-const PH_IMAGE_MIME   = 'application/x-ph-image'
-const PH_SPINE_MIME   = 'application/x-ph-spine'
 
 function readRef(e: DragEvent, mime: string): PlaceholderChildRef | null {
   const data = e.dataTransfer?.getData(mime)
@@ -210,6 +207,11 @@ async function onPhDrop(e: DragEvent, slotId: string, phName: string): Promise<v
     await actions.moveSlotIntoPlaceholder(topLevelSlotId, slotId, phName)
     return
   }
+  const layerId = e.dataTransfer?.getData(IMAGE_LAYER_MIME)
+  if (layerId) {
+    actions.demoteLayer(layerId, slotId, phName)
+    return
+  }
   const spine = readRef(e, PH_SPINE_MIME)
   if (spine) {
     await actions.moveSpine(spine, slotId, phName)
@@ -226,7 +228,7 @@ async function onPhDrop(e: DragEvent, slotId: string, phName: string): Promise<v
 
 // ── Image rows ──────────────────────────────────────────────────────────────
 const draggingPhImageId = ref<string | null>(null)
-const dragOverPhImageId = ref<string | null>(null)
+const dragOverEntryId   = ref<string | null>(null)
 
 function onPhImageDragStart(e: DragEvent, imageId: string, slotId: string, phName: string): void {
   draggingPhImageId.value = imageId
@@ -235,18 +237,22 @@ function onPhImageDragStart(e: DragEvent, imageId: string, slotId: string, phNam
 
 function onPhImageDragEnd(): void {
   draggingPhImageId.value = null
-  dragOverPhImageId.value = null
+  dragOverEntryId.value   = null
 }
 
-function onPhImageEntryDrop(e: DragEvent, dstSlotId: string, dstPhName: string, dstImageId: string): void {
-  dragOverPhImageId.value = null
+async function onEntryDrop(e: DragEvent, dstSlotId: string, dstPhName: string, dstEntryId: string): Promise<void> {
+  dragOverEntryId.value = null
   const image = readRef(e, PH_IMAGE_MIME)
-  if (image && image.imageId !== dstImageId) actions.moveImage(image, dstSlotId, dstPhName, dstImageId)
+  if (image) {
+    if (image.imageId !== dstEntryId) actions.moveImage(image, dstSlotId, dstPhName, dstEntryId)
+    return
+  }
+  const spine = readRef(e, PH_SPINE_MIME)
+  if (spine && spine.imageId !== dstEntryId) await actions.moveSpine(spine, dstSlotId, dstPhName, dstEntryId)
 }
 
 // ── Child spine rows ────────────────────────────────────────────────────────
 const draggingPhSpineId = ref<string | null>(null)
-const dragOverPhSpineId = ref<string | null>(null)
 
 function onPhSpineDragStart(e: DragEvent, imageId: string, slotId: string, phName: string): void {
   draggingPhSpineId.value = imageId
@@ -255,13 +261,7 @@ function onPhSpineDragStart(e: DragEvent, imageId: string, slotId: string, phNam
 
 function onPhSpineDragEnd(): void {
   draggingPhSpineId.value = null
-  dragOverPhSpineId.value = null
-}
-
-async function onPhSpineEntryDrop(e: DragEvent, dstSlotId: string, dstPhName: string, dstSpineId: string): Promise<void> {
-  dragOverPhSpineId.value = null
-  const spine = readRef(e, PH_SPINE_MIME)
-  if (spine && spine.imageId !== dstSpineId) await actions.moveSpine(spine, dstSlotId, dstPhName, dstSpineId)
+  dragOverEntryId.value   = null
 }
 </script>
 

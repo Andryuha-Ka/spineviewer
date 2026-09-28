@@ -92,6 +92,48 @@ describe('compareSpines placeholders', () => {
       skins: [{ name: 'default', attachments: { body: { placeholder_att: { blend } } } }],
     })
     const diff = await compareSpines(json(withAtt('normal')), json(withAtt('additive')))
-    expect(diff.placeholders).toEqual([{ name: 'placeholder_att', kind: 'attachment', status: 'equal' }])
+    expect(diff.placeholders).toEqual([{ name: 'placeholder_att', kind: 'attachment', status: 'equal', slot: 'body' }])
+  })
+
+  it('keeps same-named attachments in different slots apart', async () => {
+    const withSlots = (...slots: string[]) => ({
+      ...base,
+      skins: [{ name: 'default', attachments: Object.fromEntries(slots.map(s => [s, { placeholder_gem: {} }])) }],
+    })
+    const diff = await compareSpines(json(withSlots('hand_l', 'hand_r')), json(withSlots('hand_l')))
+    const atts = diff.placeholders.filter(p => p.kind === 'attachment')
+    expect(atts).toEqual([
+      { name: 'placeholder_gem', kind: 'attachment', status: 'equal', slot: 'hand_l' },
+      { name: 'placeholder_gem', kind: 'attachment', status: 'removed', slot: 'hand_r' },
+    ])
+    expect(diff.placeholders.filter(p => p.status !== 'equal')).toHaveLength(1)
+  })
+})
+
+describe('compareSpines slot draw order', () => {
+  const withSlots = (...names: string[]) => ({ ...base, slots: names.map(name => ({ name, bone: 'root' })) })
+  const flagged = async (a: string[], b: string[]) => {
+    const diff = await compareSpines(json(withSlots(...a)), json(withSlots(...b)))
+    return diff.sections.find(s => s.id === 'slots')!.items
+      .filter(i => i.children?.some(c => c.key === 'drawOrder'))
+      .map(i => i.key)
+  }
+
+  it('ignores an inserted slot', async () => {
+    expect(await flagged(['a', 'b', 'c', 'd'], ['a', 'x', 'b', 'c', 'd'])).toEqual([])
+  })
+
+  it('ignores a removed slot', async () => {
+    expect(await flagged(['a', 'b', 'c', 'd'], ['a', 'c', 'd'])).toEqual([])
+  })
+
+  it('flags only a moved slot', async () => {
+    expect(await flagged(['a', 'b', 'c', 'd'], ['b', 'c', 'd', 'a'])).toEqual(['a'])
+  })
+
+  it('flags one slot of an adjacent swap', async () => {
+    const res = await flagged(['a', 'b', 'c', 'd'], ['a', 'c', 'b', 'd'])
+    expect(res).toHaveLength(1)
+    expect(['b', 'c']).toContain(res[0])
   })
 })

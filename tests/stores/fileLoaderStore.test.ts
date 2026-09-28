@@ -21,24 +21,21 @@ const saved = (extra: Partial<SpineSlotSavedState> = {}): SpineSlotSavedState =>
 
 const ids = () => useFileLoaderStore().spineSlots.map(s => s.id)
 
-describe('useFileLoaderStore.reorderSlots (N8)', () => {
+describe('useFileLoaderStore.setTopLevelOrder', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('moves by position in the top-level list and leaves child slots in place', () => {
+  it('puts listed ids first and keeps the relative order of child slots', () => {
     const loader = useFileLoaderStore()
-    loader.setSlots([slot('a'), slot('b'), slot('a-child', { parentSlotId: 'a' }), slot('c')], '4.1')
-    // Spines list shows a, b, c — drag c (index 2) to the top
-    loader.reorderSlots(2, 0)
-    expect(ids()).toEqual(['c', 'a', 'a-child', 'b'])
-    loader.reorderSlots(0, 2)
-    expect(ids()).toEqual(['a', 'b', 'a-child', 'c'])
+    loader.setSlots([slot('a'), slot('a1', { parentSlotId: 'a' }), slot('b'), slot('a2', { parentSlotId: 'a' }), slot('c')], '4.1')
+    loader.setTopLevelOrder(['c', 'a', 'b'])
+    expect(ids()).toEqual(['c', 'a', 'b', 'a1', 'a2'])
   })
 
-  it('ignores out-of-range sources', () => {
+  it('ignores unknown ids', () => {
     const loader = useFileLoaderStore()
     loader.setSlots([slot('a'), slot('b')], '4.1')
-    loader.reorderSlots(5, 0)
-    expect(ids()).toEqual(['a', 'b'])
+    loader.setTopLevelOrder(['x', 'b', 'a'])
+    expect(ids()).toEqual(['b', 'a'])
   })
 })
 

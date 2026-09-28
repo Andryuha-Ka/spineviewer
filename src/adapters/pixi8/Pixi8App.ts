@@ -101,8 +101,13 @@ export class Pixi8App implements IPixiApp {
   }
 
   createSprite(dataUrl: string): unknown {
-    const sprite = PIXI.Sprite.from(dataUrl)
+    const sprite = new PIXI.Sprite()
     sprite.anchor.set(0.5, 0.5)
+    const img = new Image()
+    img.onload = () => {
+      if (!sprite.destroyed) sprite.texture = PIXI.Texture.from(img)
+    }
+    img.src = dataUrl
     return sprite
   }
 

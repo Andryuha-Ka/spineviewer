@@ -8,6 +8,8 @@ import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesSto
 import { useVersionStore } from '@/core/stores/useVersionStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
+import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
+import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
 import type { FileSet, PHChildEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 
 // binary skeleton header: hash, then the editor version string
@@ -224,6 +226,97 @@ describe('usePlaceholderActions', () => {
       usePlaceholderActions().toggleSpineChildSync('a', 'p', ph.getPlaceholderSpineEntries('a', 'p')[0])
       expect(ph.getPlaceholderSpineEntries('a', 'p')[0].syncEnabled).toBe(false)
       expect(loader.spineSlots.find(s => s.id === 'kid')?.syncEnabled).toBe(false)
+    })
+  })
+
+  it('moveSlotIntoPlaceholder decrements listIndex for a skeleton above the background', async () => {
+    useFileLoaderStore().setSlots([slot('a'), slot('b'), slot('c')], '4.2')
+    const bg = useBackgroundStore()
+    bg.set({ dataUrl: 'data:bg', width: 1, height: 1 })
+    bg.setListIndex(2)
+    await usePlaceholderActions().moveSlotIntoPlaceholder('a', 'c', 'p')
+    expect(bg.listIndex).toBe(1)
+  })
+
+  it('reorders a mixed placeholder across kinds (A1)', async () => {
+    const loader = useFileLoaderStore()
+    const ph = usePlaceholderImagesStore()
+    loader.setSlots([slot('a'), slot('kid', { parentSlotId: 'a' })], '4.2')
+    ph.setSlotImages('a', { p: [image('i1'), spine('e1', 'kid'), image('i2')] })
+    const actions = usePlaceholderActions()
+    actions.moveImage({ imageId: 'i2', srcSlotId: 'a', srcPhName: 'p' }, 'a', 'p', 'e1')
+    expect(ph.getPlaceholderImages('a', 'p').map(e => e.imageId)).toEqual(['i1', 'i2', 'e1'])
+    await actions.moveSpine({ imageId: 'e1', srcSlotId: 'a', srcPhName: 'p' }, 'a', 'p', 'i1')
+    expect(ph.getPlaceholderImages('a', 'p').map(e => e.imageId)).toEqual(['e1', 'i1', 'i2'])
+  })
+
+  describe('promoteSpine (A2)', () => {
+    it('leaves an active child first, then makes it a synced top-level skeleton at the drop row', async () => {
+      const loader = useFileLoaderStore()
+      const sel = useSlotSelectionStore()
+      const ph = usePlaceholderImagesStore()
+      loader.setSlots([slot('a'), slot('b'), slot('kid', { parentSlotId: 'a', savedState: saved(), syncEnabled: false, indPosX: 40, indZoom: 2 })], '4.2')
+      ph.setSlotImages('a', { p: [image('i1'), spine('e1', 'kid')] })
+      sel.setActiveSlot('kid')
+      await nextTick()
+      const parentsWhenLeaving: Array<string | undefined> = []
+      watch(() => sel.activeSlotId, () => parentsWhenLeaving.push(loader.spineSlots.find(s => s.id === 'kid')?.parentSlotId))
+
+      await usePlaceholderActions().promoteSpine({ imageId: 'e1', srcSlotId: 'a', srcPhName: 'p' }, 'a', 'after')
+
+      expect(parentsWhenLeaving[0]).toBe('a')
+      expect(ph.getPlaceholderImages('a', 'p').map(e => e.imageId)).toEqual(['i1'])
+      expect(ph.peekActions().some(a => a.type === 'remove-spine')).toBe(true)
+      const kid = loader.spineSlots.find(s => s.id === 'kid')!
+      expect(kid).toMatchObject({ parentSlotId: undefined, syncEnabled: true, indPosX: 0, indPosY: 0, indZoom: 1 })
+      expect(kid.savedState).toMatchObject({ syncEnabled: true, indPosX: 0, indPosY: 0, indZoom: 1, selectedAnimation: 'run' })
+      expect(useImageLayersStore().rows.map(r => r.id)).toEqual(['a', 'kid', 'b'])
+      expect(sel.activeSlotId).toBe('kid')
+      expect(loader.spineSlots).toHaveLength(3)
+    })
+  })
+
+  describe('image layers (A3)', () => {
+    it('promoteImage queues a remove and adds an inactive layer with the entry scale at the drop row', () => {
+      const ph = usePlaceholderImagesStore()
+      const layers = useImageLayersStore()
+      useFileLoaderStore().setSlots([slot('a'), slot('b')], '4.2')
+      ph.setSlotImages('a', { p: [{ ...image('i1'), scale: 2.5 } as PHChildEntry] })
+
+      usePlaceholderActions().promoteImage({ imageId: 'i1', srcSlotId: 'a', srcPhName: 'p' }, 'b', 'before')
+
+      expect(ph.getPlaceholderImages('a', 'p')).toEqual([])
+      expect(ph.peekActions()).toContainEqual({ type: 'remove', slotId: 'a', phName: 'p', imageId: 'i1' })
+      const [layer] = layers.layers
+      expect(layer).toMatchObject({ name: 'i1.png', dataUrl: 'data:', scale: 2.5 })
+      expect(layers.rows.map(r => r.id)).toEqual(['a', layer.id, 'b'])
+      expect(layers.activeLayerId).toBeNull()
+    })
+
+    it('demoteLayer queues an add with the scale, removes the layer and activates an inactive destination', () => {
+      const ph = usePlaceholderImagesStore()
+      const layers = useImageLayersStore()
+      const sel = useSlotSelectionStore()
+      useFileLoaderStore().setSlots([slot('a'), slot('b')], '4.2')
+      const id = layers.addLayer({ name: 'l.png', dataUrl: 'data:l', scale: 3 })
+
+      usePlaceholderActions().demoteLayer(id, 'b', 'q')
+
+      const [entry] = ph.getPlaceholderImages('b', 'q')
+      expect(entry).toMatchObject({ kind: 'image', fileName: 'l.png', dataURL: 'data:l', scale: 3, posX: 0, posY: 0 })
+      expect(ph.peekActions()).toContainEqual({ type: 'add', slotId: 'b', phName: 'q', imageId: entry.imageId, dataURL: 'data:l' })
+      expect(layers.layers).toEqual([])
+      expect(sel.activeSlotId).toBe('b')
+    })
+
+    it('demoteLayer does not activate a pinned destination', () => {
+      const layers = useImageLayersStore()
+      const sel = useSlotSelectionStore()
+      useFileLoaderStore().setSlots([slot('a'), slot('b')], '4.2')
+      sel.setPinned('b', true)
+      sel.setActiveSlot('a')
+      usePlaceholderActions().demoteLayer(layers.addLayer({ name: 'l', dataUrl: 'd', scale: 1 }), 'b', 'q')
+      expect(sel.activeSlotId).toBe('a')
     })
   })
 

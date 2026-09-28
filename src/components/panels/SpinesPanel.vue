@@ -45,7 +45,8 @@
       </button>
     </div>
     <div class="spines-list">
-      <template v-for="(slot, index) in visibleSlots" :key="slot.id">
+      <template v-for="{ id, slot, layer } in listRows" :key="id">
+        <template v-if="slot">
         <div
           class="spine-item"
           :class="{
@@ -53,17 +54,17 @@
             'spine-item--pinned':       slotSelectionStore.isPinned(slot.id) && slot.id !== slotSelectionStore.activeSlotId,
             'spine-item--error':        isSlotError(slot),
             'spine-item--modified':     isModified(slot),
-            'spine-item--dragging':     dragSrcIndex === index,
-            'spine-item--drop-top':     dragOverIndex === index && dropPosition === 'top',
-            'spine-item--drop-bottom':  dragOverIndex === index && dropPosition === 'bottom',
+            'spine-item--dragging':     dragSrcKey === id,
+            'spine-item--drop-top':     dragOverKey === id && dropPosition === 'top',
+            'spine-item--drop-bottom':  dragOverKey === id && dropPosition === 'bottom',
           }"
           :title="slot.error ?? (slot.validationErrors?.length ? slot.validationErrors[0] : slot.name)"
           :draggable="!isSlotError(slot)"
-          @click="!isSlotError(slot) && (slotSelectionStore.setActiveSlot(slot.id), backgroundStore.setActive(false))"
-          @dragstart="onDragStart($event, index)"
-          @dragover="onDragOver($event, index)"
+          @click="!isSlotError(slot) && (slotSelectionStore.setActiveSlot(slot.id), layersStore.deactivateItems())"
+          @dragstart="onDragStart($event, id, SPINE_SLOT_MIME)"
+          @dragover="onDragOver($event, id)"
           @dragleave="onDragLeave"
-          @drop="onDrop($event, index)"
+          @drop="onDrop($event, id)"
           @dragend="onDragEnd"
         >
           <span
@@ -160,6 +161,54 @@
           :spine-slot="slot"
           @thumb-click="onImageThumbClick"
         />
+        </template>
+        <div
+          v-else-if="layer"
+          class="spine-item"
+          :class="{
+            'spine-item--active':      layer.id === layersStore.activeLayerId,
+            'spine-item--dragging':    dragSrcKey === id,
+            'spine-item--drop-top':    dragOverKey === id && dropPosition === 'top',
+            'spine-item--drop-bottom': dragOverKey === id && dropPosition === 'bottom',
+          }"
+          :title="layer.name"
+          draggable="true"
+          @click="layersStore.setActive(layer.id)"
+          @dragstart="onDragStart($event, id, IMAGE_LAYER_MIME)"
+          @dragover="onDragOver($event, id)"
+          @dragleave="onDragLeave"
+          @drop="onDrop($event, id)"
+          @dragend="onDragEnd"
+        >
+          <span class="spine-drag-handle" title="Drag to reorder or into a placeholder">
+            <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor">
+              <circle cx="2" cy="2"  r="1.2"/>
+              <circle cx="6" cy="2"  r="1.2"/>
+              <circle cx="2" cy="6"  r="1.2"/>
+              <circle cx="6" cy="6"  r="1.2"/>
+              <circle cx="2" cy="10" r="1.2"/>
+              <circle cx="6" cy="10" r="1.2"/>
+            </svg>
+          </span>
+          <img :src="layer.dataUrl" class="spine-layer-thumb" alt="" />
+          <span class="spine-name">{{ layer.name }}</span>
+          <button
+            class="spine-sync-btn"
+            :class="{ 'spine-sync-btn--desynced': !layer.syncEnabled }"
+            title="Sync with global viewport"
+            @click.stop="layersStore.setSync(layer.id, !layer.syncEnabled)"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7a5 5 0 0 1 0-10h2"/>
+              <line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+          </button>
+          <button
+            class="spine-layer-remove"
+            title="Remove layer"
+            @click.stop="layersStore.removeLayer(layer.id)"
+          >×</button>
+        </div>
       </template>
 
       <!-- Background image item (special: no pin, sync only) -->
@@ -244,7 +293,8 @@ import { spineVersionProblem } from '@/core/utils/versionDetector'
 import { useVersionStore } from '@/core/stores/useVersionStore'
 import type { SpineSlot } from '@/core/types/FileSet'
 import { buildSlotSavedState, trackTimesOf } from '@/core/utils/slotState'
-import { SPINE_SLOT_MIME } from '@/core/composables/usePlaceholderActions'
+import { usePlaceholderActions, SPINE_SLOT_MIME, PH_IMAGE_MIME, PH_SPINE_MIME, IMAGE_LAYER_MIME, type PlaceholderChildRef } from '@/core/composables/usePlaceholderActions'
+import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 
 const fileLoaderStore    = useFileLoaderStore()
 const slotSelectionStore = useSlotSelectionStore()
@@ -255,6 +305,8 @@ const backgroundStore = useBackgroundStore()
 const skeletonStore   = useSkeletonStore()
 const phImagesStore   = usePlaceholderImagesStore()
 const versionStore    = useVersionStore()
+const layersStore     = useImageLayersStore()
+const actions         = usePlaceholderActions()
 
 // ── Placeholder image activation ────────────────────────────────────────────
 const pendingImageToActivate = ref<string | null>(null)
@@ -263,7 +315,7 @@ function onImageThumbClick(slotId: string, imageId: string): void {
   if (slotId !== slotSelectionStore.activeSlotId) {
     pendingImageToActivate.value = imageId
     slotSelectionStore.setActiveSlot(slotId)
-    backgroundStore.setActive(false)
+    layersStore.deactivateItems()
     const s = new Set(expandedSlots.value)
     s.add(slotId)
     expandedSlots.value = s
@@ -283,6 +335,12 @@ watch(() => slotSelectionStore.activeSlotId, (newId) => {
 // ── Global toolbar ───────────────────────────────────────────────────────────
 // Top-level slots only — child spines (parentSlotId set) are shown inside placeholder trees
 const visibleSlots = computed(() => fileLoaderStore.spineSlots.filter(s => !s.parentSlotId))
+
+const listRows = computed(() => layersStore.rows.map(r => ({
+  id:    r.id,
+  slot:  r.kind === 'slot' ? fileLoaderStore.spineSlots.find(s => s.id === r.id) : undefined,
+  layer: r.kind === 'layer' ? layersStore.layers.find(l => l.id === r.id) : undefined,
+})))
 
 const validSlots = computed(() =>
   fileLoaderStore.spineSlots.filter(s => !s.error && !(s.validationErrors?.length)),
@@ -309,6 +367,7 @@ function toggleAllSync(): void {
   globalSyncEnabled.value = !globalSyncEnabled.value
   for (const slot of validSlots.value) fileLoaderStore.setSyncEnabled(slot.id, globalSyncEnabled.value)
   phImagesStore.setAllImagesSync(globalSyncEnabled.value)
+  layersStore.setAllSync(globalSyncEnabled.value)
 }
 
 function toggleAllPin(): void {
@@ -342,7 +401,7 @@ function toggleExpand(id: string): void {
 function onExpandBtnClick(id: string): void {
   if (id !== slotSelectionStore.activeSlotId) {
     slotSelectionStore.setActiveSlot(id)
-    backgroundStore.setActive(false)
+    layersStore.deactivateItems()
     const s = new Set(expandedSlots.value)
     s.add(id)
     expandedSlots.value = s
@@ -362,6 +421,7 @@ const errorCount = computed(() => fileLoaderStore.spineSlots.filter(s =>  isSlot
 // ── Background ────────────────────────────────────────────────────────────────
 function onActivateBackground() {
   backgroundStore.setActive(true)
+  layersStore.setActive(null)
 }
 
 // ── Clone ────────────────────────────────────────────────────────────────────
@@ -388,37 +448,37 @@ function onClone(id: string) {
 }
 
 // ── Drag-and-drop reorder ────────────────────────────────────────────────────
-const dragSrcIndex   = ref<number | null>(null)
-const dragOverIndex  = ref<number | null>(null)
+const dragSrcKey     = ref<string | null>(null)
+const dragOverKey    = ref<string | null>(null)
 const dropPosition   = ref<'top' | 'bottom'>('top')
 const dragSrcIsBg    = ref(false)
 const bgDragOver     = ref(false)
 const bgDropPosition = ref<'top' | 'bottom'>('top')
 
-function onDragStart(e: DragEvent, index: number) {
-  dragSrcIndex.value = index
-  dragSrcIsBg.value  = false
+function onDragStart(e: DragEvent, key: string, mime: string) {
+  dragSrcKey.value  = key
+  dragSrcIsBg.value = false
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', String(index))
-    // a placeholder drop zone takes the row as a child spine
-    e.dataTransfer.setData(SPINE_SLOT_MIME, visibleSlots.value[index]?.id ?? '')
+    e.dataTransfer.setData('text/plain', key)
+    // a placeholder drop zone takes the row as a child spine or an image
+    e.dataTransfer.setData(mime, key)
   }
 }
 
 function onBgDragStart(e: DragEvent) {
-  dragSrcIsBg.value  = true
-  dragSrcIndex.value = null
+  dragSrcIsBg.value = true
+  dragSrcKey.value  = null
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', 'bg')
   }
 }
 
-function onDragOver(e: DragEvent, index: number) {
+function onDragOver(e: DragEvent, key: string) {
   e.preventDefault()
   if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-  dragOverIndex.value = index
+  dragOverKey.value = key
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   dropPosition.value = (e.clientY - rect.top) < rect.height / 2 ? 'top' : 'bottom'
 }
@@ -432,60 +492,47 @@ function onBgDragOver(e: DragEvent) {
 }
 
 function onDragLeave() {
-  dragOverIndex.value = null
+  dragOverKey.value = null
 }
 
 function onBgDragLeave() {
   bgDragOver.value = false
 }
 
-function onDrop(e: DragEvent, toIndex: number) {
-  e.preventDefault()
+function readChildRef(e: DragEvent, mime: string): PlaceholderChildRef | null {
+  const data = e.dataTransfer?.getData(mime)
+  return data ? JSON.parse(data) as PlaceholderChildRef : null
+}
 
-  if (dragSrcIsBg.value) {
-    // Background being dropped onto a spine item
-    const targetListIdx = dropPosition.value === 'top' ? toIndex : toIndex + 1
-    backgroundStore.setListIndex(targetListIdx)
-    dragSrcIsBg.value  = false
-    dragOverIndex.value = null
+async function onDrop(e: DragEvent, targetKey: string) {
+  e.preventDefault()
+  const where  = dropPosition.value === 'top' ? 'before' : 'after'
+  const srcKey = dragSrcKey.value
+  const isBg   = dragSrcIsBg.value
+  onDragEnd()
+
+  if (isBg) {
+    const slotIdx = visibleSlots.value.findIndex(s => s.id === targetKey)
+    if (slotIdx >= 0) backgroundStore.setListIndex(where === 'before' ? slotIdx : slotIdx + 1)
     return
   }
-
-  if (dragSrcIndex.value === null) return
-
-  let target = toIndex
-  if (dropPosition.value === 'bottom') target = toIndex + 1
-  const src = dragSrcIndex.value
-  if (target > src) target -= 1
-
-  // Adjust bg listIndex when a spine crosses its position
-  if (backgroundStore.isLoaded) {
-    const bgIdx = backgroundStore.listIndex
-    if (src < bgIdx && target >= bgIdx) {
-      backgroundStore.setListIndex(bgIdx - 1)
-    } else if (src >= bgIdx && target < bgIdx) {
-      backgroundStore.setListIndex(bgIdx + 1)
-    }
-  }
-
-  fileLoaderStore.reorderSlots(src, target)
-  dragSrcIndex.value  = null
-  dragOverIndex.value = null
+  const spine = readChildRef(e, PH_SPINE_MIME)
+  if (spine) return actions.promoteSpine(spine, targetKey, where)
+  const image = readChildRef(e, PH_IMAGE_MIME)
+  if (image) return actions.promoteImage(image, targetKey, where)
+  if (srcKey) layersStore.placeRow(srcKey, targetKey, where)
 }
 
 function onBgDrop(e: DragEvent) {
   e.preventDefault()
-  bgDragOver.value    = false
-  dragSrcIndex.value  = null
-  dragOverIndex.value = null
-  dragSrcIsBg.value   = false
+  onDragEnd()
 }
 
 function onDragEnd() {
-  dragSrcIndex.value  = null
-  dragOverIndex.value = null
-  dragSrcIsBg.value   = false
-  bgDragOver.value    = false
+  dragSrcKey.value  = null
+  dragOverKey.value = null
+  dragSrcIsBg.value = false
+  bgDragOver.value  = false
 }
 
 // ── Drop zone ────────────────────────────────────────────────────────────────
@@ -944,6 +991,32 @@ function modifiedHint(slot: SpineSlot): string {
 .spine-expand-btn--open {
   transform: rotate(180deg);
   color: #fbbf24;
+}
+
+.spine-layer-thumb {
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 2px;
+  flex-shrink: 0;
+  border: 1px solid var(--c-border);
+}
+
+.spine-layer-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--c-text-ghost);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.spine-layer-remove:hover {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
 }
 
 /* Placeholder tree */

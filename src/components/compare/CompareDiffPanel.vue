@@ -182,12 +182,13 @@
               <span class="ov-sub-title">{{ changedPlaceholders > 0 ? '⚠ ' : '' }}Placeholders</span>
               <span class="ov-sub-hint">
                 {{ diff.placeholders.length }} total
-                <template v-if="changedPlaceholders > 0"> · {{ changedPlaceholders }} changed</template>
+                <template v-if="addedPlaceholders > 0"> · {{ addedPlaceholders }} added</template>
+                <template v-if="removedPlaceholders > 0"> · {{ removedPlaceholders }} removed</template>
               </span>
             </div>
             <div v-if="diff.placeholders.length === 0" class="ov-empty">No placeholder elements found</div>
             <template v-else>
-              <template v-for="ph in visiblePlaceholders" :key="`${ph.kind}::${ph.name}`">
+              <template v-for="ph in visiblePlaceholders" :key="`${ph.kind}::${ph.slot ?? ''}::${ph.name}`">
                 <div
                   class="ph-item"
                   :class="[
@@ -388,6 +389,9 @@ const changedPlaceholders = computed(() => {
   if (!diff.value) return 0
   return diff.value.placeholders.filter(p => p.status !== 'equal').length
 })
+
+const addedPlaceholders   = computed(() => diff.value?.placeholders.filter(p => p.status === 'added').length ?? 0)
+const removedPlaceholders = computed(() => diff.value?.placeholders.filter(p => p.status === 'removed').length ?? 0)
 
 const visiblePlaceholders = computed<PlaceholderDiff[]>(() => {
   if (!diff.value) return []

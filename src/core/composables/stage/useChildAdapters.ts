@@ -142,6 +142,18 @@ export function useChildAdapters() {
     return null
   }
 
+  /** zIndex of every image and child spine in a placeholder = its list index. */
+  function orderPlaceholderChildren(parentAdapter: ISpineAdapter, slotId: string, phName: string): void {
+    placeholderImagesStore.getPlaceholderImages(slotId, phName).forEach((e, i) => {
+      if (e.kind === 'image') parentAdapter.setImageZIndex(e.imageId, i)
+      else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const obj = childAdapters.get(e.imageId)?.getSpineObject() as any
+        if (obj) obj.zIndex = i
+      }
+    })
+  }
+
   // In-flight mounts by entry id: the drain and reloadChildAdaptersForSlot can request the same entry concurrently.
   const mountsInFlight = new Map<string, Promise<void>>()
 
@@ -177,12 +189,6 @@ export function useChildAdapters() {
       return
     }
     try {
-      // Count existing children in this specific placeholder to assign the correct zIndex.
-      // zIndex determines both visual stacking (via sortableChildren on the child container)
-      // and hit-test priority in Priority 2b of usePanAndDrag.
-      const _existingInPh = [...childAdapterMeta.values()].filter(
-        m => m.parentSlotId === parentSlotId && m.phName === phName,
-      ).length
       const childAdapter = await createSpineAdapter(versionStore.pixiVersion!, versionStore.spineVersion!, childSlotForLoad.fileSet)
       await childAdapter.load(childSlotForLoad.fileSet)
       childAdapter.mount(phContainer)
@@ -192,10 +198,10 @@ export function useChildAdapters() {
         spineObj.x = entry.posX
         spineObj.y = entry.posY
         spineObj.scale.set(entry.scale)
-        spineObj.zIndex = _existingInPh
       }
       childAdapters.set(entry.imageId, childAdapter)
       childAdapterMeta.set(entry.imageId, { parentSlotId, phName, childSlotId: entry.childSlotId, phContainer })
+      orderPlaceholderChildren(parentAdapter, parentSlotId, phName)
       applyChildTransform(entry.imageId)
       const childSlot = fileLoaderStore.spineSlots.find(s => s.id === entry.childSlotId)
       if (childSlot?.savedState) {
@@ -237,17 +243,14 @@ export function useChildAdapters() {
     const dstContainer = dstParentAdapter?.getPlaceholderContainer(dstPhName)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const spineObj = childAdapter.getSpineObject() as any
-    if (!dstContainer || !spineObj) {
+    if (!dstParentAdapter || !dstContainer || !spineObj) {
       destroyChildAdapter(entryId)
       return
     }
-    const zIndex = [...childAdapterMeta.entries()].filter(
-      ([id, m]) => id !== entryId && m.parentSlotId === dstParentSlotId && m.phName === dstPhName,
-    ).length
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(dstContainer as any).addChild(spineObj)
-    spineObj.zIndex = zIndex
     childAdapterMeta.set(entryId, { ...meta, parentSlotId: dstParentSlotId, phName: dstPhName, phContainer: dstContainer })
+    orderPlaceholderChildren(dstParentAdapter, dstParentSlotId, dstPhName)
     applyChildTransform(entryId)
   }
 
@@ -262,11 +265,13 @@ export function useChildAdapters() {
     childAdapterMeta,
     activeChildAdapter,
     saveChildState,
+    destroyChildAdapter,
     destroyChildAdaptersForSlot,
     applyChildTransform,
     getActiveChildParentMatrix,
     mountChildAdapter,
     moveChildAdapter,
+    orderPlaceholderChildren,
     reloadChildAdaptersForSlot,
     destroyAll,
   }

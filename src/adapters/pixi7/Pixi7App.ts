@@ -102,7 +102,9 @@ export class Pixi7App implements IPixiApp {
   }
 
   createSprite(dataUrl: string): unknown {
-    const sprite = PIXI.Sprite.from(dataUrl)
+    const img = new Image()
+    img.src = dataUrl
+    const sprite = new PIXI.Sprite(new PIXI.Texture(new PIXI.BaseTexture(img)))
     sprite.anchor.set(0.5, 0.5)
     return sprite
   }

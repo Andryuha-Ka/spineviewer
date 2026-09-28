@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { makeFakeAdapter, track } from '../helpers/fakeAdapter'
-import type { PHSpineEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
+import type { PHImageEntry, PHSpineEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 
 const created: ReturnType<typeof makeFakeAdapter>[] = []
 vi.mock('@/core/AdapterFactory', () => ({
@@ -17,12 +17,17 @@ const { useFileLoaderStore } = await import('@/core/stores/useFileLoaderStore')
 const { useVersionStore } = await import('@/core/stores/useVersionStore')
 const { useSlotSelectionStore } = await import('@/core/stores/useSlotSelectionStore')
 const { useAnimationStore } = await import('@/core/stores/useAnimationStore')
+const { usePlaceholderImagesStore } = await import('@/core/stores/usePlaceholderImagesStore')
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const FILESET = { skeleton: {}, atlas: {}, images: [] } as any
 
 function entry(imageId: string, childSlotId: string): PHSpineEntry {
   return { kind: 'spine', imageId, childSlotId, fileName: 'c.skel', fileSet: FILESET, syncEnabled: true, posX: 0, posY: 0, scale: 1 }
+}
+
+function image(imageId: string): PHImageEntry {
+  return { kind: 'image', imageId, fileName: 'i.png', dataURL: 'data:', syncEnabled: true, posX: 0, posY: 0, scale: 1 }
 }
 
 function saved(extra: Partial<SpineSlotSavedState>): SpineSlotSavedState {
@@ -190,5 +195,34 @@ describe('useChildAdapters', () => {
     expect(created[0].destroy).not.toHaveBeenCalled()
     expect(dst.containers.get('placeholder_2')!.children).toContain(created[0].spineObj)
     expect(children.childAdapterMeta.get('e1')).toMatchObject({ parentSlotId: 'other', phName: 'placeholder_2' })
+  })
+
+  it('orderPlaceholderChildren sets zIndex = list index for images and child spines (D2)', async () => {
+    const children = useChildAdapters()
+    const parent = makeFakeAdapter()
+    usePlaceholderImagesStore().setSlotImages('parent', { p: [image('img1'), entry('e1', 'child'), image('img2')] })
+    await children.mountChildAdapter(parent, 'parent', 'p', entry('e1', 'child'))
+    created[0].spineObj.zIndex = -1
+    parent.setImageZIndex.mockClear()
+
+    children.orderPlaceholderChildren(parent, 'parent', 'p')
+    expect(parent.setImageZIndex.mock.calls).toEqual([['img1', 0], ['img2', 2]])
+    expect(created[0].spineObj.zIndex).toBe(1)
+  })
+
+  it('mounting a child listed second in a mixed placeholder sets its zIndex to 1', async () => {
+    usePlaceholderImagesStore().setSlotImages('parent', { p: [image('img1'), entry('e1', 'child'), image('img2')] })
+    await useChildAdapters().mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    expect(created[0].spineObj.zIndex).toBe(1)
+  })
+
+  it('a child moved into a placeholder holding two images gets zIndex 2', async () => {
+    const children = useChildAdapters()
+    await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    usePlaceholderImagesStore().setSlotImages('other', { q: [image('img1'), image('img2'), entry('e1', 'child')] })
+    const dst = makeFakeAdapter()
+    children.moveChildAdapter('e1', dst, 'other', 'q')
+    expect(created[0].spineObj.zIndex).toBe(2)
+    expect(dst.setImageZIndex.mock.calls).toEqual([['img1', 0], ['img2', 1]])
   })
 })

@@ -14,6 +14,7 @@ import { useVersionStore } from '@/core/stores/useVersionStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useViewerStore } from '@/core/stores/useViewerStore'
+import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 import { buildSlotSavedState, trackTimesOf } from '@/core/utils/slotState'
 import { groupSpineFiles } from '@/core/utils/fileLoader'
 import { spineVersionProblem } from '@/core/utils/versionDetector'
@@ -30,6 +31,9 @@ const SPINE_FILE_RE = /\.(json|skel|atlas)$/i
 
 /** Drag data type of a Spines list row; a placeholder drop zone takes it as a child spine. */
 export const SPINE_SLOT_MIME = 'application/x-spine-slot'
+export const PH_IMAGE_MIME = 'application/x-ph-image'
+export const PH_SPINE_MIME = 'application/x-ph-spine'
+export const IMAGE_LAYER_MIME = 'application/x-image-layer'
 
 function isSlotError(slot: SpineSlot): boolean {
   return !!slot.error || !!(slot.validationErrors?.length)
@@ -44,6 +48,7 @@ export function usePlaceholderActions() {
   const animationStore     = useAnimationStore()
   const skeletonStore      = useSkeletonStore()
   const viewerStore        = useViewerStore()
+  const layersStore        = useImageLayersStore()
 
   /** A child spine runs on its own version's runtime; only a version of the other Pixi major is refused. */
   function childVersionProblem(fileSet: FileSet): string | null {
@@ -111,6 +116,10 @@ export function usePlaceholderActions() {
     }
     phImagesStore.moveChild(src.srcSlotId, src.srcPhName, src.imageId, dstSlotId, dstPhName)
     fileLoaderStore.patchSlotPlaceholderImages(src.srcSlotId, phImagesStore.getSlotImages(src.srcSlotId))
+    activateDestination(dstSlotId)
+  }
+
+  function activateDestination(dstSlotId: string): void {
     if (dstSlotId !== slotSelectionStore.activeSlotId && !slotSelectionStore.isPinned(dstSlotId)) {
       fileLoaderStore.patchSlotPlaceholderImages(dstSlotId, phImagesStore.getSlotImages(dstSlotId))
       slotSelectionStore.setActiveSlot(dstSlotId)
@@ -138,10 +147,47 @@ export function usePlaceholderActions() {
     }
     phImagesStore.moveChild(src.srcSlotId, src.srcPhName, src.imageId, dstSlotId, dstPhName)
     fileLoaderStore.patchSlotPlaceholderImages(src.srcSlotId, phImagesStore.getSlotImages(src.srcSlotId))
-    if (dstSlotId !== slotSelectionStore.activeSlotId && !slotSelectionStore.isPinned(dstSlotId)) {
-      fileLoaderStore.patchSlotPlaceholderImages(dstSlotId, phImagesStore.getSlotImages(dstSlotId))
-      slotSelectionStore.setActiveSlot(dstSlotId)
+    activateDestination(dstSlotId)
+  }
+
+  /** Makes a child spine a top-level skeleton at the drop row and activates it. */
+  async function promoteSpine(src: PlaceholderChildRef, targetKey: string, where: 'before' | 'after'): Promise<void> {
+    const entry = phImagesStore.getPlaceholderSpineEntries(src.srcSlotId, src.srcPhName).find(en => en.imageId === src.imageId)
+    if (!entry) return
+    if (slotSelectionStore.activeSlotId === entry.childSlotId) {
+      slotSelectionStore.setActiveSlot(src.srcSlotId)
+      await nextTick()
     }
+    phImagesStore.removeSpineChild(src.srcSlotId, src.srcPhName, entry.imageId)
+    fileLoaderStore.patchSlotPlaceholderImages(src.srcSlotId, phImagesStore.getSlotImages(src.srcSlotId))
+    await nextTick()
+    const slot = fileLoaderStore.spineSlots.find(s => s.id === entry.childSlotId)
+    if (!slot) return
+    const reset = { syncEnabled: true, indPosX: 0, indPosY: 0, indZoom: 1 }
+    slot.parentSlotId = undefined
+    Object.assign(slot, reset)
+    if (slot.savedState) slot.savedState = { ...slot.savedState, ...reset }
+    layersStore.placeRow(slot.id, targetKey, where)
+    slotSelectionStore.setActiveSlot(slot.id)
+  }
+
+  /** Turns a placeholder image into an image layer at the drop row. */
+  function promoteImage(src: PlaceholderChildRef, targetKey: string, where: 'before' | 'after'): void {
+    const entry = phImagesStore.getPlaceholderImages(src.srcSlotId, src.srcPhName).find(en => en.imageId === src.imageId)
+    if (entry?.kind !== 'image') return
+    phImagesStore.removeImage(src.srcSlotId, src.srcPhName, entry.imageId)
+    fileLoaderStore.patchSlotPlaceholderImages(src.srcSlotId, phImagesStore.getSlotImages(src.srcSlotId))
+    const layerId = layersStore.addLayer({ name: entry.fileName, dataUrl: entry.dataURL, scale: entry.scale })
+    layersStore.placeRow(layerId, targetKey, where)
+  }
+
+  /** Turns an image layer into the last image of a placeholder. */
+  function demoteLayer(layerId: string, dstSlotId: string, phName: string): void {
+    const layer = layersStore.layers.find(l => l.id === layerId)
+    if (!layer) return
+    phImagesStore.addImageData(dstSlotId, phName, { fileName: layer.name, dataURL: layer.dataUrl, scale: layer.scale })
+    layersStore.removeLayer(layerId)
+    activateDestination(dstSlotId)
   }
 
   function reorder(slotId: string, phName: string, movedId: string, beforeId: string): void {
@@ -174,6 +220,7 @@ export function usePlaceholderActions() {
       slotSelectionStore.setActiveSlot(dstSlotId)
       await nextTick()
     }
+    layersStore.detachTopLevel(slotId)
     slot.parentSlotId = dstSlotId
     slot.syncEnabled  = true
     slot.indPosX      = 0
@@ -256,6 +303,9 @@ export function usePlaceholderActions() {
     moveImage,
     moveSpine,
     moveSlotIntoPlaceholder,
+    promoteSpine,
+    promoteImage,
+    demoteLayer,
     toggleSpineChildSync,
     removeSpineChild,
     cloneSpineChild,

@@ -118,6 +118,7 @@ import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { useBackgroundStore } from '@/core/stores/useBackgroundStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
+import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 import { useChildAdapters } from '@/core/composables/stage/useChildAdapters'
 import { useLoopStateMachine } from '@/core/composables/stage/useLoopStateMachine'
 import { useViewportSync } from '@/core/composables/stage/useViewportSync'
@@ -147,9 +148,11 @@ const fileLoaderStore         = useFileLoaderStore()
 const slotSelectionStore      = useSlotSelectionStore()
 const backgroundStore         = useBackgroundStore()
 const placeholderImagesStore  = usePlaceholderImagesStore()
+const layersStore             = useImageLayersStore()
 
 // ── Mutable adapter/state references ─────────────────────────────────────────
 let bgSprite: PixiSpriteObject | null = null
+const layerSprites = new Map<string, PixiSpriteObject>()
 let pixiApp: IPixiApp | null = null
 // the active top-level slot on stage (the parent while a child spine is active)
 const onStage: ActiveStage = { adapter: null, obj: null }
@@ -204,7 +207,7 @@ const seekDrag = useSeekDrag(
   () => {},
 )
 
-const viewport = useViewportSync(mountedSpineObjects, () => bgSprite, _uiAdapter)
+const viewport = useViewportSync(mountedSpineObjects, () => bgSprite, () => layerSprites, _uiAdapter)
 const { baseX, baseY, originScreenX, originScreenY, selectedBonePos, selectedSlotRect, applyViewport, syncZOrder, updateSelectedSlotRect } = viewport
 
 const panDrag = usePanAndDrag(
@@ -282,9 +285,7 @@ async function drainPlaceholderActions() {
   for (const action of actions) {
     if (action.type === 'reorder-child') {
       const adapter = adapterForSlot(action.slotId)
-      if (adapter && action.orderedIds) {
-        action.orderedIds.forEach((id, idx) => adapter.setImageZIndex(id, idx))
-      }
+      if (adapter) children.orderPlaceholderChildren(adapter, action.slotId, action.phName)
     } else if (action.type === 'move-child') {
       if (action.kind === 'image') {
         const srcAdapter = adapterForSlot(action.slotId)
@@ -293,9 +294,7 @@ async function drainPlaceholderActions() {
         if (dstAdapter && action.dataURL && action.imageId) {
           dstAdapter.addImageToPlaceholder(action.dstPhName, action.dataURL, action.imageId)
           dstAdapter.setImageTransform(action.imageId, 0, 0, action.scale ?? 1)
-          const dstEntries = placeholderImagesStore.getPlaceholderImages(action.dstSlotId, action.dstPhName)
-          const zIdx = dstEntries.findIndex(e => e.imageId === action.imageId)
-          if (zIdx !== -1) dstAdapter.setImageZIndex(action.imageId, zIdx)
+          children.orderPlaceholderChildren(dstAdapter, action.dstSlotId, action.dstPhName)
         }
       } else {
         children.moveChildAdapter(action.imageId, adapterForSlot(action.dstSlotId), action.dstSlotId, action.dstPhName)
@@ -308,12 +307,7 @@ async function drainPlaceholderActions() {
         if (parentAdapter) await children.mountChildAdapter(parentAdapter, action.slotId, action.phName, entry)
       }
     } else if (action.type === 'remove-spine') {
-      const childAdapter = children.childAdapters.get(action.imageId)
-      if (childAdapter) {
-        childAdapter.destroy()
-        children.childAdapters.delete(action.imageId)
-        children.childAdapterMeta.delete(action.imageId)
-      }
+      children.destroyChildAdapter(action.imageId)
     } else {
       // A slot that is not on stage picks its images up from the store when it is restored.
       const adapter = adapterForSlot(action.slotId)
@@ -324,6 +318,7 @@ async function drainPlaceholderActions() {
         if (ctx && (ctx.entry.posX !== 0 || ctx.entry.posY !== 0 || ctx.entry.scale !== 1)) {
           adapter.setImageTransform(action.imageId, ctx.entry.posX, ctx.entry.posY, ctx.entry.scale)
         }
+        children.orderPlaceholderChildren(adapter, action.slotId, action.phName)
       } else if (action.type === 'remove') {
         adapter.removeImageFromPlaceholder(action.phName, action.imageId)
       }
@@ -548,8 +543,29 @@ onMounted(async () => {
     )
 
     watchStage(
-      () => backgroundStore.listIndex,
-      () => syncZOrder(),
+      () => layersStore.layers.map(l => l.id).join(),
+      () => {
+        const ids = new Set(layersStore.layers.map(l => l.id))
+        for (const [id, sprite] of layerSprites) {
+          if (ids.has(id)) continue
+          pixiApp!.removeFromStage(sprite)
+          sprite.destroy?.({ texture: true })
+          layerSprites.delete(id)
+        }
+        for (const l of layersStore.layers) {
+          if (layerSprites.has(l.id)) continue
+          const sprite = pixiApp!.createSprite(l.dataUrl) as PixiSpriteObject
+          pixiApp!.addToStage(sprite)
+          layerSprites.set(l.id, sprite)
+        }
+        applyViewport()
+        syncZOrder()
+      },
+    )
+
+    watchStage(
+      () => layersStore.layers.map(l => [l.posX, l.posY, l.scale]),
+      () => applyViewport(),
     )
 
     watchStage(
@@ -658,7 +674,7 @@ onMounted(async () => {
     slotSwitch.start(watchStage)
 
     watchStage(
-      () => fileLoaderStore.spineSlots.filter(s => !s.parentSlotId).map(s => s.id).join(),
+      () => layersStore.stackRows.map(r => r.kind === 'bg' ? 'bg' : r.id).join(),
       () => syncZOrder(),
     )
 
@@ -685,6 +701,9 @@ onUnmounted(() => {
     bgSprite = null
   }
   backgroundStore.clearAll()
+  for (const sprite of layerSprites.values()) sprite.destroy?.({ texture: true })
+  layerSprites.clear()
+  layersStore.clear()
   if (pixiApp && tickerFn) pixiApp.ticker.remove(tickerFn)
   progressOverlay?.destroy()
   progressOverlay = null

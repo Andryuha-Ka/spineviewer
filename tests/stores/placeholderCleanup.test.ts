@@ -104,4 +104,15 @@ describe('placeholder action drain', () => {
     expect(ph.drainActions().map(a => 'imageId' in a && a.imageId)).toEqual(['e1', 'e2', 'e3'])
     expect(ph.hasPendingActions).toBe(false)
   })
+
+  it('addImageData lists the image last and queues add with its scale kept on the entry', () => {
+    const ph = usePlaceholderImagesStore()
+    ph.addSpineChild('a', 'p', spineEntry('e1', 'c1'))
+    ph.drainActions()
+    ph.addImageData('a', 'p', { fileName: 'x.png', dataURL: 'data:x', scale: 2 })
+    const entries = ph.getPlaceholderImages('a', 'p')
+    expect(entries.map(e => e.kind)).toEqual(['spine', 'image'])
+    expect(entries[1]).toMatchObject({ fileName: 'x.png', dataURL: 'data:x', scale: 2, posX: 0, posY: 0, syncEnabled: true })
+    expect(ph.peekActions()).toEqual([{ type: 'add', slotId: 'a', phName: 'p', imageId: entries[1].imageId, dataURL: 'data:x' }])
+  })
 })

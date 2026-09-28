@@ -166,15 +166,12 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
     removeSlot(id)
   }
 
-  /** Indices are positions among top-level slots (the Spines list); child slots keep their array positions. */
-  function reorderSlots(fromIndex: number, toIndex: number) {
-    if (fromIndex === toIndex) return
-    const top = spineSlots.value.filter(s => !s.parentSlotId)
-    const [item] = top.splice(fromIndex, 1)
-    if (!item) return
-    top.splice(toIndex, 0, item)
-    let next = 0
-    spineSlots.value = spineSlots.value.map(s => (s.parentSlotId ? s : top[next++]))
+  /** Listed ids first in that order; every other slot keeps its relative order after them. */
+  function setTopLevelOrder(ids: string[]): void {
+    const byId = new Map(spineSlots.value.map(s => [s.id, s]))
+    const head = [...new Set(ids)].map(id => byId.get(id)).filter((s): s is SpineSlot => !!s)
+    const listed = new Set(head)
+    spineSlots.value = [...head, ...spineSlots.value.filter(s => !listed.has(s))]
   }
 
   /** Patch placeholderChildren in savedState for a non-active slot (e.g. after drag-reparent). No-op if slot has no savedState yet. */
@@ -305,7 +302,7 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
     saveSlotState,
     removeSlot,
     removeSlotCascade,
-    reorderSlots,
+    setTopLevelOrder,
     addSlot,
     cloneSlot,
     setSyncEnabled,

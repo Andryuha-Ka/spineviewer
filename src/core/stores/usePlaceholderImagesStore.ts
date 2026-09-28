@@ -29,17 +29,18 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
   const hasPendingActions = computed(() => _pendingActions.value.length > 0)
 
   async function addImage(slotId: string, phName: string, file: File): Promise<void> {
-    const dataURL = await readFileAsDataURL(file)
-    const imageId = crypto.randomUUID()
+    addImageData(slotId, phName, { fileName: file.name, dataURL: await readFileAsDataURL(file), scale: 1 })
+  }
 
+  function addImageData(slotId: string, phName: string, src: { fileName: string; dataURL: string; scale: number }): void {
+    const imageId = crypto.randomUUID()
     if (!children.value[slotId]) children.value[slotId] = {}
     if (!children.value[slotId][phName]) children.value[slotId][phName] = []
     children.value[slotId][phName].push({
-      kind: 'image', imageId, fileName: file.name, dataURL,
-      syncEnabled: true, posX: 0, posY: 0, scale: 1,
+      kind: 'image', imageId, fileName: src.fileName, dataURL: src.dataURL,
+      syncEnabled: true, posX: 0, posY: 0, scale: src.scale,
     })
-
-    _pendingActions.value.push({ type: 'add', slotId, phName, imageId, dataURL })
+    _pendingActions.value.push({ type: 'add', slotId, phName, imageId, dataURL: src.dataURL })
   }
 
   function addSpineChild(slotId: string, phName: string, entry: PHSpineEntry): void {
@@ -219,6 +220,7 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
 
     // ── Mutation ───────────────────────────────────────────
     addImage,
+    addImageData,
     addSpineChild,
     removeImage,
     removeSpineChild,

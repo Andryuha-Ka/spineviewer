@@ -48,10 +48,10 @@ export default class Spine42Adapter implements ISpineAdapter {
   /** Per-label-name texture cache — reused across setPlaceholderLabels calls. */
   private _phTextures = new Map<string, PIXI.Texture>()
   private _phImageSprites: Map<string, PIXI.Sprite> = new Map() // imageId → Sprite
-  private _phSlotContainers: Map<string, PIXI.Container> = new Map() // phName → slot-following container (images live here)
-  // Dedicated sub-containers inside slot containers — child spines mount here, not directly into the slot object.
+  private _phSlotContainers: Map<string, PIXI.Container> = new Map() // phName → slot-following container
+  // Dedicated sub-containers inside slot containers — images and child spines mount here, not directly into the slot object.
   // Keeps child Spine objects separate from the addSlotObject mechanism to avoid render pipeline conflicts.
-  private _phChildContainers: Map<string, PIXI.Container> = new Map() // phName → child spine container
+  private _phChildContainers: Map<string, PIXI.Container> = new Map() // phName → images + child spines
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -541,25 +541,12 @@ export default class Spine42Adapter implements ISpineAdapter {
   addImageToPlaceholder(placeholderName: string, dataURL: string, imageId: string): void {
     if (!this._spine) return
     if (this._phImageSprites.has(imageId)) return
-    // Verify the slot exists in this skeleton
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const slotExists = (this._spine.skeleton.slots as any[]).some((s: any) => s.data.name === placeholderName)
-    if (!slotExists) return
-
-    // spine-pixi-v8 has no slotContainers array. Use addSlotObject() to attach a
-    // Container that automatically follows the slot bone transform each frame.
-    let phContainer = this._phSlotContainers.get(placeholderName)
-    if (!phContainer) {
-      phContainer = new PIXI.Container()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(this._spine as any).addSlotObject(placeholderName, phContainer)
-      this._phSlotContainers.set(placeholderName, phContainer)
-    }
+    const phContainer = this.getPlaceholderContainer(placeholderName) as PIXI.Container | null
+    if (!phContainer) return
 
     // Register sprite immediately so removeImageFromPlaceholder can find it.
     // Texture.from(dataURL) in Pixi8 loads asynchronously — assign texture via
     // HTMLImageElement.onload to guarantee it is visible on the first render frame.
-    phContainer.sortableChildren = true
     const sprite = new PIXI.Sprite()
     sprite.anchor.set(0.5, 0.5)
     sprite.x = 0
@@ -665,8 +652,8 @@ export default class Spine42Adapter implements ISpineAdapter {
       this._phSlotContainers.set(phName, slotContainer)
     }
 
-    // Return a dedicated sub-container for the child spine — kept separate from image sprites
-    // so the addSlotObject mechanism never processes the child Spine's internal hierarchy.
+    // Dedicated sub-container shared by images and child spines, so the addSlotObject
+    // mechanism never processes a child Spine's internal hierarchy.
     let childContainer = this._phChildContainers.get(phName)
     if (!childContainer) {
       childContainer = new PIXI.Container()

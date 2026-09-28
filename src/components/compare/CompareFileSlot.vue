@@ -93,7 +93,7 @@ const currentLabel = computed(() => {
   return currentSlot.value.label
 })
 
-const loadedOptions = computed(() => fileLoaderStore.spineSlots.filter(s => !s.error))
+const loadedOptions = computed(() => fileLoaderStore.spineSlots.filter(s => !s.parentSlotId && !s.error && !s.validationErrors?.length))
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
