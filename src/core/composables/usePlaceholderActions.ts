@@ -63,8 +63,8 @@ export function usePlaceholderActions() {
       await addSpineFromFiles(files, slotId, phName)
       return
     }
-    for (const file of files.filter(f => f.type.startsWith('image/'))) {
-      await phImagesStore.addImage(slotId, phName, file)
+    for (const [i, file] of files.filter(f => f.type.startsWith('image/')).entries()) {
+      await phImagesStore.addImage(slotId, phName, file, i)
     }
   }
 

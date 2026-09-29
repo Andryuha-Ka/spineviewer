@@ -79,13 +79,17 @@ export const useImageLayersStore = defineStore('image-layers', () => {
     }
   }
 
-  function addLayer(src: { name: string; dataUrl: string; scale: number; background?: boolean }): string {
+  function addLayer(src: { name: string; dataUrl: string; scale: number }): string {
     const id = crypto.randomUUID()
-    const keys = rows.value.map(r => r.id)
     layers.value.push({ id, name: src.name, dataUrl: src.dataUrl, posX: 0, posY: 0, scale: src.scale, syncEnabled: true, background: false })
-    rowOrder.value = [...keys, id]
-    if (src.background) setBackground(id)
+    placeOnTop([id])
     return id
+  }
+
+  function placeOnTop(keys: string[]): void {
+    const top = new Set(keys)
+    rowOrder.value = [...keys, ...rows.value.map(r => r.id).filter(id => !top.has(id))]
+    fileLoaderStore.setTopLevelOrder(rows.value.filter(r => r.kind === 'slot').map(r => r.id))
   }
 
   function setBackground(id: string | null): void {
@@ -160,6 +164,7 @@ export const useImageLayersStore = defineStore('image-layers', () => {
     setActive,
     deactivateItems,
     placeRow,
+    placeOnTop,
     clear,
   }
 })

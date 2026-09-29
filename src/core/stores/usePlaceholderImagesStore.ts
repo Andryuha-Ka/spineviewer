@@ -28,25 +28,25 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
 
   const hasPendingActions = computed(() => _pendingActions.value.length > 0)
 
-  async function addImage(slotId: string, phName: string, file: File): Promise<void> {
-    addImageData(slotId, phName, { fileName: file.name, dataURL: await readFileAsDataURL(file), scale: 1 })
+  async function addImage(slotId: string, phName: string, file: File, at = 0): Promise<void> {
+    addImageData(slotId, phName, { fileName: file.name, dataURL: await readFileAsDataURL(file), scale: 1 }, at)
   }
 
-  function addImageData(slotId: string, phName: string, src: { fileName: string; dataURL: string; scale: number }): void {
+  function addImageData(slotId: string, phName: string, src: { fileName: string; dataURL: string; scale: number }, at = 0): void {
     const imageId = crypto.randomUUID()
     if (!children.value[slotId]) children.value[slotId] = {}
     if (!children.value[slotId][phName]) children.value[slotId][phName] = []
-    children.value[slotId][phName].push({
+    children.value[slotId][phName].splice(at, 0, {
       kind: 'image', imageId, fileName: src.fileName, dataURL: src.dataURL,
       syncEnabled: true, posX: 0, posY: 0, scale: src.scale,
     })
     _pendingActions.value.push({ type: 'add', slotId, phName, imageId, dataURL: src.dataURL })
   }
 
-  function addSpineChild(slotId: string, phName: string, entry: PHSpineEntry): void {
+  function addSpineChild(slotId: string, phName: string, entry: PHSpineEntry, at = 0): void {
     if (!children.value[slotId]) children.value[slotId] = {}
     if (!children.value[slotId][phName]) children.value[slotId][phName] = []
-    children.value[slotId][phName].push(entry)
+    children.value[slotId][phName].splice(at, 0, entry)
     _pendingActions.value.push({ type: 'add-spine', slotId, phName, imageId: entry.imageId, childSlotId: entry.childSlotId })
   }
 
@@ -106,14 +106,16 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     if (activeImageId.value === imageId) activeImageId.value = null
     if (!children.value[dstSlotId]) children.value[dstSlotId] = {}
     if (!children.value[dstSlotId][dstPhName]) children.value[dstSlotId][dstPhName] = []
-    children.value[dstSlotId][dstPhName].push({ ...entry, posX: 0, posY: 0 })
+    children.value[dstSlotId][dstPhName].unshift({ ...entry, posX: 0, posY: 0 })
     const dataURL = entry.kind === 'image' ? entry.dataURL : undefined
     _pendingActions.value.push({ type: 'move-child', slotId: srcSlotId, phName: srcPhName, imageId, dataURL, dstSlotId, dstPhName, scale: entry.scale, kind: entry.kind })
   }
 
   function cloneImage(slotId: string, phName: string, imageId: string): void {
-    const entry = children.value[slotId]?.[phName]?.find(e => e.imageId === imageId)
-    if (!entry || entry.kind !== 'image') return
+    const entries = children.value[slotId]?.[phName]
+    const idx = entries?.findIndex(e => e.imageId === imageId) ?? -1
+    const entry = entries?.[idx]
+    if (!entries || !entry || entry.kind !== 'image') return
     const newId = crypto.randomUUID()
     const clone: PHImageEntry = {
       kind: 'image',
@@ -125,14 +127,16 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
       posY: 0,
       scale: entry.scale,
     }
-    children.value[slotId][phName].push(clone)
+    entries.splice(idx, 0, clone)
     _pendingActions.value.push({ type: 'add', slotId, phName, imageId: newId, dataURL: entry.dataURL })
   }
 
   function cloneSpineChild(slotId: string, phName: string, entryId: string, newChildSlotId: string): void {
-    const src = children.value[slotId]?.[phName]?.find(e => e.imageId === entryId)
+    const entries = children.value[slotId]?.[phName] ?? []
+    const idx = entries.findIndex(e => e.imageId === entryId)
+    const src = entries[idx]
     if (!src || src.kind !== 'spine') return
-    addSpineChild(slotId, phName, { ...src, imageId: crypto.randomUUID(), childSlotId: newChildSlotId, posX: 0, posY: 0, syncEnabled: false })
+    addSpineChild(slotId, phName, { ...src, imageId: crypto.randomUUID(), childSlotId: newChildSlotId, posX: 0, posY: 0, syncEnabled: false }, idx)
   }
 
   function getChildContext(imageId: string): { slotId: string; phName: string; entry: PHChildEntry } | null {

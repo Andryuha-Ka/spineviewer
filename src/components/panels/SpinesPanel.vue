@@ -392,6 +392,7 @@ function onClone(id: string) {
 
   const newSlot = fileLoaderStore.cloneSlot(id)
   if (!newSlot) return
+  layersStore.placeRow(newSlot.id, id, 'before')
   slotSelectionStore.setActiveSlot(newSlot.id)
 }
 
@@ -465,7 +466,7 @@ async function handleDroppedFiles(files: File[]): Promise<void> {
   if (!hasSpine && hasImages) {
     const imgFile = files.find(f => imageExts.test(f.name))!
     const dataUrl = await readFileAsDataURL(imgFile)
-    layersStore.addLayer({ name: imgFile.name, dataUrl, scale: 1, background: true })
+    layersStore.addLayer({ name: imgFile.name, dataUrl, scale: 1 })
     return
   }
 
@@ -477,6 +478,7 @@ async function handleDroppedFiles(files: File[]): Promise<void> {
     }
     const inheritDesync  = !globalSyncEnabled.value
     const inheritExpand  = globalExpandEnabled.value
+    const added: string[] = []
     for (const slot of result.slots) {
       if (!slot.error && slot.fileSet) {
         const errs = validateSpineFileSet(slot.fileSet)
@@ -485,6 +487,7 @@ async function handleDroppedFiles(files: File[]): Promise<void> {
         if (errs.length > 0) slot.validationErrors = errs
       }
       fileLoaderStore.addSlot(slot)
+      added.push(slot.id)
       if (!slot.error) {
         if (inheritDesync) fileLoaderStore.setSyncEnabled(slot.id, false)
         if (inheritExpand && slot.placeholders?.some(p => p.kind === 'slot')) {
@@ -494,6 +497,7 @@ async function handleDroppedFiles(files: File[]): Promise<void> {
         }
       }
     }
+    layersStore.placeOnTop(added.filter(id => fileLoaderStore.spineSlots.some(s => s.id === id)))
   }
 }
 

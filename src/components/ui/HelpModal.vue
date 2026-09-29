@@ -185,6 +185,14 @@
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
           <div class="cl-entry">
+            <span class="cl-ver">v1.3.16</span>
+            <ul class="help-list">
+              <li><b>Dropped images become normal layers</b> — an image dropped on the canvas or the Spines drop zone is added as a normal image layer at the top of the list; the background is never replaced, tick <b>Background</b> yourself</li>
+              <li><b>New items appear in front</b> — new skeletons and image layers go to the top of the Spines list, and new or moved-in placeholder images and child spines go to the top of their placeholder</li>
+              <li><b>Clones appear above their source</b> — a cloned skeleton, placeholder image or child spine is listed directly above the original and renders just in front of it</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
             <span class="cl-ver">v1.3.15</span>
             <ul class="help-list">
               <li><b>Placeholder stacking like the Spines list</b> — inside a placeholder the top row renders in front; newly added, cloned or moved-in images and child spines go to the bottom of the tree and render behind</li>

@@ -15,7 +15,12 @@ function seed(ids: string[]) {
 
 const keys = () => useImageLayersStore().rows.map(r => r.id)
 const topIds = () => useFileLoaderStore().spineSlots.filter(s => !s.parentSlotId).map(s => s.id)
-const addBg = (name = 'bg.png') => useImageLayersStore().addLayer({ name, dataUrl: 'data:bg', scale: 1, background: true })
+const addBg = (name = 'bg.png') => {
+  const layers = useImageLayersStore()
+  const id = layers.addLayer({ name, dataUrl: 'data:bg', scale: 1 })
+  layers.setBackground(id)
+  return id
+}
 const layer = (id: string) => useImageLayersStore().layers.find(l => l.id === id)!
 const flagged = () => useImageLayersStore().layers.filter(l => l.background).map(l => l.id)
 
@@ -72,7 +77,8 @@ describe('useImageLayersStore background layer', () => {
     const bg = addBg()
     useFileLoaderStore().addSlot(slot('b'))
     const hat = layers.addLayer({ name: 'hat.png', dataUrl: 'data:h', scale: 1 })
-    expect(keys()).toEqual(['a', 'b', hat, bg])
+    expect(keys()).toEqual([hat, 'a', 'b', bg])
+    expect(layer(bg).background).toBe(true)
   })
 
   it('a second background leaves the first unflagged directly above it', () => {
@@ -163,11 +169,11 @@ describe('useImageLayersStore background layer', () => {
 describe('useImageLayersStore mutations', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('addLayer creates a synced layer at the origin with the given scale, at the bottom', () => {
+  it('addLayer creates a synced layer at the origin with the given scale, at the top', () => {
     const layers = seed(['a'])
     const id = layers.addLayer({ name: 'hat.png', dataUrl: 'data:h', scale: 2 })
     expect(layers.layers).toEqual([{ id, name: 'hat.png', dataUrl: 'data:h', posX: 0, posY: 0, scale: 2, syncEnabled: true, background: false }])
-    expect(keys()).toEqual(['a', id])
+    expect(keys()).toEqual([id, 'a'])
   })
 
   it('setActive on the background layer clears the active placeholder image', () => {
@@ -201,7 +207,7 @@ describe('useImageLayersStore mutations', () => {
     layers.removeLayer(id)
     expect(layers.layers.map(l => l.id)).toEqual([id2])
     expect(layers.activeLayerId).toBeNull()
-    expect(keys()).toEqual(['a', id2])
+    expect(keys()).toEqual([id2, 'a'])
   })
 
   it('clear empties layers, rowOrder and activeLayerId', () => {
@@ -257,5 +263,28 @@ describe('useImageLayersStore.placeRow', () => {
     layers.placeRow('zz', 'a', 'before')
     layers.placeRow('a', 'zz', 'before')
     expect(keys()).toEqual(['a', 'b'])
+  })
+})
+
+describe('useImageLayersStore.placeOnTop', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('puts new slots on top in the given order after a picker load', () => {
+    seed(['a', 'b'])
+    const loader = useFileLoaderStore()
+    loader.addSlot(slot('c'))
+    loader.addSlot(slot('d'))
+    useImageLayersStore().placeOnTop(['c', 'd'])
+    expect(keys()).toEqual(['c', 'd', 'a', 'b'])
+    expect(topIds()).toEqual(['c', 'd', 'a', 'b'])
+  })
+
+  it('keeps the background last and ignores unknown keys', () => {
+    const layers = seed(['a'])
+    const bg = addBg()
+    useFileLoaderStore().addSlot(slot('b'))
+    layers.placeOnTop(['ghost', 'b'])
+    expect(keys()).toEqual(['b', 'a', bg])
+    expect(layer(bg).background).toBe(true)
   })
 })

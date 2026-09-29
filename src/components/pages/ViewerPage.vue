@@ -194,7 +194,7 @@ async function onCanvasDrop(e: DragEvent) {
   if (!hasSpine && hasImages) {
     const imgFile = files.find(f => imageExts.test(f.name))!
     const dataUrl = await readFileAsDataURL(imgFile)
-    layersStore.addLayer({ name: imgFile.name, dataUrl, scale: 1, background: true })
+    layersStore.addLayer({ name: imgFile.name, dataUrl, scale: 1 })
     activeTab.value = 'spines'
     return
   }
@@ -205,6 +205,7 @@ async function onCanvasDrop(e: DragEvent) {
       window.alert(result.globalError)
       return
     }
+    const added: string[] = []
     for (const slot of result.slots) {
       if (!slot.error && slot.fileSet) {
         const errs = validateSpineFileSet(slot.fileSet)
@@ -213,7 +214,9 @@ async function onCanvasDrop(e: DragEvent) {
         if (errs.length > 0) slot.validationErrors = errs
       }
       fileLoaderStore.addSlot(slot)
+      added.push(slot.id)
     }
+    layersStore.placeOnTop(added.filter(id => fileLoaderStore.spineSlots.some(s => s.id === id)))
   }
 }
 

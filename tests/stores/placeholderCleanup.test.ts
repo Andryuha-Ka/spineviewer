@@ -105,14 +105,35 @@ describe('placeholder action drain', () => {
     expect(ph.hasPendingActions).toBe(false)
   })
 
-  it('addImageData lists the image last and queues add with its scale kept on the entry', () => {
+  it('addImageData lists the image first and queues add with its scale kept on the entry', () => {
     const ph = usePlaceholderImagesStore()
     ph.addSpineChild('a', 'p', spineEntry('e1', 'c1'))
     ph.drainActions()
     ph.addImageData('a', 'p', { fileName: 'x.png', dataURL: 'data:x', scale: 2 })
     const entries = ph.getPlaceholderImages('a', 'p')
-    expect(entries.map(e => e.kind)).toEqual(['spine', 'image'])
-    expect(entries[1]).toMatchObject({ fileName: 'x.png', dataURL: 'data:x', scale: 2, posX: 0, posY: 0, syncEnabled: true })
-    expect(ph.peekActions()).toEqual([{ type: 'add', slotId: 'a', phName: 'p', imageId: entries[1].imageId, dataURL: 'data:x' }])
+    expect(entries.map(e => e.kind)).toEqual(['image', 'spine'])
+    expect(entries[0]).toMatchObject({ fileName: 'x.png', dataURL: 'data:x', scale: 2, posX: 0, posY: 0, syncEnabled: true })
+    expect(ph.peekActions()).toEqual([{ type: 'add', slotId: 'a', phName: 'p', imageId: entries[0].imageId, dataURL: 'data:x' }])
+  })
+
+  it('addSpineChild lists the child first and cloneImage lists the copy directly above its source (F8)', () => {
+    const ph = usePlaceholderImagesStore()
+    ph.addImageData('a', 'p', { fileName: 'bow.png', dataURL: 'data:b', scale: 1 })
+    ph.addImageData('a', 'p', { fileName: 'hat.png', dataURL: 'data:h', scale: 1 })
+    ph.addSpineChild('a', 'p', spineEntry('e1', 'c1'))
+    const bow = ph.getPlaceholderImages('a', 'p')[2]
+    ph.cloneImage('a', 'p', bow.imageId)
+    const list = ph.getPlaceholderImages('a', 'p')
+    expect(list.map(e => e.kind === 'spine' ? e.imageId : e.fileName)).toEqual(['e1', 'hat.png', 'bow.png', 'bow.png'])
+    expect(list[3].imageId).toBe(bow.imageId)
+    expect(list[2].imageId).not.toBe(bow.imageId)
+  })
+
+  it('moveChild lists the moved entry first in the destination (F8)', () => {
+    const ph = usePlaceholderImagesStore()
+    ph.addImageData('b', 'q', { fileName: 'bow.png', dataURL: 'data:b', scale: 1 })
+    ph.addImageData('a', 'p', { fileName: 'hat.png', dataURL: 'data:h', scale: 1 })
+    ph.moveChild('a', 'p', ph.getPlaceholderImages('a', 'p')[0].imageId, 'b', 'q')
+    expect(ph.getPlaceholderImages('b', 'q').map(e => e.kind === 'image' && e.fileName)).toEqual(['hat.png', 'bow.png'])
   })
 })

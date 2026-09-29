@@ -21,7 +21,8 @@ describe('useViewportSync', () => {
     const layers = useImageLayersStore()
     const id = layers.addLayer({ name: 'l.png', dataUrl: 'data:l', scale: 1 })
     layers.placeRow(id, 'A', 'before')
-    const bgId = layers.addLayer({ name: 'bg.png', dataUrl: 'data:bg', scale: 1, background: true })
+    const bgId = layers.addLayer({ name: 'bg.png', dataUrl: 'data:bg', scale: 1 })
+    layers.setBackground(bgId)
     const a = obj(), b = obj(), bgS = obj(), l = obj()
     const vp = useViewportSync(new Map([['A', a], ['B', b]]), () => new Map([[id, l], [bgId, bgS]]), () => null)
     vp.syncZOrder()
@@ -33,7 +34,8 @@ describe('useViewportSync', () => {
     viewer.zoom = 2
     viewer.posX = 10
     const layers = useImageLayersStore()
-    const id = layers.addLayer({ name: 'bg.png', dataUrl: 'data:bg', scale: 1, background: true })
+    const id = layers.addLayer({ name: 'bg.png', dataUrl: 'data:bg', scale: 1 })
+    layers.setBackground(id)
     layers.setSync(id, false)
     layers.setTransform(id, 50, 20, 0.5)
     const l = obj()

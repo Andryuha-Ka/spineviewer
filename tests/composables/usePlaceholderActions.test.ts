@@ -182,8 +182,8 @@ describe('usePlaceholderActions', () => {
       ph.setSlotImages('a', { p: [spine('e1', 'kid')] })
       usePlaceholderActions().cloneSpineChild('a', 'p', ph.getPlaceholderSpineEntries('a', 'p')[0])
       const entries = ph.getPlaceholderSpineEntries('a', 'p')
-      expect(entries).toHaveLength(2)
-      const clone = loader.spineSlots.find(s => s.id === entries[1].childSlotId)!
+      expect(entries.map(e => e.imageId)[1]).toBe('e1')
+      const clone = loader.spineSlots.find(s => s.id === entries[0].childSlotId)!
       expect(clone).toMatchObject({ parentSlotId: 'a', syncEnabled: false })
     })
 
@@ -194,7 +194,7 @@ describe('usePlaceholderActions', () => {
       loader.setSlots([slot('a'), slot('kid', { parentSlotId: 'a', savedState: src })], '4.2')
       ph.setSlotImages('a', { p: [spine('e1', 'kid')] })
       usePlaceholderActions().cloneSpineChild('a', 'p', ph.getPlaceholderSpineEntries('a', 'p')[0])
-      const cloneId = ph.getPlaceholderSpineEntries('a', 'p')[1].childSlotId
+      const cloneId = ph.getPlaceholderSpineEntries('a', 'p')[0].childSlotId
       const clone = loader.spineSlots.find(s => s.id === cloneId)!
       expect(clone).toMatchObject({ syncEnabled: false, indPosX: 0, indPosY: 0 })
       expect(clone.savedState).toMatchObject({ trackPlaylists: src.trackPlaylists, selectedSkins: ['gold'] })
@@ -213,7 +213,7 @@ describe('usePlaceholderActions', () => {
       useSkeletonStore().activeSkins = ['blue']
       usePlaceholderActions().cloneSpineChild('a', 'p', ph.getPlaceholderSpineEntries('a', 'p')[0])
       expect(loader.spineSlots.find(s => s.id === 'kid')!.savedState).toMatchObject({ trackTimes: { 0: 1.25 }, selectedSkins: ['blue'] })
-      const cloneId = ph.getPlaceholderSpineEntries('a', 'p')[1].childSlotId
+      const cloneId = ph.getPlaceholderSpineEntries('a', 'p')[0].childSlotId
       expect(loader.spineSlots.find(s => s.id === cloneId)!.savedState).toMatchObject({ trackTimes: { 0: 1.25 }, selectedSkins: ['blue'] })
     })
 
@@ -303,7 +303,8 @@ describe('usePlaceholderActions', () => {
       const ph = usePlaceholderImagesStore()
       const layers = useImageLayersStore()
       useFileLoaderStore().setSlots([slot('a'), slot('b')], '4.2')
-      const id = layers.addLayer({ name: 'bg.png', dataUrl: 'data:bg', scale: 1, background: true })
+      const id = layers.addLayer({ name: 'bg.png', dataUrl: 'data:bg', scale: 1 })
+      layers.setBackground(id)
 
       usePlaceholderActions().demoteLayer(id, 'b', 'q')
 
@@ -321,6 +322,32 @@ describe('usePlaceholderActions', () => {
       usePlaceholderActions().demoteLayer(layers.addLayer({ name: 'l', dataUrl: 'd', scale: 1 }), 'b', 'q')
       expect(sel.activeSlotId).toBe('a')
     })
+  })
+
+  it('lists new, moved-in and demoted children first (F8)', async () => {
+    const loader = useFileLoaderStore()
+    const ph = usePlaceholderImagesStore()
+    const layers = useImageLayersStore()
+    loader.setSlots([slot('a'), slot('b'), slot('kid', { parentSlotId: 'a' })], '4.2')
+    ph.setSlotImages('a', { p: [image('i1'), spine('e1', 'kid')] })
+    ph.setSlotImages('b', { q: [image('i2')] })
+    useSlotSelectionStore().setPinned('b', true)
+    const actions = usePlaceholderActions()
+    actions.moveImage({ imageId: 'i1', srcSlotId: 'a', srcPhName: 'p' }, 'b', 'q')
+    expect(ph.getPlaceholderImages('b', 'q').map(e => e.imageId)).toEqual(['i1', 'i2'])
+    await actions.moveSpine({ imageId: 'e1', srcSlotId: 'a', srcPhName: 'p' }, 'b', 'q')
+    expect(ph.getPlaceholderImages('b', 'q').map(e => e.imageId)).toEqual(['e1', 'i1', 'i2'])
+    actions.demoteLayer(layers.addLayer({ name: 'l.png', dataUrl: 'd', scale: 1 }), 'b', 'q')
+    expect(ph.getPlaceholderImages('b', 'q').map(e => e.fileName)[0]).toBe('l.png')
+  })
+
+  it('keeps drop order at the top of a placeholder for several images (F8)', async () => {
+    const ph = usePlaceholderImagesStore()
+    ph.setSlotImages('a', { p: [image('i1')] })
+    const hat = new File(['x'], 'hat.png', { type: 'image/png' })
+    const bow = new File(['x'], 'bow.png', { type: 'image/png' })
+    await usePlaceholderActions().dropFiles([hat, bow], 'a', 'p')
+    expect(ph.getPlaceholderImages('a', 'p').map(e => e.imageId === 'i1' ? 'i1' : e.fileName)).toEqual(['hat.png', 'bow.png', 'i1'])
   })
 
   it('drops images as placeholder sprites and ignores other files', async () => {

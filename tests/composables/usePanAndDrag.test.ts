@@ -105,7 +105,8 @@ describe('usePanAndDrag — background layer and one active item', () => {
     viewer.posX = 20
     viewer.posY = 0
     const layers = useImageLayersStore()
-    bgId = layers.addLayer({ name: 'bg.png', dataUrl: 'data:bg', scale: 1, background: true })
+    bgId = layers.addLayer({ name: 'bg.png', dataUrl: 'data:bg', scale: 1 })
+    layers.setBackground(bgId)
     layers.setSync(bgId, false)
     layers.setTransform(bgId, 50, 20, 1)
     layers.setActive(bgId)

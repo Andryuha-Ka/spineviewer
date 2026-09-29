@@ -56,14 +56,14 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - **Placeholder images** — expand a skeleton row (▶) to reveal its placeholder slots; drop PNG/JPG/WebP images onto a slot to attach them as child sprites at the placeholder's origin; multiple images per slot; each removable individually; click a thumbnail to **activate** it; disable the sync toggle (🔗) on an image to move it by dragging or scale it with the scroll wheel independently; transform saved per skeleton
 - **Placeholder spines** — drop a spine skeleton file onto a placeholder slot to attach it as a live child spine that renders and animates inside the container; click its sprite on canvas to activate it and control animation, skins, and tracks independently; disable sync (🔗) to reposition and scale it freely
 - **Move a spine into a placeholder** — drag a skeleton row by its 6-dot handle onto another skeleton's placeholder drop zone: it becomes a child spine of that placeholder and keeps its animation and skins (a skeleton whose own placeholders hold images or spines cannot be moved)
-- **Placeholder stacking** — images and child spines of a placeholder stack like the Spines list: the top row renders in front, and a newly added, cloned or moved-in child is listed last and renders behind; drag a row of either kind onto another to reorder them, and the canvas follows at once, also on pinned skeletons
+- **Placeholder stacking** — images and child spines of a placeholder stack like the Spines list: the top row renders in front, a newly added or moved-in child is listed first and renders in front, and a clone appears directly above its source; drag a row of either kind onto another to reorder them, and the canvas follows at once, also on pinned skeletons
 - **Child spine to top level** — drag a child spine row onto the Spines list to make it a normal skeleton at that position (upper or lower half of the target row); it keeps its animation, starts synced at the scene origin and becomes active
 - **Image layers** — drag a placeholder image onto the Spines list to make it an image layer: its own row (thumbnail, name, Background checkbox, 🔗 sync, ✕) ordered and stacked together with the skeletons; click the row to activate it, then with sync off drag and scroll to move and scale only the layer; layers appear in PNG, sprite sheet and GIF exports and are discarded when you leave the viewer; drop a layer row on a placeholder drop zone to put it back as a placeholder image
-- **Drop zone** at the bottom of the Spines tab — drop an image file (PNG / JPG / WebP / AVIF) to add it as the background layer, or drop spine file sets to add new skeletons with automatic version detection and validation
+- **Drop zone** at the bottom of the Spines tab — drop an image file (PNG / JPG / WebP / AVIF) to add it as an image layer, or drop spine file sets to add new skeletons with automatic version detection and validation; new rows appear at the top of the list, in front of everything
 
 ### Background Image
 - The background is an image layer with its **Background** checkbox ticked; only one layer can be the background at a time
-- Drop a **PNG / JPG / WebP / AVIF** file onto the Spines tab drop zone (or the canvas) to add it as a new background layer at the bottom of the list, at the scene origin; a previous background stays as a normal layer directly above it
+- Drop a **PNG / JPG / WebP / AVIF** file onto the Spines tab drop zone (or the canvas) to add it as a new image layer at the top of the list, at the scene origin; an existing background is never replaced — tick **Background** on the new layer to make it the background
 - Tick **Background** on any image layer to make it the background: it moves to the bottom row and renders behind everything; untick it to turn it back into a normal layer
 - The background row has no drag handle and cannot be reordered or dragged into a placeholder; rows dropped on it land directly above it; ✕ removes it
 - Has its own **sync toggle** — when disabled and active, drag and zoom move only the background, in screen pixels (the scene does not move it); the global Sync button leaves it alone
@@ -221,11 +221,16 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 - **Sync toggle** (🔗) — disable to move/zoom the active skeleton independently; hold Shift to move the global scene
 - **Clone** the active skeleton via the clone button in the Spines tab
 - **Drag a skeleton onto a placeholder** of another skeleton to turn it into a child spine; drag a child spine or a placeholder image back onto the list to make it a top-level skeleton or an image layer
-- **Drop zone** at the bottom of the Spines tab — drop an image to add a background layer or spine files to add more skeletons
+- **Drop zone** at the bottom of the Spines tab — drop an image to add an image layer or spine files to add more skeletons; new rows go to the top
 
 ---
 
 ## Changelog
+
+### v1.3.16
+- **Dropped images become normal layers** — an image dropped on the canvas or the Spines drop zone is added as a normal image layer at the top of the list; the background is never replaced, tick **Background** yourself
+- **New items appear in front** — new skeletons and image layers go to the top of the Spines list, and new or moved-in placeholder images and child spines go to the top of their placeholder
+- **Clones appear above their source** — a cloned skeleton, placeholder image or child spine is listed directly above the original and renders just in front of it
 
 ### v1.3.15
 - **Placeholder stacking like the Spines list** — inside a placeholder the top row renders in front; newly added, cloned or moved-in images and child spines go to the bottom of the tree and render behind
