@@ -182,7 +182,7 @@ function densityClass(density: number): string {
 }
 
 .label {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--c-text-muted);
   text-transform: uppercase;
@@ -235,11 +235,11 @@ function densityClass(density: number): string {
   color: var(--c-text);
 }
 
-.val--warn { color: #facc15; }
-.val--crit { color: #f87171; }
+.val--warn { color: var(--c-warning); }
+.val--crit { color: var(--c-error); }
 
 .metric-hint {
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   color: var(--c-text-ghost);
   font-variant-numeric: tabular-nums;
   min-width: 40px;
@@ -247,14 +247,14 @@ function densityClass(density: number): string {
 }
 
 .binary-note {
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   color: var(--c-text-ghost);
   padding: 2px 4px;
 }
 
 /* ── Recommendations ── */
 .no-recs {
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   color: var(--c-text-faint);
   padding: 4px 4px;
 }
@@ -269,7 +269,7 @@ function densityClass(density: number): string {
 }
 
 .rec-item {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--c-text-dim);
   line-height: 1.4;
   padding: 4px 6px;
@@ -287,13 +287,13 @@ function densityClass(density: number): string {
 .kf-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
 }
 
 .kf-table thead th {
   text-align: left;
   font-weight: 600;
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   color: var(--c-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -335,7 +335,7 @@ function densityClass(density: number): string {
 }
 
 .dup--warn {
-  color: #facc15;
+  color: var(--c-warning);
 }
 
 /* ── Empty hint ── */
@@ -357,7 +357,7 @@ function densityClass(density: number): string {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   padding: 2px 4px;
   border-radius: 4px;
 }
@@ -374,12 +374,12 @@ function densityClass(density: number): string {
 }
 
 .blend-normal   { color: var(--c-text-muted); }
-.blend-additive { color: #fb923c; }
-.blend-multiply { color: #c084fc; }
-.blend-screen   { color: #22d3ee; }
+.blend-additive { color: var(--c-cat-1); }
+.blend-multiply { color: var(--c-cat-2); }
+.blend-screen   { color: var(--c-cat-3); }
 
 .unsupported-tag {
-  font-size: 0.6rem;
+  font-size: 0.6875rem;
   font-weight: 400;
   color: var(--c-text-ghost);
   text-transform: none;

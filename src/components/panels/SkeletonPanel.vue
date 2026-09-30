@@ -375,7 +375,7 @@ function fmtS(n: number): string {
 }
 
 .label {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--c-text-muted);
   text-transform: uppercase;
@@ -406,8 +406,9 @@ function fmtS(n: number): string {
   border: none;
   color: var(--c-text-faint);
   cursor: pointer;
-  padding: 0 2px;
-  font-size: 0.85rem;
+  min-height: 20px;
+  padding: 2px 6px;
+  font-size: 0.875rem;
   line-height: 1;
   border-radius: 3px;
   transition: color 0.12s;
@@ -457,11 +458,11 @@ function fmtS(n: number): string {
 }
 
 .bone-row--selected {
-  background: rgba(124, 106, 245, 0.15);
+  background: var(--c-accent-soft);
 }
 
 .bone-row--selected:hover {
-  background: rgba(124, 106, 245, 0.22);
+  background: var(--c-selection);
 }
 
 /* Toggle icon: ▸ / ▾ for parent nodes, · for leaf nodes */
@@ -469,7 +470,7 @@ function fmtS(n: number): string {
   flex-shrink: 0;
   width: 12px;
   text-align: center;
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   line-height: 1;
   color: var(--c-text-ghost);
   user-select: none;
@@ -501,7 +502,7 @@ function fmtS(n: number): string {
 .bone-vals {
   color: var(--c-text-faint);
   font-variant-numeric: tabular-nums;
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -522,8 +523,10 @@ function fmtS(n: number): string {
 .sync-label {
   display: inline-flex;
   align-items: center;
+  min-height: 20px;
+  padding: 0 4px;
   gap: 4px;
-  font-size: 0.62rem;
+  font-size: 0.6875rem;
   color: var(--c-text-faint);
   cursor: pointer;
   user-select: none;
@@ -535,7 +538,7 @@ function fmtS(n: number): string {
   width: 10px;
   height: 10px;
   cursor: pointer;
-  accent-color: #7c6af5;
+  accent-color: var(--c-accent);
   flex-shrink: 0;
 }
 
@@ -559,15 +562,15 @@ function fmtS(n: number): string {
 }
 
 .attach-row:hover .ac { background: var(--c-raised); }
-.attach-row--selected .ac { background: rgba(96, 165, 250, 0.12); }
-.attach-row--selected:hover .ac { background: rgba(96, 165, 250, 0.2); }
+.attach-row--selected .ac { background: var(--c-accent-soft); }
+.attach-row--selected:hover .ac { background: var(--c-selection); }
 
 /* Grid cells */
 .ac {
   display: flex;
   align-items: center;
   padding: 2px 6px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   min-width: 0;
 }
 
@@ -592,7 +595,7 @@ function fmtS(n: number): string {
 }
 
 .ac--hdr {
-  font-size: 0.6rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -619,30 +622,30 @@ function fmtS(n: number): string {
 
 .attach-type {
   display: inline-block;
-  font-size: 0.6rem;
+  font-size: 0.6875rem;
   padding: 1px 4px;
   border-radius: 3px;
   background: var(--c-border-dim);
   color: var(--c-text-muted);
 }
 
-.type-region   { color: #4ade80; background: rgba(74,  222, 128, 0.1); }
-.type-mesh     { color: #60a5fa; background: rgba(96,  165, 250, 0.1); }
-.type-clipping { color: #f87171; background: rgba(248, 113, 113, 0.1); }
-.type-path     { color: #facc15; background: rgba(250, 204,  21, 0.1); }
+.type-region   { color: var(--c-success); background: var(--c-success-soft); }
+.type-mesh     { color: var(--c-info); background: var(--c-info-soft); }
+.type-clipping { color: var(--c-error); background: var(--c-error-soft); }
+.type-path     { color: var(--c-warning); background: var(--c-warning-soft); }
 
 .blend-badge {
   display: inline-block;
-  font-size: 0.58rem;
+  font-size: 0.6875rem;
   padding: 1px 4px;
   border-radius: 3px;
   margin-left: 3px;
   font-weight: 600;
 }
 
-.blend-1 { color: #fb923c; background: rgba(251, 146,  60, 0.12); }  /* additive */
-.blend-2 { color: #c084fc; background: rgba(192, 132, 252, 0.12); }  /* multiply */
-.blend-3 { color: #22d3ee; background: rgba( 34, 211, 238, 0.12); }  /* screen */
+.blend-1 { color: var(--c-cat-1); background: color-mix(in srgb, var(--c-cat-1) 12%, transparent); }  /* additive */
+.blend-2 { color: var(--c-cat-2); background: color-mix(in srgb, var(--c-cat-2) 12%, transparent); }  /* multiply */
+.blend-3 { color: var(--c-cat-3); background: color-mix(in srgb, var(--c-cat-3) 12%, transparent); }  /* screen */
 
 .empty-hint {
   padding: 16px;

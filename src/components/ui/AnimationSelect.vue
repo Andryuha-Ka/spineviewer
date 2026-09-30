@@ -165,7 +165,7 @@ const selectedKeyPath = computed<Set<string>>(() => {
 function renderLabel(option: DropdownOption): VNodeChild {
   const inSelected = selectedKeyPath.value.has(String(option.key ?? ''))
   return h('span', {
-    style: inSelected ? { color: '#9d8fff', fontWeight: '600' } : undefined,
+    style: inSelected ? { color: 'var(--c-accent)', fontWeight: '600' } : undefined,
   }, String(option.label ?? ''))
 }
 
@@ -191,7 +191,7 @@ function onSelect(key: string | number) {
   border-radius: 3px;
   background: var(--c-surface);
   color: var(--c-text);
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   cursor: pointer;
   outline: none;
   transition: border-color 0.15s;
@@ -219,7 +219,7 @@ function onSelect(key: string | number) {
   border: none;
   background: none;
   color: var(--c-text-muted);
-  font-size: 0.95rem;
+  font-size: 0.875rem;
   line-height: 1;
   cursor: pointer;
 }

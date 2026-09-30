@@ -114,7 +114,7 @@ function posBtnIcon(pos: 'left' | 'right' | 'bottom'): string {
   color: var(--c-text-muted);
   border-radius: 6px;
   padding: 4px 12px;
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
   flex-shrink: 0;
@@ -155,8 +155,8 @@ function posBtnIcon(pos: 'left' | 'right' | 'bottom'): string {
 }
 
 .toggle-btn:hover   { border-color: var(--c-text-ghost); }
-.toggle-btn--on     { border-color: #4ade80; color: #4ade80; }
-.toggle-btn--on:hover { border-color: #6ee7a0; }
+.toggle-btn--on     { border-color: var(--c-success); color: var(--c-success); }
+.toggle-btn--on:hover { border-color: var(--c-success); }
 
 /* ── Master toggle ────────────────────────────────────────────────── */
 .master-toggle {
@@ -167,16 +167,17 @@ function posBtnIcon(pos: 'left' | 'right' | 'bottom'): string {
 }
 
 .master-label {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-ghost);
 }
 
 .master-btn {
   background: var(--c-raised);
+  height: 24px;
   border: 1px solid var(--c-border-dim);
   border-radius: 4px;
   padding: 2px 8px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--c-text-muted);
   cursor: pointer;
@@ -184,7 +185,7 @@ function posBtnIcon(pos: 'left' | 'right' | 'bottom'): string {
 }
 
 .master-btn:hover    { border-color: var(--c-text-ghost); }
-.master-btn--active  { background: #7c6af5; border-color: #7c6af5; color: white; }
+.master-btn--active  { background: var(--c-accent); border-color: var(--c-accent); color: var(--c-accent-text); }
 
 /* ── Panel position ───────────────────────────────────────────────── */
 .panel-pos-group {
@@ -195,6 +196,7 @@ function posBtnIcon(pos: 'left' | 'right' | 'bottom'): string {
 
 .pos-btn {
   background: transparent;
+  height: 24px;
   border: 1px solid var(--c-border-dim);
   border-radius: 4px;
   padding: 3px 8px;
@@ -205,5 +207,5 @@ function posBtnIcon(pos: 'left' | 'right' | 'bottom'): string {
 }
 
 .pos-btn:hover   { border-color: var(--c-text-ghost); color: var(--c-text-muted); }
-.pos-btn--active { border-color: #7c6af5; color: #9d8fff; }
+.pos-btn--active { border-color: var(--c-accent); color: var(--c-accent); }
 </style>

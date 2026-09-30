@@ -212,7 +212,7 @@ onMounted(() => {
 
 .panel-resize-handle:hover,
 .panel-resize-handle:active {
-  background: #7c6af5;
+  background: var(--c-accent);
 }
 
 .panel-resize-handle--left {

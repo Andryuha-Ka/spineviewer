@@ -278,7 +278,7 @@ function onPhSpineDragEnd(): void {
 
 .ph-pending-hint {
   padding: 4px 8px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-ghost);
   font-style: italic;
 }
@@ -295,8 +295,8 @@ function onPhSpineDragEnd(): void {
 }
 
 .ph-drop-zone--over {
-  border-color: #9d8fff;
-  background: rgba(157, 143, 255, 0.08);
+  border-color: var(--c-accent);
+  background: var(--c-accent-soft);
 }
 
 .ph-drop-name {
@@ -309,7 +309,7 @@ function onPhSpineDragEnd(): void {
 }
 
 .ph-drop-hint {
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   color: var(--c-text-ghost);
   white-space: nowrap;
 }
@@ -344,7 +344,7 @@ function onPhSpineDragEnd(): void {
   gap: 5px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--c-raised);
   cursor: grab;
 }
 
@@ -362,11 +362,11 @@ function onPhSpineDragEnd(): void {
 }
 
 .ph-image-entry--active {
-  background: rgba(157, 143, 255, 0.08);
+  background: var(--c-selection);
 }
 
 .ph-image-entry--active .ph-image-thumb {
-  outline: 1.5px solid #9d8fff;
+  outline: 1.5px solid var(--c-accent);
   border-radius: 2px;
 }
 
@@ -384,11 +384,11 @@ function onPhSpineDragEnd(): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   background: none;
   border: none;
-  color: #4ade80;
+  color: var(--c-success);
   cursor: pointer;
   padding: 0;
   border-radius: 3px;
@@ -396,7 +396,7 @@ function onPhSpineDragEnd(): void {
 }
 
 .ph-image-sync-btn--desynced {
-  color: #f59e0b;
+  color: var(--c-warning);
 }
 
 .ph-image-sync-btn:hover {
@@ -405,7 +405,7 @@ function onPhSpineDragEnd(): void {
 
 .ph-image-name {
   flex: 1;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -417,8 +417,8 @@ function onPhSpineDragEnd(): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   background: none;
   border: none;
   color: var(--c-text-ghost);
@@ -438,13 +438,13 @@ function onPhSpineDragEnd(): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   background: none;
   border: none;
   color: var(--c-text-ghost);
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   line-height: 1;
   border-radius: 2px;
   padding: 0;
@@ -452,8 +452,14 @@ function onPhSpineDragEnd(): void {
 }
 
 .ph-image-remove:hover {
-  background: rgba(248, 113, 113, 0.2);
-  color: #f87171;
+  background: var(--c-error-soft);
+  color: var(--c-error);
+}
+
+/* row gap is 5px: adjacent action buttons end up 4px apart */
+.ph-image-entry > button + button,
+.ph-spine-entry > button + button {
+  margin-left: -1px;
 }
 
 /* Child prefix in main spine list */
@@ -464,7 +470,7 @@ function onPhSpineDragEnd(): void {
   gap: 5px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(157, 143, 255, 0.04);
+  background: var(--c-raised);
   cursor: grab;
 }
 
@@ -474,12 +480,12 @@ function onPhSpineDragEnd(): void {
 
 .ph-spine-icon {
   flex-shrink: 0;
-  color: #9d8fff;
+  color: var(--c-text-muted);
 }
 
 .ph-spine-name {
   flex: 1;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -487,11 +493,11 @@ function onPhSpineDragEnd(): void {
 }
 
 .ph-spine-entry--active {
-  background: rgba(157, 143, 255, 0.08);
+  background: var(--c-selection);
 }
 
 .ph-spine-entry--active .ph-spine-icon {
-  color: #b8aaff;
+  color: var(--c-accent);
 }
 
 .ph-spine-entry--dragging {

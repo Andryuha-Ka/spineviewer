@@ -369,7 +369,7 @@ const isAddMode = ref(false)
 
 // ── Event flash helpers ─────────────────────────────────────────────────────
 const FLASH_MS = 200
-const PALETTE = ['#7c6af5', '#4ade80', '#60a5fa', '#f87171', '#facc15', '#fb923c', '#a78bfa', '#34d399']
+const PALETTE = ['var(--c-cat-1)', 'var(--c-cat-2)', 'var(--c-cat-3)', 'var(--c-cat-4)', 'var(--c-cat-5)']
 
 function nameColor(name: string): string {
   let hash = 0
@@ -515,7 +515,7 @@ function onAnimClear() {
 }
 
 .label {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--c-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -543,18 +543,18 @@ function onAnimClear() {
 .track-btn:not(:disabled):hover { border-color: var(--c-text-ghost); color: var(--c-text-dim); }
 
 .track-btn--active {
-  border-color: #4ade80 !important;
-  color: #4ade80 !important;
+  border-color: var(--c-success) !important;
+  color: var(--c-success) !important;
 }
 
 .track-btn--running {
-  border-color: #3b82f6;
-  color: #3b82f6;
+  border-color: var(--c-info);
+  color: var(--c-info);
 }
 
 .track-btn--active.track-btn--running {
-  border-color: #4ade80 !important;
-  color: #4ade80 !important;
+  border-color: var(--c-success) !important;
+  color: var(--c-success) !important;
 }
 
 /* ── Button rows ─────────────────────────── */
@@ -583,7 +583,7 @@ function onAnimClear() {
 }
 
 .speed-value {
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
   color: var(--c-text-dim);
   font-weight: 600;
@@ -655,7 +655,7 @@ function onAnimClear() {
 }
 
 .track-block--active {
-  border-color: #3b82f6;
+  border-color: var(--c-info);
 }
 
 .track-block-header {
@@ -677,15 +677,17 @@ function onAnimClear() {
 .block-spacer { flex: 1; }
 
 .track-loop-label {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  min-height: 20px;
+  padding: 0 4px;
   gap: 3px;
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .track-loop-text {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-faint);
 }
 
@@ -711,7 +713,7 @@ function onAnimClear() {
 .track-entry--played { opacity: 0.45; }
 
 .entry-icon {
-  font-size: 0.6rem;
+  font-size: 0.6875rem;
   color: var(--c-text-ghost);
   flex-shrink: 0;
   text-align: center;
@@ -726,7 +728,8 @@ function onAnimClear() {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 1px 3px;
+  min-height: 20px;
+  padding: 2px 6px;
   border-radius: 3px;
   transition: background 0.12s, color 0.12s;
   width: 18px;
@@ -757,7 +760,7 @@ function onAnimClear() {
 }
 
 .ecol-hdr {
-  font-size: 0.62rem;
+  font-size: 0.6875rem;
   color: var(--c-text-ghost);
   font-weight: 600;
   text-transform: uppercase;
@@ -776,7 +779,7 @@ function onAnimClear() {
   align-items: center;
   gap: 4px;
   padding: 2px 4px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   border-radius: 4px;
 }
 
@@ -785,7 +788,7 @@ function onAnimClear() {
 }
 
 .events-row--flash {
-  background: rgba(124,106,245,0.18);
+  background: var(--c-accent-soft);
   transition: background 0s;
 }
 
@@ -841,7 +844,7 @@ function onAnimClear() {
 }
 
 .empty-hint {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--c-text-ghost);
   padding: 4px 0;
 }

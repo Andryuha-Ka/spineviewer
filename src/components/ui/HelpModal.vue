@@ -185,6 +185,13 @@
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
           <div class="cl-entry">
+            <span class="cl-ver">v1.3.17</span>
+            <ul class="help-list">
+              <li><b>Studio Mono theme</b> — monochrome dark/light palette, readable 11px minimum text, larger row buttons</li>
+              <li><b>Palette selector</b> — pick Studio Mono, Darkroom Neutral, Slate Scrub, Keyframe Rose or Graphite Teal in ⚙ settings, each in Dark and Light; Darkroom Neutral is the new default</li>
+            </ul>
+          </div>
+          <div class="cl-entry">
             <span class="cl-ver">v1.3.16</span>
             <ul class="help-list">
               <li><b>Dropped images become normal layers</b> — an image dropped on the canvas or the Spines drop zone is added as a normal image layer at the top of the list; the background is never replaced, tick <b>Background</b> yourself</li>
@@ -381,7 +388,7 @@ const appVersion = __APP_VERSION__
   color: var(--c-text-muted);
   border-radius: 6px;
   padding: 4px 10px;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
   line-height: 1;
@@ -408,7 +415,7 @@ const appVersion = __APP_VERSION__
 }
 
 .sec-title {
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -417,16 +424,16 @@ const appVersion = __APP_VERSION__
 }
 
 .help-p {
-  font-size: 0.82rem;
+  font-size: 0.8125rem;
   color: var(--c-text-dim);
   line-height: 1.5;
   margin: 0;
 }
 
 .help-p--warn {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.07);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: var(--c-warning);
+  background: var(--c-warning-soft);
+  border: 1px solid var(--c-warning);
   border-radius: 5px;
   padding: 5px 8px;
 }
@@ -440,7 +447,7 @@ const appVersion = __APP_VERSION__
 }
 
 .help-list li {
-  font-size: 0.82rem;
+  font-size: 0.8125rem;
   color: var(--c-text-dim);
   line-height: 1.5;
 }
@@ -451,7 +458,7 @@ const appVersion = __APP_VERSION__
 
 code {
   font-family: 'Consolas', 'Menlo', monospace;
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   background: var(--c-surface);
   border: 1px solid var(--c-border);
   border-radius: 3px;
@@ -474,21 +481,21 @@ code {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: 0.82rem;
+  font-size: 0.8125rem;
   color: var(--c-text-dim);
   line-height: 1.45;
 }
 
 .tab-badge {
   flex-shrink: 0;
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   padding: 2px 7px;
   border-radius: 5px;
-  background: rgba(124, 106, 245, 0.14);
-  color: #9d8fff;
-  border: 1px solid rgba(124, 106, 245, 0.3);
+  background: var(--c-badge-bg);
+  color: var(--c-badge-text);
+  border: 1px solid var(--c-badge-border);
   min-width: 40px;
   text-align: center;
 }
@@ -496,7 +503,7 @@ code {
 /* Keyboard table */
 .kbd-table {
   border-collapse: collapse;
-  font-size: 0.82rem;
+  font-size: 0.8125rem;
   width: 100%;
 }
 
@@ -518,7 +525,7 @@ kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   font-family: inherit;
   font-weight: 600;
   padding: 2px 6px;
@@ -533,7 +540,7 @@ kbd {
 /* Version table */
 .ver-table {
   border-collapse: collapse;
-  font-size: 0.82rem;
+  font-size: 0.8125rem;
   width: 100%;
 }
 
@@ -545,7 +552,7 @@ kbd {
 }
 
 .ver-table th {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -572,14 +579,14 @@ kbd {
 
 .cl-ver {
   flex-shrink: 0;
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   padding: 2px 7px;
   border-radius: 5px;
-  background: rgba(34, 197, 94, 0.1);
-  color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: var(--c-success-soft);
+  color: var(--c-success);
+  border: 1px solid var(--c-success);
   min-width: 48px;
   text-align: center;
   margin-top: 2px;
@@ -599,31 +606,36 @@ kbd {
 }
 
 .about-name {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--c-text);
 }
 
 .about-link {
-  font-size: 0.82rem;
-  color: #7c6af5;
+  font-size: 0.8125rem;
+  color: var(--c-accent);
   text-decoration: none;
   transition: color 0.15s;
 }
 
 .about-link:hover {
-  color: #9d8fff;
+  color: var(--c-accent-hover);
   text-decoration: underline;
 }
 
 .about-copy {
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   color: var(--c-text-muted);
 }
 
 .about-ver {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-ghost);
   letter-spacing: 0.06em;
+}
+
+:global(html.theme-dark .help-modal-card) {
+  outline: 1px solid var(--c-border-strong);
+  box-shadow: var(--c-modal-glow), 0 24px 64px var(--c-shadow-strong);
 }
 </style>

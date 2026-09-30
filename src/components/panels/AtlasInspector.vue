@@ -181,10 +181,12 @@ import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import type { AtlasRegion, AtlasPage } from '@/core/utils/atlasTextParser'
 import type { SpineFileType } from '@/core/types/FileSet'
+import { useSettingsStore } from '@/core/stores/useSettingsStore'
 
 const atlasStore         = useAtlasStore()
 const skeletonStore      = useSkeletonStore()
 const slotSelectionStore = useSlotSelectionStore()
+const settingsStore      = useSettingsStore()
 
 const TYPE_LABELS: Record<SpineFileType, string> = {
   'skeleton-json': 'JSON',
@@ -251,6 +253,23 @@ function scheduleDraw() {
     draw()
   })
 }
+
+const colors = { sunken: '', border: '', info: '', infoSoft: '', success: '', successSoft: '', muted: '' }
+
+function readColors() {
+  const css = getComputedStyle(document.documentElement)
+  const v = (name: string) => css.getPropertyValue(name).trim()
+  colors.sunken      = v('--c-sunken')
+  colors.border      = v('--c-border-strong')
+  colors.info        = v('--c-info')
+  colors.infoSoft    = v('--c-info-soft')
+  colors.success     = v('--c-success')
+  colors.successSoft = v('--c-success-soft')
+  colors.muted       = v('--c-text-muted')
+}
+
+onMounted(readColors)
+watch(() => [settingsStore.theme, settingsStore.palette], () => { readColors(); scheduleDraw() }, { flush: 'post' })
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 const page = computed<AtlasPage | null>(() => atlasStore.pages[pageIndex.value] ?? null)
@@ -412,14 +431,16 @@ function draw() {
     ctx.imageSmoothingQuality = 'high'
     ctx.drawImage(currentBitmap.value, 0, 0)
   } else {
-    ctx.fillStyle = '#111113'
+    ctx.fillStyle = colors.sunken
     ctx.fillRect(0, 0, p.width, p.height)
   }
 
   // Atlas bounds outline
-  ctx.strokeStyle = 'rgba(160,160,180,0.5)'
+  ctx.strokeStyle = colors.border
   ctx.lineWidth   = 1 / zoom
+  ctx.globalAlpha = 0.5
   ctx.strokeRect(0, 0, p.width, p.height)
+  ctx.globalAlpha = 1
 
   // Line width in atlas coords for 1 CSS pixel
   const lw1 = 1 / zoom
@@ -432,24 +453,29 @@ function draw() {
     const isHL    = r.name === highlightedRegion.value
     const seen    = isSeen(r.name)
 
+    let strokeAlpha = 1
     if (isHL || isHover) {
-      ctx.fillStyle   = 'rgba(96,165,250,0.18)'
-      ctx.strokeStyle = '#60a5fa'
+      ctx.fillStyle   = colors.infoSoft
+      ctx.strokeStyle = colors.info
       ctx.lineWidth   = 1.5 * lw1
     } else if (seen) {
-      ctx.fillStyle   = 'rgba(74,222,128,0.07)'
-      ctx.strokeStyle = 'rgba(74,222,128,0.7)'
+      ctx.fillStyle   = colors.successSoft
+      ctx.strokeStyle = colors.success
       ctx.lineWidth   = lw1
+      strokeAlpha     = 0.7
     } else {
       ctx.fillStyle   = 'transparent'
-      ctx.strokeStyle = 'rgba(130,130,155,0.5)'
+      ctx.strokeStyle = colors.border
       ctx.lineWidth   = lw1
+      strokeAlpha     = 0.5
     }
 
     ctx.beginPath()
     ctx.rect(r.x, r.y, rw, rh)
     ctx.fill()
+    ctx.globalAlpha = strokeAlpha
     ctx.stroke()
+    ctx.globalAlpha = 1
   }
 
   // Region name labels at zoom >= 3
@@ -465,10 +491,10 @@ function draw() {
       const isHL    = r.name === highlightedRegion.value
 
       ctx.fillStyle = isHL || isHover
-        ? '#60a5fa'
+        ? colors.info
         : isSeen(r.name)
-          ? 'rgba(74,222,128,0.9)'
-          : 'rgba(180,180,200,0.75)'
+          ? colors.success
+          : colors.muted
 
       ctx.save()
       ctx.beginPath()
@@ -673,12 +699,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
 }
 
 .file-type-badge {
   flex-shrink: 0;
-  font-size: 0.58rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   padding: 1px 4px;
@@ -687,8 +713,8 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.file-type-badge--atlas { background: #3b2d5a; color: #c4b5fd; }
-.file-type-badge--image { background: #1e3d2e; color: #86efac; }
+.file-type-badge--atlas { background: var(--c-accent-soft); color: var(--c-accent); }
+.file-type-badge--image { background: var(--c-success-soft); color: var(--c-success); }
 
 .file-name {
   flex: 1;
@@ -698,11 +724,8 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.file-name--atlas { color: #c4b5fd; }
-.file-name--image { color: #86efac; }
-
-:global(html.theme-light .file-name--atlas) { color: #6d28d9; }
-:global(html.theme-light .file-name--image) { color: #15803d; }
+.file-name--atlas { color: var(--c-accent); }
+.file-name--image { color: var(--c-success); }
 
 .file-size {
   flex-shrink: 0;
@@ -727,7 +750,7 @@ onUnmounted(() => {
 
 .stat-label {
   color: var(--c-text-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -736,7 +759,7 @@ onUnmounted(() => {
 .stat-val {
   color: var(--c-text-dim);
   font-variant-numeric: tabular-nums;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   flex-shrink: 0;
 }
 
@@ -758,8 +781,14 @@ onUnmounted(() => {
   background: var(--c-bg);
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
-  outline: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 24px 64px var(--c-shadow-strong);
+  outline: 1px solid var(--c-border);
+}
+
+:global(html.theme-dark .atlas-modal) {
+  background: var(--c-surface);
+  outline-color: var(--c-border-strong);
+  box-shadow: var(--c-modal-glow), 0 24px 64px var(--c-shadow-strong);
 }
 
 /* ── Modal header ── */
@@ -774,7 +803,7 @@ onUnmounted(() => {
 }
 
 .modal-title {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--c-text-dim);
   flex-shrink: 0;
@@ -795,13 +824,13 @@ onUnmounted(() => {
   color: var(--c-text-muted);
   border-radius: 4px;
   padding: 2px 8px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.12s;
 }
 
-.page-tab--active { border-color: #60a5fa; color: #60a5fa; }
+.page-tab--active { border-color: var(--c-accent); color: var(--c-accent); }
 .page-tab:not(.page-tab--active):hover { border-color: var(--c-text-ghost); }
 
 .header-spacer { flex: 1; }
@@ -833,18 +862,18 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   /* Checkerboard: distinguishes canvas from modal bg in both themes */
-  background-color: #111318;
+  background-color: var(--c-sunken);
   background-image:
-    repeating-conic-gradient(#1a1b22 0% 25%, #111318 0% 50%);
+    repeating-conic-gradient(var(--c-raised) 0% 25%, var(--c-sunken) 0% 50%);
   background-size: 20px 20px;
   cursor: crosshair;
   border-right: 1px solid var(--c-border-dim);
 }
 
-:global(html.theme-light) .canvas-area {
-  background-color: #e8e8ee;
+:global(html.theme-light .canvas-area) {
+  background-color: var(--c-surface);
   background-image:
-    repeating-conic-gradient(#d8d8e0 0% 25%, #e8e8ee 0% 50%);
+    repeating-conic-gradient(var(--c-raised) 0% 25%, var(--c-surface) 0% 50%);
 }
 
 .atlas-canvas {
@@ -862,7 +891,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   color: var(--c-text-muted);
   pointer-events: none;
 }
@@ -878,18 +907,18 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   white-space: nowrap;
   pointer-events: none;
   z-index: 10;
   color: var(--c-text-dim);
   max-width: 200px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 12px var(--c-shadow);
 }
 
 .canvas-tooltip strong {
   color: var(--c-text);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -898,7 +927,7 @@ onUnmounted(() => {
 
 .tt-tag {
   display: inline-block;
-  font-size: 0.6rem;
+  font-size: 0.6875rem;
   padding: 1px 4px;
   border-radius: 3px;
   font-weight: 600;
@@ -907,9 +936,9 @@ onUnmounted(() => {
   align-self: flex-start;
 }
 
-.tt-tag--rot    { background: rgba(250,204,21,0.15); color: #facc15; }
-.tt-tag--used   { background: rgba(74,222,128,0.15); color: #4ade80; }
-.tt-tag--unseen { background: rgba(130,130,150,0.15); color: var(--c-text-faint); }
+.tt-tag--rot    { background: var(--c-warning-soft); color: var(--c-warning); }
+.tt-tag--used   { background: var(--c-success-soft); color: var(--c-success); }
+.tt-tag--unseen { background: var(--c-selection); color: var(--c-text-faint); }
 
 /* ── Region sidebar ── */
 .region-sidebar {
@@ -918,7 +947,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--c-border-dim);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--c-text);
 }
 
@@ -928,7 +957,7 @@ onUnmounted(() => {
   gap: 2px;
   padding: 8px 10px 6px;
   flex-shrink: 0;
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   color: var(--c-text-faint);
   border-bottom: 1px solid var(--c-border-dim);
 }
@@ -956,7 +985,7 @@ onUnmounted(() => {
 
 .region-row:hover,
 .region-row--hover   { background: var(--c-raised); }
-.region-row--active  { background: rgba(96,165,250,0.08); }
+.region-row--active  { background: var(--c-accent-soft); }
 
 .seen-dot {
   width: 6px;
@@ -965,7 +994,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.seen-dot--used   { background: #4ade80; }
+.seen-dot--used   { background: var(--c-success); }
 .seen-dot--unseen { background: var(--c-border); }
 
 .rname {
@@ -973,13 +1002,13 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-dim);
 }
 
 .rsize {
   flex-shrink: 0;
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
   color: var(--c-text-ghost);
 }
@@ -993,7 +1022,7 @@ onUnmounted(() => {
   height: 32px;
   flex-shrink: 0;
   border-top: 1px solid var(--c-border-dim);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .foot-btn {
@@ -1002,7 +1031,7 @@ onUnmounted(() => {
   color: var(--c-text-muted);
   border-radius: 4px;
   padding: 1px 8px;
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   cursor: pointer;
   transition: all 0.1s;
 }
@@ -1025,7 +1054,7 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
   color: var(--c-text-faint);
   min-width: 80px;
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
 }
 
 .foot-coords.muted { color: var(--c-text-ghost); }
@@ -1034,7 +1063,7 @@ onUnmounted(() => {
 
 .foot-page {
   color: var(--c-text-ghost);
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

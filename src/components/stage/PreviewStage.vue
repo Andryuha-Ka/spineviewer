@@ -985,7 +985,7 @@ defineExpose({
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   font-weight: 500;
   padding: 3px 7px;
   border-radius: 6px;
@@ -997,12 +997,12 @@ defineExpose({
   width: 11px;
   height: 11px;
   cursor: pointer;
-  accent-color: #7c6af5;
+  accent-color: #c8ccd2;
   flex-shrink: 0;
 }
 
 .origin-label {
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.6);
   cursor: pointer;
   user-select: none;
   transition: color 0.15s;
@@ -1028,7 +1028,7 @@ defineExpose({
 .bg-color-input::-webkit-color-swatch { border: 1px solid rgba(255,255,255,0.2); border-radius: 3px; }
 
 .bg-color-label {
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.6);
   font-size: inherit;
   user-select: none;
 }
@@ -1037,11 +1037,11 @@ defineExpose({
   width: 12px;
   height: 12px;
   cursor: pointer;
-  accent-color: #7c6af5;
+  accent-color: #c8ccd2;
 }
 
 .ph-label {
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.6);
   font-size: inherit;
   user-select: none;
 }
@@ -1063,7 +1063,7 @@ defineExpose({
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   font-weight: 500;
 }
 
@@ -1071,7 +1071,7 @@ defineExpose({
   width: 10px;
   height: 10px;
   cursor: pointer;
-  accent-color: #7c6af5;
+  accent-color: #c8ccd2;
   flex-shrink: 0;
 }
 
@@ -1195,7 +1195,7 @@ defineExpose({
 }
 
 .loading-text {
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   color: var(--c-text-muted);
 }
 

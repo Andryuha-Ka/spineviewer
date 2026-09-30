@@ -9,6 +9,7 @@ import * as PIXI from 'pixi8'
 import type { IProgressOverlay, ProgressOverlayParams, TrackDisplayState, MarkerDisplay } from '@/core/types/IProgressOverlay'
 import {
   buildDCSparkline,
+  OVERLAY_ACCENT,
   hitTestOverlay,
   overlayTotalHeight,
   OVERLAY_MARGIN_X,
@@ -29,10 +30,10 @@ function makeText(str: string, style: Record<string, unknown>): any {
   return new (PIXI as any).Text({ text: str, style })
 }
 
-const BASE_STYLE = { fontFamily: 'monospace', fontSize: 10, fill: 0xffffff, lineHeight: 14 }
-const IDX_STYLE  = { fontFamily: 'monospace', fontSize: 10, fill: 0x888888, lineHeight: 14 }
-const NAME_STYLE = { fontFamily: 'monospace', fontSize: 10, fill: 0xaaaaaa, lineHeight: 14 }
-const DC_TITLE_STYLE = { fontFamily: 'monospace', fontSize: 9, fill: 0x555555, lineHeight: 14 }
+const BASE_STYLE = { fontFamily: 'monospace', fontSize: 11, fill: 0xffffff, lineHeight: 15 }
+const IDX_STYLE  = { fontFamily: 'monospace', fontSize: 11, fill: 0x888888, lineHeight: 15 }
+const NAME_STYLE = { fontFamily: 'monospace', fontSize: 11, fill: 0xaaaaaa, lineHeight: 15 }
+const DC_TITLE_STYLE = { fontFamily: 'monospace', fontSize: 11, fill: 0x999999, lineHeight: 15 }
 
 export class Pixi8ProgressOverlay implements IProgressOverlay {
   private readonly _container: PIXI.Container
@@ -111,7 +112,7 @@ export class Pixi8ProgressOverlay implements IProgressOverlay {
       // Bar fill
       const fillW = Math.max(0, barW * track.normPos)
       if (fillW > 0) {
-        this._gfx.rect(barX, barTop, fillW, barH).fill({ color: 0x7c6af5, alpha: 0.85 })
+        this._gfx.rect(barX, barTop, fillW, barH).fill({ color: OVERLAY_ACCENT, alpha: 0.85 })
       }
 
       // Event markers
@@ -177,7 +178,7 @@ export class Pixi8ProgressOverlay implements IProgressOverlay {
           polyPoints.push(graphX + px, graphTop + py)
         }
         polyPoints.push(graphX + graphW, graphTop + DC_GRAPH_H)
-        this._gfx.poly(polyPoints).fill({ color: 0x7c6af5, alpha: 0.12 })
+        this._gfx.poly(polyPoints).fill({ color: OVERLAY_ACCENT, alpha: 0.12 })
 
         // Line
         let first = true
@@ -185,7 +186,7 @@ export class Pixi8ProgressOverlay implements IProgressOverlay {
           if (first) { this._gfx.moveTo(graphX + px, graphTop + py); first = false }
           else        { this._gfx.lineTo(graphX + px, graphTop + py) }
         }
-        this._gfx.stroke({ width: 1.5, color: 0x7c6af5, alpha: 0.75 })
+        this._gfx.stroke({ width: 1.5, color: OVERLAY_ACCENT, alpha: 0.75 })
       }
     } else {
       this._dcTitleText.visible = false
@@ -249,7 +250,7 @@ export class Pixi8ProgressOverlay implements IProgressOverlay {
       const time = makeText('', BASE_STYLE)
       idx.alpha  = 0.65
       name.alpha = 0.65
-      time.alpha = 0.45
+      time.alpha = 0.6
       this._container.addChild(idx)
       this._container.addChild(name)
       this._container.addChild(time)

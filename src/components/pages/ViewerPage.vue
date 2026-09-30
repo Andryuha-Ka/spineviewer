@@ -281,7 +281,7 @@ function onSetSkins(names: string[]) {
   color: var(--c-text-muted);
   border-radius: 6px;
   padding: 4px 12px;
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }
@@ -308,25 +308,22 @@ function onSetSkins(names: string[]) {
   text-overflow: ellipsis;
 }
 
-.spine-name-tag--skeleton-json { color: #60a5fa; }
-.spine-name-tag--skeleton-skel { color: #93c5fd; }
-
-:global(html.theme-light .spine-name-tag--skeleton-json) { color: #1d4ed8; }
-:global(html.theme-light .spine-name-tag--skeleton-skel) { color: #2563eb; }
+.spine-name-tag--skeleton-json,
+.spine-name-tag--skeleton-skel { color: var(--c-info); }
 
 .spine-type-badge {
   flex-shrink: 0;
-  font-size: 0.58rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   padding: 1px 4px;
   border-radius: 3px;
-  min-width: 34px;
+  min-width: 38px;
   text-align: center;
 }
 
-.spine-type-badge--skeleton-json { background: #1e3a5f; color: #60a5fa; }
-.spine-type-badge--skeleton-skel { background: #1e3a5f; color: #93c5fd; }
+.spine-type-badge--skeleton-json,
+.spine-type-badge--skeleton-skel { background: var(--c-info-soft); color: var(--c-info); }
 
 .content {
   display: flex;
@@ -351,7 +348,7 @@ function onSetSkins(names: string[]) {
 
 .resize-handle:hover,
 .resize-handle:active {
-  background: #7c6af5;
+  background: var(--c-accent);
 }
 
 .stage-area {

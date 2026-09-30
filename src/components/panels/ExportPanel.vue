@@ -274,7 +274,7 @@ const progressLabel = computed(() => {
 }
 
 .label {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--c-text-muted);
   text-transform: uppercase;
@@ -282,7 +282,7 @@ const progressLabel = computed(() => {
 }
 
 .hint {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-ghost);
   margin: 0;
 }
@@ -297,7 +297,7 @@ const progressLabel = computed(() => {
   width: 52px;
   flex-shrink: 0;
   color: var(--c-text-dim);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
 }
 
 .field-select {
@@ -309,7 +309,7 @@ const progressLabel = computed(() => {
 }
 
 .field-hint {
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   color: var(--c-text-ghost);
 }
 
@@ -329,7 +329,7 @@ const progressLabel = computed(() => {
 }
 
 .progress-label {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-dim);
 }
 
@@ -342,7 +342,7 @@ const progressLabel = computed(() => {
 
 .progress-fill {
   height: 100%;
-  background: #4ade80;
+  background: var(--c-success);
   transition: width 0.1s linear;
   border-radius: 2px;
 }
@@ -350,16 +350,16 @@ const progressLabel = computed(() => {
 /* ── Error ── */
 .export-error {
   padding: 8px 10px;
-  font-size: 0.7rem;
-  color: #f87171;
+  font-size: 0.75rem;
+  color: var(--c-error);
   border-bottom: 1px solid var(--c-border-dim);
 }
 
 /* ── Notice ── */
 .export-notice {
   padding: 8px 10px;
-  font-size: 0.7rem;
-  color: #fbbf24;
+  font-size: 0.75rem;
+  color: var(--c-warning);
   border-bottom: 1px solid var(--c-border-dim);
 }
 

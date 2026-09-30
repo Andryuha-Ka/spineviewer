@@ -119,7 +119,7 @@ watch(() => skeletonStore.freeBones, () => { overrides.value.clear() })
 }
 
 .panel-hint {
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   color: var(--c-text-ghost);
 }
 
@@ -139,7 +139,7 @@ watch(() => skeletonStore.freeBones, () => { overrides.value.clear() })
 }
 
 .bone-name {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--c-text-dim);
   margin-bottom: 4px;
   font-family: monospace;
@@ -152,7 +152,7 @@ watch(() => skeletonStore.freeBones, () => { overrides.value.clear() })
 }
 
 .ctrl-label {
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   color: var(--c-text-ghost);
   min-width: 10px;
   text-align: right;
@@ -164,7 +164,7 @@ watch(() => skeletonStore.freeBones, () => { overrides.value.clear() })
   border: 1px solid var(--c-border-dim);
   border-radius: 3px;
   color: var(--c-text);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   padding: 2px 4px;
   text-align: right;
 }
@@ -175,7 +175,7 @@ watch(() => skeletonStore.freeBones, () => { overrides.value.clear() })
 
 .ctrl-input:focus {
   outline: none;
-  border-color: #7c6af5;
+  border-color: var(--c-focus-ring);
 }
 
 /* Remove default number spinners */
@@ -191,7 +191,8 @@ watch(() => skeletonStore.freeBones, () => { overrides.value.clear() })
   border-radius: 3px;
   color: var(--c-text-ghost);
   font-size: 0.75rem;
-  padding: 1px 5px;
+  min-height: 20px;
+  padding: 2px 6px;
   cursor: pointer;
   margin-left: 2px;
   transition: color 0.15s, border-color 0.15s;

@@ -9,6 +9,7 @@ import * as PIXI from 'pixi.js'
 import type { IProgressOverlay, ProgressOverlayParams, TrackDisplayState, MarkerDisplay } from '@/core/types/IProgressOverlay'
 import {
   buildDCSparkline,
+  OVERLAY_ACCENT,
   hitTestOverlay,
   overlayTotalHeight,
   OVERLAY_MARGIN_X,
@@ -24,37 +25,37 @@ import {
 
 const TEXT_STYLE = new PIXI.TextStyle({
   fontFamily: 'monospace',
-  fontSize: 10,
+  fontSize: 11,
   fill: 0xffffff,
-  lineHeight: 14,
+  lineHeight: 15,
 })
 
 const IDX_STYLE = new PIXI.TextStyle({
   fontFamily: 'monospace',
-  fontSize: 10,
+  fontSize: 11,
   fill: 0x888888,
-  lineHeight: 14,
+  lineHeight: 15,
 })
 
 const NAME_STYLE = new PIXI.TextStyle({
   fontFamily: 'monospace',
-  fontSize: 10,
+  fontSize: 11,
   fill: 0xaaaaaa,
-  lineHeight: 14,
+  lineHeight: 15,
 })
 
 const DC_STYLE = new PIXI.TextStyle({
   fontFamily: 'monospace',
-  fontSize: 10,
+  fontSize: 11,
   fill: 0xffffff,
-  lineHeight: 14,
+  lineHeight: 15,
 })
 
 const DC_TITLE_STYLE = new PIXI.TextStyle({
   fontFamily: 'monospace',
-  fontSize: 9,
-  fill: 0x555555,
-  lineHeight: 14,
+  fontSize: 11,
+  fill: 0x999999,
+  lineHeight: 15,
 })
 
 export class Pixi7ProgressOverlay implements IProgressOverlay {
@@ -127,7 +128,7 @@ export class Pixi7ProgressOverlay implements IProgressOverlay {
       // Bar fill
       const fillW = Math.max(0, barW * track.normPos)
       if (fillW > 0) {
-        this._gfx.beginFill(0x7c6af5, 0.85)
+        this._gfx.beginFill(OVERLAY_ACCENT, 0.85)
         this._gfx.drawRect(barX, barTop, fillW, barH)
         this._gfx.endFill()
       }
@@ -194,7 +195,7 @@ export class Pixi7ProgressOverlay implements IProgressOverlay {
         // Fill polygon — base always spans full width (0..graphW) so graph
         // visually covers the full animation timeline regardless of where
         // the first/last DC sample lands.
-        this._gfx.beginFill(0x7c6af5, 0.12)
+        this._gfx.beginFill(OVERLAY_ACCENT, 0.12)
         this._gfx.moveTo(graphX, graphTop + DC_GRAPH_H)
         for (const [px, py] of spark.linePoints) {
           this._gfx.lineTo(graphX + px, graphTop + py)
@@ -204,7 +205,7 @@ export class Pixi7ProgressOverlay implements IProgressOverlay {
         this._gfx.endFill()
 
         // Line
-        this._gfx.lineStyle(1.5, 0x7c6af5, 0.75)
+        this._gfx.lineStyle(1.5, OVERLAY_ACCENT, 0.75)
         let first = true
         for (const [px, py] of spark.linePoints) {
           if (first) { this._gfx.moveTo(graphX + px, graphTop + py); first = false }
@@ -273,7 +274,7 @@ export class Pixi7ProgressOverlay implements IProgressOverlay {
       const time = new PIXI.Text('', TEXT_STYLE)
       idx.alpha  = 0.65
       name.alpha = 0.65
-      time.alpha = 0.45
+      time.alpha = 0.6
       this._container.addChild(idx)
       this._container.addChild(name)
       this._container.addChild(time)

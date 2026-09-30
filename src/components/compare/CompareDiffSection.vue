@@ -127,7 +127,7 @@ function statusIcon(status: DiffItem['status']): string {
   border: none;
   cursor: pointer;
   color: var(--c-text-dim);
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   text-align: left;
   transition: background 0.12s;
 }
@@ -137,7 +137,7 @@ function statusIcon(status: DiffItem['status']): string {
 }
 
 .section-toggle {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   font-weight: 700;
   color: var(--c-text-ghost);
   min-width: 14px;
@@ -153,19 +153,19 @@ function statusIcon(status: DiffItem['status']): string {
 
 .section-counts {
   color: var(--c-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   flex-shrink: 0;
 }
 
 .section-badge {
   margin-left: auto;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 500;
   flex-shrink: 0;
 }
 
 .section-badge--equal   { color: var(--c-text-ghost); }
-.section-badge--changed { color: #f59e0b; }
+.section-badge--changed { color: var(--c-warning); }
 
 .section-items {
   padding: 0 0 4px;
@@ -181,12 +181,12 @@ function statusIcon(status: DiffItem['status']): string {
   font-family: 'JetBrains Mono', 'Fira Mono', monospace;
 }
 
-.diff-item--added    { background: rgba(74, 222, 128, 0.05); }
-.diff-item--removed  { background: rgba(248, 113, 113, 0.05); }
-.diff-item--changed  { background: rgba(245, 158, 11, 0.05); }
+.diff-item--added    { background: var(--c-success-soft); }
+.diff-item--removed  { background: var(--c-error-soft); }
+.diff-item--changed  { background: var(--c-warning-soft); }
 .diff-item--clickable { cursor: pointer; }
 .diff-item--clickable:hover { background: var(--c-raised); }
-.diff-item--selected  { background: rgba(124, 106, 245, 0.12) !important; outline: 1px solid rgba(124, 106, 245, 0.4); outline-offset: -1px; }
+.diff-item--selected  { background: var(--c-selection) !important; outline: 1px solid var(--c-accent); outline-offset: -1px; }
 
 .item-status-icon {
   flex-shrink: 0;
@@ -196,9 +196,9 @@ function statusIcon(status: DiffItem['status']): string {
   text-align: center;
 }
 
-.diff-item--added   .item-status-icon { color: #4ade80; }
-.diff-item--removed .item-status-icon { color: #f87171; }
-.diff-item--changed .item-status-icon { color: #f59e0b; }
+.diff-item--added   .item-status-icon { color: var(--c-success); }
+.diff-item--removed .item-status-icon { color: var(--c-error); }
+.diff-item--changed .item-status-icon { color: var(--c-warning); }
 .diff-item--equal   .item-status-icon { color: var(--c-text-ghost); }
 
 .item-key {
@@ -210,7 +210,7 @@ function statusIcon(status: DiffItem['status']): string {
 }
 
 .item-value {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--c-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -218,14 +218,14 @@ function statusIcon(status: DiffItem['status']): string {
   max-width: 120px;
 }
 
-.item-value--a       { color: #f87171; }
-.item-value--b       { color: #4ade80; }
-.item-value--added   { color: #4ade80; }
-.item-value--removed { color: #f87171; }
+.item-value--a       { color: var(--c-error); }
+.item-value--b       { color: var(--c-success); }
+.item-value--added   { color: var(--c-success); }
+.item-value--removed { color: var(--c-error); }
 
 .item-arrow {
   color: var(--c-text-ghost);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   flex-shrink: 0;
 }
 
@@ -235,9 +235,9 @@ function statusIcon(status: DiffItem['status']): string {
   align-items: center;
   gap: 6px;
   padding: 1px 12px 1px 44px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-family: 'JetBrains Mono', 'Fira Mono', monospace;
-  background: rgba(245, 158, 11, 0.03);
+  background: var(--c-warning-soft);
 }
 
 .child-key {
@@ -247,19 +247,19 @@ function statusIcon(status: DiffItem['status']): string {
 }
 
 .child-value {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100px;
 }
 
-.child-value--a { color: #f87171; }
-.child-value--b { color: #4ade80; }
+.child-value--a { color: var(--c-error); }
+.child-value--b { color: var(--c-success); }
 
 .hidden-note {
   padding: 4px 28px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-ghost);
   font-style: italic;
 }

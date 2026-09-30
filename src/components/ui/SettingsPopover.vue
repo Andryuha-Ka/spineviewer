@@ -14,6 +14,19 @@
 
     <div class="settings-body">
       <div class="settings-row">
+        <span id="settings-palette-label" class="row-label">Palette</span>
+        <n-select
+          v-model:value="settingsStore.palette"
+          class="palette-select"
+          size="small"
+          aria-labelledby="settings-palette-label"
+          :options="options"
+          :to="false"
+          :consistent-menu-width="false"
+        />
+      </div>
+
+      <div class="settings-row">
         <span class="row-label">Theme</span>
         <n-button-group size="small">
           <n-button
@@ -45,6 +58,7 @@
 <script setup lang="ts">
 import { useSettingsStore } from '@/core/stores/useSettingsStore'
 import type { FontSize } from '@/core/stores/useSettingsStore'
+import { PALETTES } from '@/core/utils/themePalette'
 
 const settingsStore = useSettingsStore()
 
@@ -53,6 +67,8 @@ const SIZES: { value: FontSize; label: string }[] = [
   { value: 'md', label: 'M' },
   { value: 'lg', label: 'L' },
 ]
+
+const options = PALETTES.map(p => ({ label: p.label, value: p.id }))
 </script>
 
 <style scoped>
@@ -62,7 +78,7 @@ const SIZES: { value: FontSize; label: string }[] = [
   color: var(--c-text-muted);
   border-radius: 6px;
   padding: 4px 10px;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   cursor: pointer;
   line-height: 1;
   transition: color 0.15s, border-color 0.15s;
@@ -77,7 +93,7 @@ const SIZES: { value: FontSize; label: string }[] = [
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 200px;
+  min-width: 240px;
 }
 
 .settings-row {
@@ -87,8 +103,13 @@ const SIZES: { value: FontSize; label: string }[] = [
   gap: 12px;
 }
 
+.palette-select {
+  flex: 1;
+  min-width: 0;
+}
+
 .row-label {
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   color: var(--c-text-muted);
 }
 </style>

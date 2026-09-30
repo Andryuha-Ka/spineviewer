@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   makeLoopState, computeNorm, resetLoopState, buildDCSparkline,
   overlayTotalHeight, hitTestOverlay,
-  OVERLAY_PAD_TOP, OVERLAY_PAD_BOTTOM, TRACK_ROW_H, DC_SECTION_H, OVERLAY_MARGIN_X,
+  OVERLAY_PAD_TOP, OVERLAY_PAD_BOTTOM, TRACK_ROW_H, DC_SECTION_H, OVERLAY_MARGIN_X, OVERLAY_ACCENT,
 } from '@/core/overlay/overlayMath'
 
 describe('computeNorm', () => {
@@ -61,5 +61,11 @@ describe('overlay hit-test', () => {
     expect(row1.trackRowIndex).toBe(1)
     expect(row1.barPct).toBeCloseTo((200 - OVERLAY_MARGIN_X) / (400 - OVERLAY_MARGIN_X * 2))
     expect(hitTestOverlay(0, top + OVERLAY_PAD_TOP + 1, 400, stageH, 2, false).barPct).toBe(0)
+  })
+})
+
+describe('overlay accent', () => {
+  it('is the neutral light grey', () => {
+    expect(OVERLAY_ACCENT).toBe(0xc8ccd2)
   })
 })

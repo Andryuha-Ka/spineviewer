@@ -112,15 +112,17 @@ export function buildDCSparkline(
 
 // ── Layout constants and hit-test ──────────────────────────────────────────────
 
+export const OVERLAY_ACCENT     = 0xc8ccd2
+
 export const OVERLAY_MARGIN_X   = 12   // px from edges
-export const TRACK_INFO_H       = 14   // height of time info row
+export const TRACK_INFO_H       = 15   // height of time info row
 export const TRACK_BAR_H        = 4    // bar height
 export const TRACK_BAR_H_HOVER  = 6   // bar height on hover
 export const TRACK_GAP          = 5    // between info row and bar
-export const TRACK_ROW_H        = TRACK_INFO_H + TRACK_GAP + TRACK_BAR_H + 6  // ~29px
-export const DC_HEADER_H        = 16
+export const TRACK_ROW_H        = TRACK_INFO_H + TRACK_GAP + TRACK_BAR_H + 6  // ~30px
+export const DC_HEADER_H        = 17
 export const DC_GRAPH_H         = 36
-export const DC_SECTION_H       = DC_HEADER_H + DC_GRAPH_H + 4  // ~56px
+export const DC_SECTION_H       = DC_HEADER_H + DC_GRAPH_H + 4  // ~57px
 export const OVERLAY_PAD_BOTTOM = 10
 export const OVERLAY_PAD_TOP    = 4
 

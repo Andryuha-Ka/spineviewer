@@ -104,9 +104,11 @@
 <script setup lang="ts">
 import { useProfilerStore } from '@/core/stores/useProfilerStore'
 import { useAtlasStore }    from '@/core/stores/useAtlasStore'
+import { useSettingsStore } from '@/core/stores/useSettingsStore'
 
 const profilerStore = useProfilerStore()
 const atlasStore    = useAtlasStore()
+const settingsStore = useSettingsStore()
 
 // ── Graph canvas ──────────────────────────────────────────────────────────────
 
@@ -114,6 +116,19 @@ const graphRef = ref<HTMLCanvasElement | null>(null)
 const MAX_FPS  = 90  // upper bound for graph y-axis
 
 let rafHandle = 0
+
+const colors = { bg: '', success: '', warning: '', error: '' }
+
+function readColors() {
+  const css = getComputedStyle(document.documentElement)
+  const v = (name: string) => css.getPropertyValue(name).trim()
+  colors.bg      = v('--c-sunken')
+  colors.success = v('--c-success')
+  colors.warning = v('--c-warning')
+  colors.error   = v('--c-error')
+}
+
+watch(() => [settingsStore.theme, settingsStore.palette], readColors, { flush: 'post' })
 
 function drawGraph() {
   const canvas = graphRef.value
@@ -136,7 +151,7 @@ function drawGraph() {
   ctx.clearRect(0, 0, w, h)
 
   // Background
-  ctx.fillStyle = 'rgba(0,0,0,0.35)'
+  ctx.fillStyle = colors.bg
   ctx.fillRect(0, 0, w, h)
 
   // Threshold lines
@@ -144,10 +159,12 @@ function drawGraph() {
   const y30 = h - (30 / MAX_FPS) * h
 
   ctx.lineWidth = 1
-  ctx.strokeStyle = 'rgba(74, 222, 128, 0.25)'
+  ctx.globalAlpha = 0.25
+  ctx.strokeStyle = colors.success
   ctx.beginPath(); ctx.moveTo(0, y60); ctx.lineTo(w, y60); ctx.stroke()
-  ctx.strokeStyle = 'rgba(250, 204, 21, 0.25)'
+  ctx.strokeStyle = colors.warning
   ctx.beginPath(); ctx.moveTo(0, y30); ctx.lineTo(w, y30); ctx.stroke()
+  ctx.globalAlpha = 1
 
   // Bars
   const history = profilerStore.fpsHistory
@@ -159,7 +176,7 @@ function drawGraph() {
     const barH = Math.min(fps / MAX_FPS, 1) * h
     const x    = (offset + i) * barW
 
-    ctx.fillStyle = fps >= 55 ? '#4ade80' : fps >= 30 ? '#facc15' : '#f87171'
+    ctx.fillStyle = fps >= 55 ? colors.success : fps >= 30 ? colors.warning : colors.error
     ctx.fillRect(Math.round(x) + 0.5, h - barH, Math.max(barW - 1, 0.5), barH)
   }
 }
@@ -169,7 +186,10 @@ function loop() {
   rafHandle = requestAnimationFrame(loop)
 }
 
-onMounted(() => { rafHandle = requestAnimationFrame(loop) })
+onMounted(() => {
+  readColors()
+  rafHandle = requestAnimationFrame(loop)
+})
 onUnmounted(() => {
   cancelAnimationFrame(rafHandle)
   longTaskObserver?.disconnect()
@@ -242,14 +262,14 @@ const clippingClass = computed(() =>
 )
 
 function fpsColor(fps: number): string {
-  return fps >= 55 ? '#4ade80' : fps >= 30 ? '#facc15' : '#f87171'
+  return fps >= 55 ? 'var(--c-success)' : fps >= 30 ? 'var(--c-warning)' : 'var(--c-error)'
 }
 
 const slowFramesReversed  = computed(() => [...profilerStore.slowFrames].reverse())
 const longTasksReversed   = computed(() => [...profilerStore.longTasks].reverse())
 
 function longTaskColor(duration: number): string {
-  return duration >= 200 ? '#f87171' : duration >= 100 ? '#facc15' : '#fb923c'
+  return duration >= 200 ? 'var(--c-error)' : duration >= 100 ? 'var(--c-warning)' : 'var(--c-cat-1)'
 }
 
 function formatAgo(timestamp: number): string {
@@ -288,7 +308,7 @@ function formatAgo(timestamp: number): string {
 .graph-label {
   position: absolute;
   right: 4px;
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   color: var(--c-text-faint);
   line-height: 1;
   pointer-events: none;
@@ -319,14 +339,14 @@ function formatAgo(timestamp: number): string {
 }
 
 .stat-label {
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   color: var(--c-text-faint);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .stat-value {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--c-text);
@@ -337,9 +357,9 @@ function formatAgo(timestamp: number): string {
 }
 
 /* FPS colour classes */
-.fps--good { color: #4ade80; }
-.fps--ok   { color: #facc15; }
-.fps--bad  { color: #f87171; }
+.fps--good { color: var(--c-success); }
+.fps--ok   { color: var(--c-warning); }
+.fps--bad  { color: var(--c-error); }
 
 /* ── Slow frames ── */
 .slow-section {
@@ -412,7 +432,7 @@ function formatAgo(timestamp: number): string {
 }
 
 .unsupported-tag {
-  font-size: 0.6rem;
+  font-size: 0.6875rem;
   font-weight: 400;
   color: var(--c-text-ghost);
   text-transform: none;

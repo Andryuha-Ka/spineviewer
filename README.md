@@ -227,6 +227,10 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 
 ## Changelog
 
+### v1.3.17
+- **Studio Mono theme** — monochrome dark/light palette, readable 11px minimum text, larger row buttons
+- **Palette selector** — pick Studio Mono, Darkroom Neutral, Slate Scrub, Keyframe Rose or Graphite Teal in ⚙ settings, each in Dark and Light; Darkroom Neutral is the new default
+
 ### v1.3.16
 - **Dropped images become normal layers** — an image dropped on the canvas or the Spines drop zone is added as a normal image layer at the top of the list; the background is never replaced, tick **Background** yourself
 - **New items appear in front** — new skeletons and image layers go to the top of the Spines list, and new or moved-in placeholder images and child spines go to the top of their placeholder

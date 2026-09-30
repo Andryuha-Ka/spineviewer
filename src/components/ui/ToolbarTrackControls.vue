@@ -110,7 +110,7 @@ function onSkinSelect(name: string) {
 
 function renderTrackLabel(option: SelectOption): VNodeChild {
   const running = animationStore.tracks.some(t => t.trackIndex === option.value)
-  return h('span', { style: running ? { color: '#3b82f6' } : undefined }, String(option.label ?? ''))
+  return h('span', { style: running ? { color: 'var(--c-info)' } : undefined }, String(option.label ?? ''))
 }
 
 function onTrackChange(value: number) {
@@ -153,7 +153,7 @@ function onLoopChange(loop: boolean) {
   border: none;
   border-radius: 3px;
   background: none;
-  color: #4ade80;
+  color: var(--c-success);
   font-size: 0.75rem;
   line-height: 1;
   cursor: pointer;

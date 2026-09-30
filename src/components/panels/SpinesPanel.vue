@@ -595,7 +595,7 @@ function modifiedHint(slot: SpineSlot): string {
 
 .spines-toolbar-label {
   flex: 1;
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   color: var(--c-text-ghost);
   user-select: none;
 }
@@ -628,7 +628,7 @@ function modifiedHint(slot: SpineSlot): string {
   left: 6px;
   right: 6px;
   height: 2px;
-  background: #9d8fff;
+  background: var(--c-accent);
   border-radius: 1px;
   pointer-events: none;
 }
@@ -662,15 +662,16 @@ function modifiedHint(slot: SpineSlot): string {
 }
 
 .spine-item:hover:not(.spine-item--error) {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--c-hover);
 }
 
 .spine-item--active {
-  background: rgba(124, 106, 245, 0.18) !important;
+  background: var(--c-selection) !important;
+  box-shadow: inset 2px 0 0 var(--c-accent);
 }
 
 .spine-item--pinned {
-  background: rgba(74, 222, 128, 0.07);
+  background: var(--c-success-soft);
 }
 
 .spine-item--error {
@@ -682,22 +683,22 @@ function modifiedHint(slot: SpineSlot): string {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--c-border-strong);
   flex-shrink: 0;
   transition: background 0.12s;
 }
 
 .spine-item--active .spine-dot {
-  background: #9d8fff;
+  background: var(--c-accent);
 }
 
 .spine-item--pinned .spine-dot {
-  background: #4ade80;
+  background: var(--c-success);
 }
 
 .spine-name {
   flex: 1;
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   color: var(--c-text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -713,7 +714,7 @@ function modifiedHint(slot: SpineSlot): string {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #f59e0b;
+  background: var(--c-warning);
   flex-shrink: 0;
   opacity: 0.8;
 }
@@ -723,11 +724,11 @@ function modifiedHint(slot: SpineSlot): string {
 }
 
 .spine-err-badge {
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   font-weight: 700;
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.15);
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: var(--c-error);
+  background: var(--c-error-soft);
+  border: 1px solid var(--c-error);
   border-radius: 4px;
   padding: 1px 5px;
   flex-shrink: 0;
@@ -735,9 +736,9 @@ function modifiedHint(slot: SpineSlot): string {
 
 /* Validation errors use amber instead of red to distinguish from classification errors */
 .spine-err-badge--validation {
-  color: #fbbf24;
-  background: rgba(251, 191, 36, 0.15);
-  border-color: rgba(251, 191, 36, 0.3);
+  color: var(--c-warning);
+  background: var(--c-warning-soft);
+  border-color: var(--c-warning);
 }
 
 /* Sync button */
@@ -746,18 +747,20 @@ function modifiedHint(slot: SpineSlot): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
   background: none;
   border: none;
-  color: #4ade80;
+  color: var(--c-success);
   cursor: pointer;
-  padding: 2px 3px;
   border-radius: 3px;
   opacity: 1;
   transition: opacity 0.12s, color 0.12s;
 }
 
 .spine-sync-btn--desynced {
-  color: #f59e0b;
+  color: var(--c-warning);
 }
 
 .spine-sync-btn:not(.spine-sync-btn--desynced):hover {
@@ -774,11 +777,13 @@ function modifiedHint(slot: SpineSlot): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
   background: none;
   border: none;
   color: var(--c-text-ghost);
   cursor: pointer;
-  padding: 2px 3px;
   border-radius: 3px;
   opacity: 1;
   transition: opacity 0.12s, color 0.12s;
@@ -799,22 +804,25 @@ function modifiedHint(slot: SpineSlot): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
   background: none;
   border: none;
   color: var(--c-text-ghost);
   cursor: pointer;
-  padding: 2px 3px;
   border-radius: 3px;
   opacity: 1;
   transition: opacity 0.12s, color 0.12s;
 }
 
 .spine-pin-btn--pinned {
-  color: #4ade80;
+  color: var(--c-success);
 }
 
 .spine-pin-btn--pending {
-  color: rgba(74, 222, 128, 0.35);
+  color: var(--c-success);
+  opacity: 0.35;
 }
 
 .spine-pin-btn:not(.spine-pin-btn--pinned):hover {
@@ -824,7 +832,7 @@ function modifiedHint(slot: SpineSlot): string {
 
 .spine-pin-btn--pinned:hover {
   background: var(--c-raised);
-  color: #4ade80;
+  color: var(--c-success);
 }
 
 /* Drop zone */
@@ -834,7 +842,7 @@ function modifiedHint(slot: SpineSlot): string {
   border: 1px dashed var(--c-border);
   border-radius: 6px;
   text-align: center;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-ghost);
   transition: border-color 0.15s, background 0.15s;
   cursor: default;
@@ -842,14 +850,14 @@ function modifiedHint(slot: SpineSlot): string {
 }
 
 .spines-dropzone--over {
-  border-color: #9d8fff;
-  background: rgba(157, 143, 255, 0.08);
+  border-color: var(--c-accent);
+  background: var(--c-accent-soft);
   color: var(--c-text-dim);
 }
 
 .spines-footer {
   padding: 8px 12px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-ghost);
   border-top: 1px solid var(--c-border);
   flex-shrink: 0;
@@ -861,23 +869,25 @@ function modifiedHint(slot: SpineSlot): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
   background: none;
   border: none;
-  color: #fbbf24;
+  color: var(--c-warning);
   cursor: pointer;
-  padding: 2px 3px;
   border-radius: 3px;
   transition: color 0.12s, transform 0.15s;
 }
 
 .spine-expand-btn:hover {
   background: var(--c-raised);
-  color: #fcd34d;
+  color: var(--c-warning);
 }
 
 .spine-expand-btn--open {
   transform: rotate(180deg);
-  color: #fbbf24;
+  color: var(--c-warning);
 }
 
 .spine-layer-thumb {
@@ -890,11 +900,13 @@ function modifiedHint(slot: SpineSlot): string {
 }
 
 .spine-bg-check {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  min-height: 20px;
+  padding: 0 4px;
   gap: 3px;
   flex-shrink: 0;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--c-text-muted);
   cursor: pointer;
 }
@@ -905,19 +917,32 @@ function modifiedHint(slot: SpineSlot): string {
 
 .spine-layer-remove {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
   background: none;
   border: none;
   color: var(--c-text-ghost);
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   line-height: 1;
-  padding: 2px 4px;
   border-radius: 3px;
 }
 
 .spine-layer-remove:hover {
-  background: rgba(248, 113, 113, 0.2);
-  color: #f87171;
+  background: var(--c-error-soft);
+  color: var(--c-error);
+}
+
+/* row gap is 6px: pull adjacent action buttons to 2px, "×" ends up 4px */
+.spine-item > button + button {
+  margin-left: -4px;
+}
+.spine-item > button + .spine-layer-remove {
+  margin-left: -2px;
 }
 
 /* Placeholder tree */

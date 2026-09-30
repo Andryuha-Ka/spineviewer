@@ -665,7 +665,7 @@ async function onDrop(e: DragEvent) {
 
 .canvas-slot--pan   { cursor: grabbing; }
 .canvas-slot--empty { cursor: default; }
-.canvas-slot--drag  { outline: 2px dashed #7c6af5; outline-offset: -2px; }
+.canvas-slot--drag  { outline: 2px dashed #c8ccd2; outline-offset: -2px; }
 
 .slot-canvas {
   flex: 1;
@@ -687,9 +687,9 @@ async function onDrop(e: DragEvent) {
   pointer-events: none;
 }
 
-.empty-icon  { font-size: 2rem; color: rgba(255,255,255,0.12); line-height: 1; }
-.empty-label { font-size: 0.85rem; color: rgba(255,255,255,0.3); font-weight: 500; }
-.empty-hint  { font-size: 0.72rem; color: rgba(255,255,255,0.15); }
+.empty-icon  { font-size: 2rem; color: rgba(255,255,255,0.35); line-height: 1; }
+.empty-label { font-size: 0.875rem; color: rgba(255,255,255,0.6); font-weight: 500; }
+.empty-hint  { font-size: 0.75rem; color: rgba(255,255,255,0.6); }
 
 /* ── Overlays ─────────────────────────────────────────────────────── */
 .loading-overlay,
@@ -699,11 +699,11 @@ async function onDrop(e: DragEvent) {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   pointer-events: none;
 }
 
-.loading-text { color: rgba(255,255,255,0.4); }
+.loading-text { color: rgba(255,255,255,0.6); }
 .error-text   { color: #f87171; white-space: pre-line; text-align: center; }
 
 .overlay-tl {
@@ -745,7 +745,7 @@ async function onDrop(e: DragEvent) {
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   font-weight: 500;
 }
 
@@ -753,7 +753,7 @@ async function onDrop(e: DragEvent) {
   width: 10px;
   height: 10px;
   cursor: pointer;
-  accent-color: #7c6af5;
+  accent-color: #c8ccd2;
   flex-shrink: 0;
 }
 
@@ -780,8 +780,8 @@ async function onDrop(e: DragEvent) {
 .bg-input::-webkit-color-swatch { border: 1px solid rgba(255,255,255,0.2); border-radius: 3px; }
 
 .overlay-hint {
-  font-size: 0.65rem;
-  color: rgba(255,255,255,0.35);
+  font-size: 0.6875rem;
+  color: rgba(255,255,255,0.6);
   user-select: none;
   cursor: default;
 }
@@ -790,7 +790,7 @@ async function onDrop(e: DragEvent) {
   width: 11px;
   height: 11px;
   cursor: pointer;
-  accent-color: #7c6af5;
+  accent-color: #c8ccd2;
 }
 
 .ph-hint {
@@ -806,7 +806,7 @@ async function onDrop(e: DragEvent) {
 }
 
 .fps-badge {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   padding: 3px 8px;
@@ -835,10 +835,10 @@ async function onDrop(e: DragEvent) {
 }
 
 .slot-side-badge {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.6);
   border-radius: 4px;
   padding: 1px 6px;
   flex-shrink: 0;
@@ -859,8 +859,8 @@ async function onDrop(e: DragEvent) {
 .control-bar :deep(.cmp-select--skin) {
   flex: 0 0 auto;
   max-width: 110px;
-  border-color: rgba(124,106,245,0.3);
-  color: #c4b5fd;
+  border-color: rgba(200,204,210,0.3);
+  color: #c8ccd2;
 }
 
 .ctrl-btn {
@@ -875,34 +875,34 @@ async function onDrop(e: DragEvent) {
   flex-shrink: 0;
   transition: border-color 0.12s, color 0.12s;
 }
-.ctrl-btn:hover { border-color: #7c6af5; color: #9d8fff; }
+.ctrl-btn:hover { border-color: #c8ccd2; color: #c8ccd2; }
 
 .sync-badge {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   padding: 2px 6px;
   border-radius: 4px;
   border: 1px solid transparent;
   flex-shrink: 0;
-  color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.6);
 }
 .sync-badge--on { color: #4ade80; border-color: rgba(74, 222, 128, 0.2); }
 
 .time-display {
-  font-size: 0.7rem;
-  color: rgba(255,255,255,0.4);
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.6);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
 .fps-inline {
-  font-size: 0.65rem;
-  color: rgba(255,255,255,0.25);
+  font-size: 0.6875rem;
+  color: rgba(255,255,255,0.6);
   flex-shrink: 0;
 }
 
 .empty-bar-hint {
-  font-size: 0.72rem;
-  color: rgba(255,255,255,0.2);
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.6);
 }
 
 /* ── Anim not-found toast ─────────────────────────────────────────── */
@@ -914,7 +914,7 @@ async function onDrop(e: DragEvent) {
   background: rgba(20, 20, 26, 0.88);
   border: 1px solid rgba(248, 113, 113, 0.4);
   color: #f87171;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   padding: 5px 12px;
   border-radius: 6px;
   backdrop-filter: blur(6px);

@@ -7,7 +7,7 @@
 -->
 
 <template>
-  <n-config-provider :theme="naiveTheme">
+  <n-config-provider :theme="naiveTheme" :theme-overrides="themeOverrides">
     <n-global-style />
     <VersionPickerPage
       v-if="page === 'picker'"
@@ -34,6 +34,7 @@ import VersionPickerPage from '@/components/pages/VersionPickerPage.vue'
 import ViewerPage from '@/components/pages/ViewerPage.vue'
 import ComparePage from '@/components/compare/ComparePage.vue'
 import { useSettingsStore } from '@/core/stores/useSettingsStore'
+import { naiveOverrides } from '@/core/utils/themePalette'
 
 const settingsStore = useSettingsStore()
 const page     = ref<'picker' | 'viewer' | 'compare'>('picker')
@@ -47,13 +48,14 @@ function onOpenCompare(payload?: { left?: string; right?: string }) {
 }
 
 const naiveTheme = computed(() => settingsStore.theme === 'dark' ? darkTheme : null)
+const themeOverrides = computed(() => naiveOverrides(settingsStore.palette, settingsStore.theme))
 
 watchEffect(() => {
   const html = document.documentElement
-  // Remove previous theme/font classes
-  const toRemove = [...html.classList].filter(c => c.startsWith('theme-') || c.startsWith('font-'))
+  // Remove previous theme/palette/font classes
+  const toRemove = [...html.classList].filter(c => c.startsWith('theme-') || c.startsWith('palette-') || c.startsWith('font-'))
   toRemove.forEach(c => html.classList.remove(c))
-  html.classList.add(`theme-${settingsStore.theme}`, `font-${settingsStore.fontSize}`)
+  html.classList.add(`theme-${settingsStore.theme}`, `palette-${settingsStore.palette}`, `font-${settingsStore.fontSize}`)
 })
 </script>
 

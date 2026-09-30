@@ -268,7 +268,7 @@ function onResizeStart(e: MouseEvent) {
 
 .split-handle:hover,
 .split-handle:active {
-  background: #7c6af5;
+  background: var(--c-accent);
 }
 
 .split-handle-inner {
@@ -281,6 +281,6 @@ function onResizeStart(e: MouseEvent) {
 
 .split-handle:hover .split-handle-inner,
 .split-handle:active .split-handle-inner {
-  background: white;
+  background: var(--c-accent-text);
 }
 </style>

@@ -161,7 +161,7 @@ declare module '@vue/runtime-core' {
 }
 
 .slot-badge {
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   background: var(--c-raised);
   color: var(--c-text-muted);
@@ -182,13 +182,13 @@ declare module '@vue/runtime-core' {
   min-width: 140px;
   max-width: 200px;
   color: var(--c-text-muted);
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   transition: border-color 0.12s;
 }
 
 .slot-btn:hover    { border-color: var(--c-text-ghost); }
-.slot-btn--set     { border-color: #7c6af5; color: var(--c-text); }
-.slot-btn--set:hover { border-color: #9d8fff; }
+.slot-btn--set     { border-color: var(--c-accent); color: var(--c-text); }
+.slot-btn--set:hover { border-color: var(--c-accent-hover); }
 
 .slot-label {
   flex: 1;
@@ -199,7 +199,7 @@ declare module '@vue/runtime-core' {
 }
 
 .slot-arrow {
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   color: var(--c-text-ghost);
   flex-shrink: 0;
 }
@@ -214,13 +214,13 @@ declare module '@vue/runtime-core' {
   border: 1px solid var(--c-border);
   border-radius: 8px;
   min-width: 220px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px var(--c-shadow);
   overflow: hidden;
 }
 
 .dropdown-group-label {
   padding: 6px 12px 3px;
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -241,7 +241,7 @@ declare module '@vue/runtime-core' {
   background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   color: var(--c-text-dim);
   text-align: left;
   transition: background 0.1s;
@@ -249,7 +249,7 @@ declare module '@vue/runtime-core' {
 
 .dropdown-item:hover { background: var(--c-raised); }
 
-.dropdown-item--active { background: rgba(124, 106, 245, 0.1); color: #9d8fff; }
+.dropdown-item--active { background: var(--c-accent-soft); color: var(--c-accent); }
 
 .dropdown-item-name {
   overflow: hidden;
@@ -258,7 +258,7 @@ declare module '@vue/runtime-core' {
 }
 
 .dropdown-item--load   { color: var(--c-text-muted); }
-.dropdown-item--clear  { color: #f87171; }
+.dropdown-item--clear  { color: var(--c-error); }
 
 .hidden-input { display: none; }
 </style>
