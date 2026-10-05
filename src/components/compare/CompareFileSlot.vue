@@ -104,14 +104,12 @@ function isActiveLoaded(id: string): boolean {
 
 function selectLoaded(id: string, name: string) {
   const slotRef: SpineSlotRef = { source: 'loaded', slotId: id, label: name }
-  if (props.side === 'left') compareStore.setLeft(slotRef)
-  else compareStore.setRight(slotRef)
+  compareStore.setSide(props.side, slotRef)
   isOpen.value = false
 }
 
 function clearSlot() {
-  if (props.side === 'left') compareStore.setLeft(null)
-  else compareStore.setRight(null)
+  compareStore.setSide(props.side, null)
   isOpen.value = false
 }
 

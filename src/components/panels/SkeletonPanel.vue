@@ -277,12 +277,18 @@ function scrollToSelected(listRef: typeof boneListRef, selector: string) {
 }
 
 // Expand all collapsed ancestors of a bone so it becomes visible in the tree
+const boneByName = computed(() => {
+  const m = new Map<string, (typeof skeletonStore.bones)[number]>()
+  for (const b of skeletonStore.bones) if (!m.has(b.name)) m.set(b.name, b)
+  return m
+})
+
 function expandAncestors(boneName: string) {
   const next = new Set(collapsedBones.value)
-  let current = skeletonStore.bones.find(b => b.name === boneName)
+  let current = boneByName.value.get(boneName)
   while (current?.parent) {
     next.delete(current.parent)
-    current = skeletonStore.bones.find(b => b.name === current!.parent)
+    current = boneByName.value.get(current.parent)
   }
   collapsedBones.value = next
 }

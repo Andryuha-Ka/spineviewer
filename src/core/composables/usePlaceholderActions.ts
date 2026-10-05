@@ -16,7 +16,7 @@ import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useViewerStore } from '@/core/stores/useViewerStore'
 import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 import { buildSlotSavedState, trackTimesOf } from '@/core/utils/slotState'
-import { groupSpineFiles } from '@/core/utils/fileLoader'
+import { groupSpineFiles, isImageDropFileName } from '@/core/utils/fileLoader'
 import { spineVersionProblem } from '@/core/utils/versionDetector'
 import type { FileSet, PHSpineEntry, SpineSlot } from '@/core/types/FileSet'
 
@@ -63,7 +63,7 @@ export function usePlaceholderActions() {
       await addSpineFromFiles(files, slotId, phName)
       return
     }
-    for (const [i, file] of files.filter(f => f.type.startsWith('image/')).entries()) {
+    for (const [i, file] of files.filter(f => isImageDropFileName(f.name)).entries()) {
       await phImagesStore.addImage(slotId, phName, file, i)
     }
   }
@@ -88,7 +88,7 @@ export function usePlaceholderActions() {
       window.alert(`Cannot add more spines: limit of ${SPINE_SLOTS_LIMIT} reached`)
       return
     }
-    const childId = `slot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const childId = crypto.randomUUID()
     fileLoaderStore.addSlot({
       id: childId,
       name: fileSet.skeleton.filename,
@@ -285,7 +285,7 @@ export function usePlaceholderActions() {
         trackTimes:           trackTimesOf(animationStore.tracks),
       }))
     }
-    const newChildId = `slot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const newChildId = crypto.randomUUID()
     fileLoaderStore.addSlot({
       id: newChildId,
       name: entry.fileName,

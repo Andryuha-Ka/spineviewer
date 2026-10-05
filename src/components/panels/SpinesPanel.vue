@@ -245,7 +245,7 @@ import { useViewerStore } from '@/core/stores/useViewerStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import SpinesPlaceholderTree from '@/components/panels/SpinesPlaceholderTree.vue'
-import { groupSpineFiles, readFileAsDataURL } from '@/core/utils/fileLoader'
+import { groupSpineFiles, isImageDropFileName, readFileAsDataURL } from '@/core/utils/fileLoader'
 import { validateSpineFileSet } from '@/core/utils/spineValidator'
 import { spineVersionProblem } from '@/core/utils/versionDetector'
 import { useVersionStore } from '@/core/stores/useVersionStore'
@@ -458,13 +458,12 @@ async function onDropzoneFiles(e: DragEvent) {
 async function handleDroppedFiles(files: File[]): Promise<void> {
   if (files.length === 0) return
 
-  const imageExts  = /\.(png|jpe?g|webp|gif|avif)$/i
   const spineExts  = /\.(json|skel|atlas)$/i
-  const hasImages  = files.some(f => imageExts.test(f.name))
+  const hasImages  = files.some(f => isImageDropFileName(f.name))
   const hasSpine   = files.some(f => spineExts.test(f.name))
 
   if (!hasSpine && hasImages) {
-    const imgFile = files.find(f => imageExts.test(f.name))!
+    const imgFile = files.find(f => isImageDropFileName(f.name))!
     const dataUrl = await readFileAsDataURL(imgFile)
     layersStore.addLayer({ name: imgFile.name, dataUrl, scale: 1 })
     return

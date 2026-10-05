@@ -6,6 +6,8 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
 
+import { SPINE_ACCEPT_EXTENSIONS } from '@/core/utils/fileLoader'
+
 export interface HistorySession {
   id: string
   timestamp: number
@@ -45,9 +47,14 @@ function openDB(): Promise<IDBDatabase> {
   })
 }
 
-function idbPut(db: IDBDatabase, record: object): void {
-  const tx = db.transaction(DB_STORE, 'readwrite')
-  tx.objectStore(DB_STORE).put(record)
+function idbPut(db: IDBDatabase, record: object): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite')
+    tx.oncomplete = () => resolve()
+    tx.onerror    = () => reject(tx.error)
+    tx.onabort    = () => reject(tx.error)
+    tx.objectStore(DB_STORE).put(record)
+  })
 }
 
 async function idbGet<T>(db: IDBDatabase, id: string): Promise<T | undefined> {
@@ -86,8 +93,7 @@ function lsSave(sessions: HistorySession[]): void {
 }
 
 function makeId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-  return String(Date.now()) + Math.random().toString(36).slice(2)
+  return crypto.randomUUID()
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -118,7 +124,7 @@ export async function saveSession(
   if (session.hasHandles && handles) {
     try {
       const db = await openDB()
-      idbPut(db, { ...session, handles })
+      await idbPut(db, { ...session, handles })
       await idbPrune(db)
     } catch (e) {
       console.warn('[fileHistory] IndexedDB write failed', e)
@@ -203,7 +209,7 @@ export async function pickFilesViaFSAA(
       ...(startIn ? { startIn } : {}),
       types: [{
         description: 'Spine files',
-        accept: { 'application/octet-stream': ['.json', '.skel', '.atlas', '.png', '.jpg', '.jpeg', '.webp', '.avif'] },
+        accept: { 'application/octet-stream': SPINE_ACCEPT_EXTENSIONS },
       }],
     })
     const files = await Promise.all(handles.map((h: FileSystemFileHandle) => h.getFile()))
@@ -235,31 +241,4 @@ export async function pickFolderViaFSAA(): Promise<{ files: File[]; handles: Fil
     if ((e as Error).name !== 'AbortError') console.warn('[fileHistory] showDirectoryPicker failed', e)
     return null
   }
-}
-
-/**
- * Try to get FileSystemFileHandles from a DataTransfer (drag-drop).
- * Only works if FSAA is supported AND items have the getAsFileSystemHandle method.
- */
-export async function handlesFromDataTransfer(dt: DataTransfer): Promise<FileSystemFileHandle[]> {
-  if (!isFileSystemAccessSupported()) return []
-  const handles: FileSystemFileHandle[] = []
-  for (const item of Array.from(dt.items)) {
-    try {
-      // TODO: remove cast when File System Access API types are stable in TypeScript lib
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const handle = await (item as any).getAsFileSystemHandle?.()
-      if (handle?.kind === 'file') {
-        handles.push(handle as FileSystemFileHandle)
-      } else if (handle?.kind === 'directory') {
-        // Enumerate files from dropped directory
-        // TODO: remove cast when File System Access API types are stable in TypeScript lib
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for await (const entry of (handle as any).values()) {
-          if (entry.kind === 'file') handles.push(entry as FileSystemFileHandle)
-        }
-      }
-    } catch {}
-  }
-  return handles
 }

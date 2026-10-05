@@ -8,12 +8,13 @@
 
 import { defineStore } from 'pinia'
 import { guessFileType } from '@/core/utils/fileLoader'
+import { withoutFileSets } from '@/core/utils/slotState'
 import type { FileSet, PHChildEntry, SpineFile, SpineFileType, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 import { useSlotSelectionStore } from './useSlotSelectionStore'
 import { usePlaceholderImagesStore } from './usePlaceholderImagesStore'
 
 function newSlotId(): string {
-  return `slot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  return crypto.randomUUID()
 }
 
 // placeholderChildren is rebuilt by cloneSlot; it may hold FileSet ArrayBuffers that JSON cannot copy.
@@ -38,7 +39,7 @@ function cloneFileSet(fs: FileSet): FileSet {
   }
 }
 
-export interface PendingFileInfo {
+interface PendingFileInfo {
   name: string
   size: number
   type: SpineFileType
@@ -178,7 +179,7 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
   function patchSlotPlaceholderImages(slotId: string, placeholderChildren: Record<string, PHChildEntry[]>): void {
     const slot = spineSlots.value.find(s => s.id === slotId)
     if (!slot?.savedState) return
-    slot.savedState = { ...slot.savedState, placeholderChildren: JSON.parse(JSON.stringify(placeholderChildren)) }
+    slot.savedState = { ...slot.savedState, placeholderChildren: withoutFileSets(placeholderChildren) }
   }
 
   /** Update placeholders on a slot — triggers reactive array update so SpinesPanel re-renders. */

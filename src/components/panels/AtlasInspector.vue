@@ -179,7 +179,7 @@
 import { useAtlasStore }   from '@/core/stores/useAtlasStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
-import type { AtlasRegion, AtlasPage } from '@/core/utils/atlasTextParser'
+import { atlasUtilization, type AtlasRegion, type AtlasPage } from '@/core/utils/atlasTextParser'
 import type { SpineFileType } from '@/core/types/FileSet'
 import { useSettingsStore } from '@/core/stores/useSettingsStore'
 
@@ -286,22 +286,12 @@ const totalSeen = computed(() => {
   return n
 })
 
-const avgUtil = computed(() => {
-  if (!atlasStore.pages.length) return 0
-  let total = 0, used = 0
-  for (const p of atlasStore.pages) {
-    total += p.width * p.height
-    used  += p.regions.reduce((s, r) => s + r.width * r.height, 0)
-  }
-  return total ? Math.min(100, Math.round(used / total * 100)) : 0
-})
+const avgUtil = computed(() => Math.min(100, Math.round(atlasUtilization(atlasStore.pages) * 100)))
 
 const utilPct = computed(() => {
   const p = page.value
-  if (!p || !p.width || !p.height) return 0
-  const total = p.width * p.height
-  const used  = p.regions.reduce((s, r) => s + r.width * r.height, 0)
-  return Math.min(100, Math.round(used / total * 100))
+  if (!p) return 0
+  return Math.min(100, Math.round(atlasUtilization([p]) * 100))
 })
 
 const filteredRegions = computed(() => {

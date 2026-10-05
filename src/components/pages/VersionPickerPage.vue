@@ -123,8 +123,8 @@
         @dragleave.prevent="isDragging = false"
         @drop.prevent="onDrop"
       >
-        <template v-if="fileLoaderStore.spineSlots.length > 0 && (fileLoaderStore.isLoaded || fileLoaderStore.spineSlots.some(s => s.error || s.validationErrors?.length))">
-          <span class="drop-state-icon" :class="{ 'drop-state-icon--warn': fileLoaderStore.spineSlots.some(s => s.error || s.validationErrors?.length) }">
+        <template v-if="fileLoaderStore.spineSlots.length > 0 && (fileLoaderStore.isLoaded || issueCount > 0)">
+          <span class="drop-state-icon" :class="{ 'drop-state-icon--warn': issueCount > 0 }">
             {{ fileLoaderStore.validSlots.length > 0 ? '✓' : '!' }}
           </span>
           <p class="drop-text-ok" :class="{ 'drop-text-warn': fileLoaderStore.validSlots.length === 0 }">
@@ -133,9 +133,9 @@
               spine{{ fileLoaderStore.validSlots.length !== 1 ? 's' : '' }} ready
             </template>
             <template v-else>No valid spines</template>
-            <template v-if="fileLoaderStore.spineSlots.some(s => s.error || s.validationErrors?.length)">
+            <template v-if="issueCount > 0">
               &middot;
-              {{ fileLoaderStore.spineSlots.filter(s => s.error || s.validationErrors?.length).length }}
+              {{ issueCount }}
               invalid
             </template>
           </p>
@@ -155,16 +155,16 @@
 
       <!-- Per-spine validation list -->
       <div
-        v-if="fileLoaderStore.spineSlots.length > 0 && fileLoaderStore.spineSlots.some(s => s.error || s.validationErrors?.length)"
+        v-if="fileLoaderStore.spineSlots.length > 0 && issueCount > 0"
         class="spine-validation-list"
       >
         <div
           v-for="slot in fileLoaderStore.spineSlots"
           :key="slot.id"
           class="spine-vrow"
-          :class="(slot.error || slot.validationErrors?.length) ? 'spine-vrow--err' : 'spine-vrow--ok'"
+          :class="slotHasIssue(slot) ? 'spine-vrow--err' : 'spine-vrow--ok'"
         >
-          <span class="spine-vicon">{{ (slot.error || slot.validationErrors?.length) ? '✗' : '✓' }}</span>
+          <span class="spine-vicon">{{ slotHasIssue(slot) ? '✗' : '✓' }}</span>
           <span class="spine-vname">{{ slot.name }}</span>
           <span v-if="slot.error" class="spine-verr">{{ slot.error }}</span>
           <template v-else-if="slot.validationErrors?.length">
@@ -176,6 +176,7 @@
       <div v-if="versionUnknown" class="version-unknown-hint">
         Version not detected — please select the runtime above manually
       </div>
+      <div v-if="unsupportedHint" class="version-unknown-hint">{{ unsupportedHint }}</div>
 
       <div class="picker-row">
         <n-button size="small" ghost @click="onChooseFiles">Choose files</n-button>
@@ -258,20 +259,21 @@
 <script setup lang="ts">
 import { useVersionStore, type PixiVersion } from '@/core/stores/useVersionStore'
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
-import { useFilePickerLogic, TYPE_LABELS, formatSize } from '@/core/composables/useFilePickerLogic'
+import { useFilePickerLogic, TYPE_LABELS, formatSize, type PickerEmits } from '@/core/composables/useFilePickerLogic'
 import { usePickerHistory as _usePickerHistory } from '@/core/composables/usePickerHistory'
+import type { SpineSlot } from '@/core/types/FileSet'
 import SettingsPopover from '@/components/ui/SettingsPopover.vue'
 import HelpModal from '@/components/ui/HelpModal.vue'
 
-const emit = defineEmits<{
-  open:           []
-  'open-compare': [payload: { left?: string; right?: string }]
-}>()
+const emit = defineEmits<PickerEmits>()
 
 const appVersion = __APP_VERSION__
 
 const store           = useVersionStore()
 const fileLoaderStore = useFileLoaderStore()
+
+const slotHasIssue = (s: SpineSlot) => !!(s.error || s.validationErrors?.length)
+const issueCount = computed(() => fileLoaderStore.spineSlots.filter(slotHasIssue).length)
 
 // Forward-reference pattern: picker is created first; history callback captures `history` by closure.
 // By the time any user interaction triggers onHistorySaved(), history is fully initialised.
@@ -279,7 +281,7 @@ const picker  = useFilePickerLogic(emit, () => history.refresh())
 const history = _usePickerHistory(picker.handleFiles, () => emit('open'))
 
 const {
-  isDragging, classifyError, versionUnknown,
+  isDragging, classifyError, versionUnknown, unsupportedHint,
   fileInputRef, folderInputRef,
   onDrop, onChooseFiles, onChooseFolder, onFileInput, onClear, onOpenCompare,
 } = picker

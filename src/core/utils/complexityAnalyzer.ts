@@ -8,11 +8,11 @@
 
 import type { ISpineAdapter } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
-import type { AtlasPage } from '@/core/utils/atlasTextParser'
+import { atlasUtilization, atlasVramBytes, type AtlasPage } from '@/core/utils/atlasTextParser'
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
-export type MetricStatus = 'ok' | 'warn' | 'crit'
+type MetricStatus = 'ok' | 'warn' | 'crit'
 
 export interface ComplexityMetric {
   name:         string
@@ -27,7 +27,7 @@ export interface ComplexityMetric {
   thresholdSuffix?: string
 }
 
-export interface AnimKeyframes {
+interface AnimKeyframes {
   name:      string
   duration:  number
   keyframes: number
@@ -36,7 +36,7 @@ export interface AnimKeyframes {
   redundant: number
 }
 
-export interface BlendStats {
+interface BlendStats {
   normal:   number
   additive: number
   multiply: number
@@ -104,7 +104,7 @@ function walkSkinSlots(skinAtts: unknown, stats: AttachmentStats): void {
       const type = (a.type as string | undefined) ?? 'region'
       if (type === 'region' || type === undefined) {
         stats.regionCount++
-      } else if (type === 'mesh') {
+      } else if (type === 'mesh' || type === 'linkedmesh') {
         stats.meshCount++
         const uvs = a.uvs
         if (Array.isArray(uvs)) stats.totalVertices += uvs.length / 2
@@ -222,22 +222,6 @@ function analyzeKeyframes(json: Record<string, unknown>): AnimKeyframes[] {
     }
   })
 }
-
-// ── Atlas helpers ─────────────────────────────────────────────────────────────
-
-function atlasUtilization(pages: AtlasPage[]): number {
-  let used = 0, total = 0
-  for (const page of pages) {
-    total += page.width * page.height
-    for (const r of page.regions) used += r.width * r.height
-  }
-  return total > 0 ? used / total : 0
-}
-
-function atlasVram(pages: AtlasPage[]): number {
-  return pages.reduce((s, p) => s + p.width * p.height * 4, 0)
-}
-
 // ── Recommendations ───────────────────────────────────────────────────────────
 
 function buildRecommendations(
@@ -318,9 +302,9 @@ export function analyzeComplexity(
   const attStats    = json ? scanAttachments(json) : collectFromRuntime(adapter)
   const blendStats  = collectBlendStats(adapter)
   const utilization = atlasUtilization(atlasPages)
-  const vramBytes   = atlasVram(atlasPages)
+  const vramBytes   = atlasVramBytes(atlasPages)
   const skelBytes   = typeof fileSet.skeleton.fileBody === 'string'
-    ? fileSet.skeleton.fileBody.length
+    ? new TextEncoder().encode(fileSet.skeleton.fileBody).byteLength
     : (fileSet.skeleton.fileBody as ArrayBuffer).byteLength
 
   const nonNormalBlends = blendStats.additive + blendStats.multiply + blendStats.screen

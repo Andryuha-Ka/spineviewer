@@ -19,10 +19,10 @@
           v-model:value="settingsStore.palette"
           class="palette-select"
           size="small"
-          aria-labelledby="settings-palette-label"
           :options="options"
           :to="false"
           :consistent-menu-width="false"
+          @vue:mounted="labelPaletteTrigger"
         />
       </div>
 
@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import type { VNode } from 'vue'
 import { useSettingsStore } from '@/core/stores/useSettingsStore'
 import type { FontSize } from '@/core/stores/useSettingsStore'
 import { PALETTES } from '@/core/utils/themePalette'
@@ -69,6 +70,14 @@ const SIZES: { value: FontSize; label: string }[] = [
 ]
 
 const options = PALETTES.map(p => ({ label: p.label, value: p.id }))
+
+// naive-ui has no prop for the focusable label element
+function labelPaletteTrigger(vnode: VNode) {
+  const label = (vnode.el as HTMLElement | null)?.querySelector('.n-base-selection-label')
+  label?.setAttribute('aria-labelledby', 'settings-palette-label')
+  label?.setAttribute('role', 'button')
+  label?.setAttribute('aria-haspopup', 'listbox')
+}
 </script>
 
 <style scoped>

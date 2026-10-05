@@ -69,6 +69,14 @@ describe('AnimationPanel track list', () => {
     await rows[2].findAll('button').find(b => b.text() === '✕')!.trigger('click')
     expect(wrapper.emitted('removeQueueEntry')).toEqual([[0, 0], [0, 2]])
   })
+
+  it('toggles Loop once when the label text is clicked', async () => {
+    const anim = useAnimationStore()
+    anim.tracks = [{ ...live('A', []), trackIndex: 2 }]
+    wrapper = mount(AnimationPanel)
+    await wrapper.find('.track-loop-text').trigger('click')
+    expect(wrapper.emitted('setTrackLoop')).toEqual([[2, true]])
+  })
 })
 
 describe('AnimationPanel skins and Composer', () => {

@@ -149,9 +149,7 @@
           />
           <span class="skin-name">{{ skin }}</span>
           <button class="copy-btn" title="Copy name" @click.stop="copyName(skin)">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
+            <CopyIcon />
           </button>
         </div>
       </div>
@@ -188,14 +186,14 @@
             :checked="animationStore.isTrackEnabled(track.trackIndex)"
             @update:checked="animationStore.setTrackEnabled(track.trackIndex, $event)"
           />
-          <label class="track-loop-label">
-            <n-checkbox
-              size="small"
-              :checked="trackLoopOf(track)"
-              @update:checked="(v) => emit('setTrackLoop', track.trackIndex, v)"
-            />
+          <n-checkbox
+            class="track-loop-label"
+            size="small"
+            :checked="trackLoopOf(track)"
+            @update:checked="(v) => emit('setTrackLoop', track.trackIndex, v)"
+          >
             <span class="track-loop-text">Loop</span>
-          </label>
+          </n-checkbox>
           <span class="track-index">#{{ track.trackIndex }}</span>
           <span class="block-spacer" />
           <n-button size="tiny" @click="emit('clearTrack', track.trackIndex)">✕</n-button>
@@ -220,9 +218,7 @@
             <span v-else class="entry-icon">{{ row.state === 'played' ? '✓' : '⏭' }}</span>
             <span class="entry-name">{{ row.name }}</span>
             <button class="copy-btn" title="Copy name" @click.stop="copyName(row.name)">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
+              <CopyIcon />
             </button>
             <n-button
               size="tiny"
@@ -245,9 +241,7 @@
             </button>
             <span class="entry-name">{{ track.animationName }}</span>
             <button class="copy-btn" title="Copy name" @click.stop="copyName(track.animationName)">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
+              <CopyIcon />
             </button>
             <n-button size="tiny" class="no-shrink" disabled>✕</n-button>
           </div>
@@ -261,9 +255,7 @@
             <span class="entry-icon">⏭</span>
             <span class="entry-name">{{ entry.animationName }}</span>
             <button class="copy-btn" title="Copy name" @click.stop="copyName(entry.animationName)">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
+              <CopyIcon />
             </button>
             <n-button
               size="tiny"
@@ -298,11 +290,8 @@
           :class="{ 'events-row--flash': isFlashing(m.name) }"
         >
           <span class="ecol-name evt-name-wrap">
-            <button class="copy-btn" title="Copy name" @click.stop="copyEventName(m.name)">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
+            <button class="copy-btn" title="Copy name" @click.stop="copyName(m.name)">
+              <CopyIcon />
             </button>
             <span class="evt-name" :style="{ color: nameColor(m.name) }" :title="m.name">{{ m.name }}</span>
           </span>
@@ -333,6 +322,14 @@ const emit = defineEmits<{
   seekDelta:        [track: number, deltaSeconds: number]
   setSkins:         [names: string[]]
 }>()
+
+const CopyIcon = () => h('svg', {
+  width: '10', height: '10', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+  'stroke-width': '2.2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+}, [
+  h('rect', { x: '9', y: '9', width: '13', height: '13', rx: '2' }),
+  h('path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' }),
+])
 
 const skeletonStore  = useSkeletonStore()
 const animationStore = useAnimationStore()
@@ -389,13 +386,9 @@ watch(() => eventsStore.lastFiredAt, () => {
     const anyActive = [...eventsStore.lastFiredAt.values()].some(t => now - t < FLASH_MS + 50)
     if (!anyActive) { clearInterval(_flashTimer!); _flashTimer = null }
   }, 50)
-}, { deep: true })
+})
 
 onUnmounted(() => { if (_flashTimer) clearInterval(_flashTimer) })
-
-function copyEventName(name: string) {
-  navigator.clipboard.writeText(name).catch(() => {})
-}
 
 function isFlashing(name: string): boolean {
   void _tick.value // reactive dependency

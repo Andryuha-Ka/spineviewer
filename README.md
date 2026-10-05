@@ -8,7 +8,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 
 ### File Loading
 - **Drag & drop** files or folders directly onto the picker page
-- **Choose Files / Choose Folder** buttons with File System Access API support (Chrome / Edge)
+- **Choose Files / Choose Folder** buttons in every browser — with the File System Access API (Chrome / Edge) the native picker opens and the files are kept for history auto-reload; without it a standard file or folder input opens
 - Automatic Spine version detection from `.json` / `.skel` headers
 - Supports all attachment image formats: PNG, JPG, WebP, AVIF
 - Load **up to 30 skeletons** simultaneously and switch between them
@@ -50,20 +50,20 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - Click any entry to switch the active skeleton
 - **Drag to reorder** skeletons — higher in the list = higher z-index on the stage (6-dot drag handle)
 - **Pin button** — keep a skeleton on stage while switching to another
-- Each skeleton's viewport position, animation, skin, placeholder toggle, and playback state is preserved independently
+- The scene pan and zoom are shared by all skeletons; each skeleton's own offsets (when its sync is off), animation, skin, placeholder toggle, placeholder children and playback state are preserved independently
 - **Sync toggle** (🔗) per skeleton — when disabled, the active skeleton moves and scales independently from the global scene; drag moves only it, scroll wheel scales only it; hold **Shift** to move the global scene while sync is off
 - **Clone button** — duplicate the active skeleton with its full current state (animation, skin, position, sync, placeholder images and child spines); the clone is fully independent of the original
-- **Placeholder images** — expand a skeleton row (▶) to reveal its placeholder slots; drop PNG/JPG/WebP images onto a slot to attach them as child sprites at the placeholder's origin; multiple images per slot; each removable individually; click a thumbnail to **activate** it; disable the sync toggle (🔗) on an image to move it by dragging or scale it with the scroll wheel independently; transform saved per skeleton
+- **Placeholder images** — expand a skeleton row (▶) to reveal its placeholder slots; drop PNG, JPG, WebP, AVIF or GIF images onto a slot to attach them as child sprites at the placeholder's origin; multiple images per slot; each removable individually; click a thumbnail to **activate** it; disable the sync toggle (🔗) on an image to move it by dragging or scale it with the scroll wheel independently; transform saved per skeleton
 - **Placeholder spines** — drop a spine skeleton file onto a placeholder slot to attach it as a live child spine that renders and animates inside the container; click its sprite on canvas to activate it and control animation, skins, and tracks independently; disable sync (🔗) to reposition and scale it freely
 - **Move a spine into a placeholder** — drag a skeleton row by its 6-dot handle onto another skeleton's placeholder drop zone: it becomes a child spine of that placeholder and keeps its animation and skins (a skeleton whose own placeholders hold images or spines cannot be moved)
 - **Placeholder stacking** — images and child spines of a placeholder stack like the Spines list: the top row renders in front, a newly added or moved-in child is listed first and renders in front, and a clone appears directly above its source; drag a row of either kind onto another to reorder them, and the canvas follows at once, also on pinned skeletons
 - **Child spine to top level** — drag a child spine row onto the Spines list to make it a normal skeleton at that position (upper or lower half of the target row); it keeps its animation, starts synced at the scene origin and becomes active
 - **Image layers** — drag a placeholder image onto the Spines list to make it an image layer: its own row (thumbnail, name, Background checkbox, 🔗 sync, ✕) ordered and stacked together with the skeletons; click the row to activate it, then with sync off drag and scroll to move and scale only the layer; layers appear in PNG, sprite sheet and GIF exports and are discarded when you leave the viewer; drop a layer row on a placeholder drop zone to put it back as a placeholder image
-- **Drop zone** at the bottom of the Spines tab — drop an image file (PNG / JPG / WebP / AVIF) to add it as an image layer, or drop spine file sets to add new skeletons with automatic version detection and validation; new rows appear at the top of the list, in front of everything
+- **Drop zone** at the bottom of the Spines tab — drop an image file (PNG / JPG / WebP / AVIF / GIF) to add it as an image layer, or drop spine file sets to add new skeletons with automatic version detection and validation; new rows appear at the top of the list, in front of everything
 
 ### Background Image
 - The background is an image layer with its **Background** checkbox ticked; only one layer can be the background at a time
-- Drop a **PNG / JPG / WebP / AVIF** file onto the Spines tab drop zone (or the canvas) to add it as a new image layer at the top of the list, at the scene origin; an existing background is never replaced — tick **Background** on the new layer to make it the background
+- Drop a **PNG / JPG / WebP / AVIF / GIF** file onto the Spines tab drop zone (or the canvas) to add it as a new image layer at the top of the list, at the scene origin; an existing background is never replaced — tick **Background** on the new layer to make it the background
 - Tick **Background** on any image layer to make it the background: it moves to the bottom row and renders behind everything; untick it to turn it back into a normal layer
 - The background row has no drag handle and cannot be reordered or dragged into a placeholder; rows dropped on it land directly above it; ✕ removes it
 - Has its own **sync toggle** — when disabled and active, drag and zoom move only the background, in screen pixels (the scene does not move it); the global Sync button leaves it alone
@@ -71,7 +71,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 
 ### Skins
 - Single skin selection with **radio buttons** — selection preserved when switching skeletons
-- **Skin Composer** — combine multiple skins into one composite skin
+- **Skin Composer** — combine multiple skins into one composite skin; on a Spine 3.8 skeleton only the first checked skin is shown, because that runtime cannot merge skins
 - First non-default skin auto-applied on initial load
 
 ### Inspector (Insp tab)
@@ -80,7 +80,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 
 ### Atlas Viewer (Atlas tab)
 - Visual preview of all atlas pages
-- Seen/unseen region tracking (regions used in current animation highlighted)
+- Seen/unseen region tracking (every region shown since the skeleton was loaded stays marked as seen)
 - Atlas utilization % (used area vs total)
 - Region search and list
 - Zoom/pan within atlas; full-screen modal
@@ -92,8 +92,8 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - **Long tasks log** — main thread tasks >50 ms (Chrome PerformanceObserver)
 
 ### Complexity Analyzer (Compl tab)
-- Bone / slot / animation / keyframe counts with OK/warn/critical thresholds
-- Mesh vertex count, mask slots, region count
+- Metrics with OK/warn/critical thresholds: Bones, Slots, Regions, Mask, Meshes, Mesh vertices, Non-normal blends, Atlas VRAM, Atlas utilization, Skeleton size
+- Per-animation keyframe table (duration, keyframe count, keyframes per second, duplicate keyframes) — JSON skeletons only
 - Blending mode breakdown (Normal / Additive / Multiply / Screen)
 - Automatic recommendations for optimization
 
@@ -106,7 +106,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 | Format | Description |
 |--------|-------------|
 | **PNG** | Current frame of the visible canvas area (background image and pinned skeletons included, viewer overlays and labels left out) |
-| **Pose JSON** | Snapshot of all bone transforms |
+| **Pose JSON** | Every bone's world x, y, rotation, scaleX and scaleY (Spine's Y-up convention) plus a timestamp |
 | **Sprite Sheet** | N-frame grid as a single PNG, same content as PNG |
 | **GIF** | Animated GIF with configurable FPS and quality, always on the background colour |
 
@@ -131,14 +131,16 @@ Side-by-side visual and structural comparison of two Spine skeletons. Accessible
 
 **Diff Panel**
 - Runs automatically when both canvases finish loading — no manual trigger needed
-- Sections: Skeleton meta · Bones · Slots · Skins · Animations · Events · Constraints · IK / Transform / Path constraints
 - **Reskin Overview** (always shown first):
   - Animation presence + duration delta
   - Skin presence diff
   - Event definition presence diff
   - Per-animation event timing diff (JSON only)
-  - Placeholder slots / bones / attachments with critical parameter change detection
-- Severity badges: 🔴 critical (missing name, missing event, placeholder changed) · 🟠 non-critical (duration delta, timing delta)
+  - Placeholder slots / bones / attachments (attachments JSON only): present on both sides, A only or B only (parameters are not compared)
+  - IK / Transform / Path constraints with changed bones, target or parameters (JSON only)
+  - Free bones: unkeyed on both sides, A only or B only (runtime only)
+- Sections below the overview: Skeleton · Bones · Slots in JSON mode; Bones · Slots · Skins · Animations · Events in runtime mode
+- Severity badges: 🔴 critical (animation, skin, event, event occurrence, placeholder or constraint present on one side only; constraint with changed bones or target) · 🟠 non-critical (duration delta, timing delta, constraint parameter changes, free-bone status differing between sides)
 
 **Placeholder Labels**
 - `ph` checkbox in each canvas overlay — show/hide named placeholder overlays
@@ -214,7 +216,7 @@ CI runs lint, tests and the build on every push to `master` before deploying.
 6. Explore the other tabs: **Spines**, **Insp**, **Bones** (when the skeleton has free bones), **Atlas**, **Perf**, **Compl**, **Export**.
 
 ### Multi-Spine Workflow
-When you drop multiple Spine skeletons, all are loaded into slots. Open the **Spines** tab in the viewer and click any entry to switch. Each skeleton's viewport, animation, skin, and placeholder state is saved independently.
+When you drop multiple Spine skeletons, all are loaded into slots. Open the **Spines** tab in the viewer and click any entry to switch. The scene pan and zoom are shared; each skeleton's own offsets (when its sync is off), animation, skin, placeholder and playback state are saved independently.
 
 - **Drag** the 6-dot handle to reorder skeletons — position in the list determines z-order (top = front)
 - **Pin** a skeleton (📌 button) to keep it visible on stage while you browse others

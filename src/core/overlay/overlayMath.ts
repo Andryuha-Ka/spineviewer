@@ -8,7 +8,7 @@
 
 // ── Loop State Machine ─────────────────────────────────────────────────────────
 
-export type LoopPhase = 'normal' | 'final-100' | 'zero'
+type LoopPhase = 'normal' | 'final-100' | 'zero'
 
 export interface TrackLoopState {
   phase: LoopPhase
@@ -76,7 +76,7 @@ export function resetLoopState(state: TrackLoopState, newNorm: number): void {
 
 // ── DC Sparkline geometry ──────────────────────────────────────────────────────
 
-export interface DCSparklineResult {
+interface DCSparklineResult {
   /** Points: [x, y][] in space (0..graphW) × (0..graphH) */
   linePoints: Array<[number, number]>
   min: number

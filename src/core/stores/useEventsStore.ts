@@ -9,7 +9,7 @@
 import { defineStore } from 'pinia'
 import type { SpineEvent, AnimationEventMarker } from '@/core/types/ISpineAdapter'
 
-export interface AnimationMarkerEntry extends AnimationEventMarker {
+interface AnimationMarkerEntry extends AnimationEventMarker {
   trackIndex: number
   animationName: string
 }

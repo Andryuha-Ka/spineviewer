@@ -8,6 +8,7 @@
 
 import type { FileSet } from '@/core/types/FileSet'
 import { parseAtlas, type AtlasPage } from '@/core/utils/atlasTextParser'
+import { basename } from '@/core/utils/buildImageResolver'
 
 // ── Atlas summary ────────────────────────────────────────────────────────────
 
@@ -134,11 +135,11 @@ export function validateSpineFileSet(fileSet: FileSet): string[] {
 
   // 2. Check atlas image pages are uploaded
   const uploadedImages = new Set(
-    fileSet.images.map(img => (img.filename.split('/').pop() ?? img.filename).toLowerCase()),
+    fileSet.images.map(img => basename(img.filename).toLowerCase()),
   )
   const missingImages: string[] = []
   for (const page of atlasInfo.pages) {
-    const pageName = (page.split('/').pop() ?? page).toLowerCase()
+    const pageName = basename(page).toLowerCase()
     if (!uploadedImages.has(pageName)) {
       missingImages.push(page)
     }

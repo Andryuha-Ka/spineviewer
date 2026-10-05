@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useFilePickerLogic } from '@/core/composables/useFilePickerLogic'
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
+import { useVersionStore } from '@/core/stores/useVersionStore'
 import type { FileSet, SpineSlot } from '@/core/types/FileSet'
 import { groupSpineFiles } from '@/core/utils/fileLoader'
 
@@ -75,6 +76,19 @@ describe('useFilePickerLogic.handleFiles (C36)', () => {
       ['Spine version mismatch: b.json is 4.2, viewer is set to 4.1'],
       undefined,
     ])
+  })
+
+  it('shows the unsupported-version hint and keeps the runtime selection (B22)', async () => {
+    const versions = useVersionStore()
+    versions.selectVersion(7, '4.1')
+    vi.mocked(groupSpineFiles).mockResolvedValue({ slots: [{ id: 'a', name: 'A', fileSet: set('a.json', '4.3.1') }] } as Awaited<ReturnType<typeof groupSpineFiles>>)
+    const picker = useFilePickerLogic(vi.fn())
+    await picker.handleFiles([new File([''], 'x')], undefined, true)
+    expect(picker.unsupportedHint.value).toBe('Spine 4.3 is newer than the supported runtimes (3.8, 4.0, 4.1, 4.2)')
+    expect(picker.versionUnknown.value).toBe(false)
+    expect([versions.pixiVersion, versions.spineVersion]).toEqual([7, '4.1'])
+    picker.onClear()
+    expect(picker.unsupportedHint.value).toBeNull()
   })
 
   it('checks nothing when the detected version is unknown', async () => {

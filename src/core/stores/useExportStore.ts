@@ -8,8 +8,8 @@
 
 import { defineStore } from 'pinia'
 
-export type ExportType = 'png' | 'gif' | 'sheet' | 'pose'
-export type ExportScale = 1 | 2 | 4
+type ExportType = 'png' | 'gif' | 'sheet' | 'pose'
+type ExportScale = 1 | 2 | 4
 
 const SCALE_KEY = 'svp:export:scale'
 const BG_KEY    = 'svp:export:background'

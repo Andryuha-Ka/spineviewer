@@ -9,8 +9,9 @@
 import { defineStore } from 'pinia'
 import type { RendererStats } from '@/core/types/IPixiApp'
 import type { AttachmentInfo } from '@/core/types/ISpineAdapter'
+import { FPS_OK } from '@/core/utils/fpsTier'
 
-export interface FrameSnapshot {
+interface FrameSnapshot {
   timestamp: number
   fps:       number
   frameMs:   number
@@ -18,18 +19,23 @@ export interface FrameSnapshot {
   meshes:    number
 }
 
-export interface LongTaskEntry {
+interface LongTaskEntry {
   timestamp: number
   duration:  number  // ms
 }
 
 const HISTORY_SIZE     = 120
+const WARMUP_FRAMES    = 30
 const MAX_SLOW_FRAMES  = 50
 const MAX_LONG_TASKS   = 50
 
 export const useProfilerStore = defineStore('profiler', () => {
-  /** Ring-buffer of FPS samples, last HISTORY_SIZE frames */
-  const fpsHistory    = ref<number[]>([])
+  /** Ring buffer of the last HISTORY_SIZE FPS samples; non-reactive, `version` signals writes */
+  const ring: number[] = new Array(HISTORY_SIZE).fill(0)
+  let head = 0
+  let size = 0
+  let framesSinceReset = 0
+  const version       = ref(0)
   const frameMs       = ref(0)
   const drawCalls     = ref<number | null>(null)
   const clippingCount = ref(0)
@@ -41,11 +47,14 @@ export const useProfilerStore = defineStore('profiler', () => {
 
   /** Called every rendered frame with current FPS and measured frame delta. */
   function recordFrame(fps: number, ms: number): void {
-    if (fpsHistory.value.length >= HISTORY_SIZE) fpsHistory.value.shift()
-    fpsHistory.value.push(fps)
+    ring[head] = fps
+    head = (head + 1) % HISTORY_SIZE
+    if (size < HISTORY_SIZE) size++
+    version.value++
     frameMs.value = ms
+    framesSinceReset++
 
-    if (fps > 0 && fps < 30) {
+    if (framesSinceReset > WARMUP_FRAMES && fps > 0 && fps < FPS_OK) {
       const snap: FrameSnapshot = {
         timestamp: performance.now(),
         fps,
@@ -57,6 +66,19 @@ export const useProfilerStore = defineStore('profiler', () => {
       slowFrames.value.push(snap)
     }
   }
+
+  /** FPS samples, oldest → newest (snapshot, at most HISTORY_SIZE). */
+  function getFpsHistory(): number[] {
+    const start = (head - size + HISTORY_SIZE) % HISTORY_SIZE
+    const out = new Array<number>(size)
+    for (let i = 0; i < size; i++) out[i] = ring[(start + i) % HISTORY_SIZE]
+    return out
+  }
+
+  const latestFps = computed(() => {
+    void version.value
+    return size > 0 ? ring[(head - 1 + HISTORY_SIZE) % HISTORY_SIZE] : 0
+  })
 
   /** Called every N frames (throttled alongside inspector) with renderer stats + attachment list. */
   function updateStats(stats: RendererStats, attachments: AttachmentInfo[]): void {
@@ -79,8 +101,15 @@ export const useProfilerStore = defineStore('profiler', () => {
     longTasks.value = []
   }
 
+  function restartWarmup(): void {
+    framesSinceReset = 0
+  }
+
   function clear(): void {
-    fpsHistory.value    = []
+    restartWarmup()
+    head = 0
+    size = 0
+    version.value++
     frameMs.value       = 0
     drawCalls.value     = null
     clippingCount.value = 0
@@ -90,7 +119,8 @@ export const useProfilerStore = defineStore('profiler', () => {
   }
 
   return {
-    fpsHistory,
+    latestFps,
+    getFpsHistory,
     frameMs,
     drawCalls,
     clippingCount,
@@ -102,6 +132,7 @@ export const useProfilerStore = defineStore('profiler', () => {
     updateStats,
     clearSlowFrames,
     clearLongTasks,
+    restartWarmup,
     clear,
   }
 })

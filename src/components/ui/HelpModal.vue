@@ -39,13 +39,13 @@
       <section class="help-section">
         <h3 class="sec-title">Playback</h3>
         <ul class="help-list">
-          <li>Select an animation in the <b>Anim</b> tab and click <b>Set</b> or double-click the row</li>
-          <li>Supports <b>tracks 0–11</b> simultaneously — add more via the <b>+</b> button</li>
+          <li>Pick an animation in the <b>Anim</b> tab flyout — it applies to the current track at once</li>
+          <li>Supports <b>tracks 0–11</b> simultaneously — choose the current track in the Anim tab track grid or with <kbd>0</kbd>–<kbd>9</kbd>; with <b>+ Add mode</b> on, a picked animation is appended to the track's list instead of replacing it</li>
           <li>Per-track <b>Loop</b> toggle and animation <b>Queue</b> (chain animations); the global <b>Loop</b> switch in the Anim tab sets the loop of newly selected animations only</li>
           <li><b>List loop</b> — with the track Loop on, a queue of several animations plays in a cycle; played entries stay in the list greyed out</li>
           <li><b>Speed</b> control: 0×–3× with fine slider</li>
           <li><b>Frame stepping</b> in 1/60 s steps — <kbd>←</kbd> <kbd>→</kbd> step the current track, the Anim tab <b>← 1f / 1f →</b> buttons step every running track</li>
-          <li><b>Toolbar track controls</b> — pick a skin (synced with Anim → Skins; a Composer mix shows as <i>Composite (N)</i>), pick a track (0–11), set its animation, play/pause (▶) the track, toggle its Loop or clear it (✕) directly in the top toolbar; works for the active skeleton and for a placeholder child spine selected in the Spines tab</li>
+          <li><b>Toolbar track controls</b> — pick a skin (synced with Anim → Skins; a Composer mix shows as <i>Composite (N)</i>), pick a track (0–11), set its animation, ▶ to enable the track (and start playback of every enabled track when stopped) or ⏸ to freeze only that track, toggle its Loop or clear it (✕) directly in the top toolbar; works for the active skeleton and for a placeholder child spine selected in the Spines tab</li>
         </ul>
       </section>
 
@@ -58,10 +58,11 @@
           <li><b>Pan</b> — left mouse drag</li>
           <li><b>Zoom</b> — scroll wheel (0.05×–20×)</li>
           <li><b>Reset view</b> — double-click the canvas</li>
-          <li>Toggle <b>origin crosshair</b> in settings (⚙)</li>
-          <li>Change <b>background color</b> via the color picker in the bottom-right corner of the canvas</li>
+          <li>Toggle <b>origin crosshair</b> with the <code>origin</code> checkbox in the top-left corner of the canvas</li>
+          <li>Change <b>background color</b> with the <code>bg</code> color input in the top-left corner of the canvas</li>
+          <li><b>Settings</b> (⚙) — palette, Dark/Light theme and font size</li>
           <li><b>Placeholder labels</b> — toggle the <code>ph</code> checkbox to show/hide named placeholder overlays; expand the list below to enable/disable individual placeholders; toggle state and per-item visibility saved per skeleton</li>
-          <li><b>Placeholder images</b> — expand a skeleton in the Spines tab to see its placeholder slots; drag &amp; drop any image (PNG/JPG/WebP) onto a placeholder drop zone to attach it as a child sprite; multiple images per placeholder are supported; each can be removed individually; click a thumbnail to <b>activate</b> it (or click directly on the sprite on canvas when desynced); disable the sync toggle (🔗) on an image to reposition it by dragging or scale it with the scroll wheel independently; clicking a desynced image of a <b>pinned non-active spine</b> on canvas activates that spine and starts dragging the image in one click; images and child spines of a placeholder stack like the Spines list (the top row renders in front; a newly added or moved-in child is listed first and renders in front, a clone sits directly above its source); state saved per skeleton</li>
+          <li><b>Placeholder images</b> — expand a skeleton in the Spines tab to see its placeholder slots; drag &amp; drop an image (PNG, JPG, WebP, AVIF or GIF) onto a placeholder drop zone to attach it as a child sprite; multiple images per placeholder are supported; each can be removed individually; click a thumbnail to <b>activate</b> it (or click directly on the sprite on canvas when desynced); disable the sync toggle (🔗) on an image to reposition it by dragging or scale it with the scroll wheel independently; clicking a desynced image of a <b>pinned non-active spine</b> on canvas activates that spine and starts dragging the image in one click; images and child spines of a placeholder stack like the Spines list (the top row renders in front; a newly added or moved-in child is listed first and renders in front, a clone sits directly above its source); state saved per skeleton</li>
           <li><b>Placeholder spines</b> — drop a spine skeleton file onto a placeholder drop zone to attach it as a live child spine inside the container; the child renders and plays simultaneously with the parent; click its sprite on canvas to activate it and control its animation, skins, and tracks independently in the side panels; disable sync (🔗) to reposition and scale it freely inside the container; multiple children per placeholder supported; state saved and restored per skeleton</li>
           <li><b>Independent pan/zoom</b> — disable the sync toggle (🔗) on a skeleton or image layer (including the background) in the Spines tab; drag and scroll then affect only that item; hold <kbd>Shift</kbd> to pan/zoom the global scene instead (Shift+drag = global pan, Shift+scroll = global zoom)</li>
         </ul>
@@ -75,15 +76,19 @@
         <div class="tab-grid">
           <div class="tab-item">
             <span class="tab-badge">Spines</span>
-            <span>Always shown — click to switch the active skeleton; <b>drag</b> the 6-dot handle to reorder (top = highest z-index on stage) or drop the row on another skeleton's placeholder to make it a child spine; <b>pin</b> (📌) to keep a skeleton visible while browsing others; click a <b>pinned non-active spine on canvas</b> to activate it directly. Viewport, animation, skin, and placeholder state saved per skeleton. <b>Sync toggle</b> (🔗) — disable to move/zoom the active item independently (Shift+drag/scroll moves the scene). <b>Clone</b> button duplicates the active skeleton with its full state. <b>Global toolbar</b> (Expand / Sync / Pin) above the list applies the action to all spines at once; Sync also desyncs all placeholder images; state persists when switching to other tabs. <b>Expand</b> a skeleton row (▶) to reveal its placeholder slots — drop images (PNG/JPG/WebP) or <b>spine skeleton files</b> onto them to attach child sprites or live child spines; click a thumbnail to activate it; each child has its own <b>sync toggle</b> (🔗) — disable to drag/scroll-scale that child independently; for images: <b>clone button</b> duplicates the image at (0, 0) with the original scale; <b>drag</b> an image or child spine row onto another row of either kind to reorder (top row in front; the canvas stacking follows the list) or onto another placeholder drop zone to move it (even across spines); drag a child spine row onto the Spines list to make it a normal skeleton at that position (it keeps its animation and becomes active); drag an image row onto the list to make it an <b>image layer</b> — its own row with a <b>Background</b> checkbox, sync and ✕, ordered and stacked with the skeletons, activated by clicking the row, moved and scaled by drag/scroll when desynced, included in exports; drop a layer row on a placeholder drop zone to turn it back into a placeholder image; child spines can be activated by clicking on canvas to control their animation and skins in the side panels. <b>Background</b> checkbox on a layer row makes it the background — one at a time, always the bottom row and behind everything, no drag handle (rows dropped on it land above it), ✕ removes it, unticking turns it back into a normal layer; a desynced background moves in screen pixels and global Sync leaves it alone. <b>Drop zone</b> at the bottom — drop an image to add it as a new background layer (no confirmation; the previous background stays as a normal layer), or drop spine files to add new skeletons</span>
+            <span>Always shown — click to switch the active skeleton; <b>drag</b> the 6-dot handle to reorder (top = highest z-index on stage) or drop the row on another skeleton's placeholder to make it a child spine; <b>pin</b> (📌) to keep a skeleton visible while browsing others; click a <b>pinned non-active spine on canvas</b> to activate it directly. The scene pan and zoom are shared; each skeleton's own offsets (when its sync is off), animation, skin, placeholder and playback state are saved per skeleton. <b>Sync toggle</b> (🔗) — disable to move/zoom the active item independently (Shift+drag/scroll moves the scene). <b>Clone</b> button duplicates the active skeleton with its full state. <b>Global toolbar</b> (Expand / Sync / Pin) above the list applies the action to all spines at once; Sync also desyncs all placeholder images; state persists when switching to other tabs. <b>Expand</b> a skeleton row (▶) to reveal its placeholder slots — drop images (PNG, JPG, WebP, AVIF or GIF) or <b>spine skeleton files</b> onto them to attach child sprites or live child spines; click a thumbnail to activate it; each child has its own <b>sync toggle</b> (🔗) — disable to drag/scroll-scale that child independently; for images: <b>clone button</b> duplicates the image at (0, 0) with the original scale; <b>drag</b> an image or child spine row onto another row of either kind to reorder (top row in front; the canvas stacking follows the list) or onto another placeholder drop zone to move it (even across spines); drag a child spine row onto the Spines list to make it a normal skeleton at that position (it keeps its animation and becomes active); drag an image row onto the list to make it an <b>image layer</b> — its own row with a <b>Background</b> checkbox, sync and ✕, ordered and stacked with the skeletons, activated by clicking the row, moved and scaled by drag/scroll when desynced, included in exports; drop a layer row on a placeholder drop zone to turn it back into a placeholder image; child spines can be activated by clicking on canvas to control their animation and skins in the side panels. <b>Background</b> checkbox on a layer row makes it the background — one at a time, always the bottom row and behind everything, no drag handle (rows dropped on it land above it), ✕ removes it, unticking turns it back into a normal layer; a desynced background moves in screen pixels and global Sync leaves it alone. <b>Drop zone</b> at the bottom — drop an image (PNG, JPG, WebP, AVIF or GIF) to add it as a normal image layer at the top of the list (the background is never replaced; only its <b>Background</b> checkbox makes a layer the background), or drop spine files to add new skeletons</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Anim</span>
-            <span>Animation list (sorted alphabetically; folder opens on hover; selected path stays highlighted), tracks, queue, skins, events table (every event keyframe of the current animations; a row flashes when its event fires)</span>
+            <span>Animation list (sorted alphabetically; folder opens on hover; selected path stays highlighted), tracks, queue, skins (<b>Skin Composer</b> combines several skins; on a Spine 3.8 skeleton only the first checked skin is shown, because that runtime cannot merge skins), events table (every event keyframe of the current animations; a row flashes when its event fires)</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Insp</span>
             <span>Bone hierarchy with live transforms; active attachment list with blend mode badges</span>
+          </div>
+          <div class="tab-item">
+            <span class="tab-badge">Bones</span>
+            <span>Shown only while the skeleton has free (unkeyed) bones — numeric X, Y, R inputs and a reset button (↺) per bone pose it live on the canvas; values are not saved</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Atlas</span>
@@ -95,7 +100,7 @@
           </div>
           <div class="tab-item">
             <span class="tab-badge">Compl</span>
-            <span>Complexity analyzer — bone/slot/keyframe counts with OK/warn/critical thresholds and optimization hints</span>
+            <span>Complexity analyzer — Bones, Slots, Regions, Mask, Meshes, Mesh vertices, Non-normal blends, Atlas VRAM, Atlas utilization and Skeleton size with OK/warn/critical thresholds, optimization hints and a per-animation keyframe table (JSON skeletons only)</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Export</span>
@@ -115,8 +120,8 @@
           <li><b>Time sync</b> (↺) — mirrors playback time from Master to Secondary in real-time</li>
           <li><b>Viewport sync</b> (⊞) — mirrors pan and zoom between canvases</li>
           <li><b>Animation / Skin sync</b> — changes on one side auto-apply the same name to the other when sync is on</li>
-          <li><b>Diff panel</b> — runs automatically on load; shows Bones · Slots · Skins · Animations · Events · Constraints</li>
-          <li><b>Reskin Overview</b> — animation presence + duration delta, skin diff, event timing diff, placeholder presence; severity badges: 🔴 critical · 🟠 non-critical</li>
+          <li><b>Diff panel</b> — runs automatically on load; below the Reskin Overview it shows Skeleton · Bones · Slots in JSON mode, or Bones · Slots · Skins · Animations · Events in runtime mode</li>
+          <li><b>Reskin Overview</b> — animation presence + duration delta, skin diff, event diff, event timing diff, placeholder presence, constraints (JSON only), free bones (runtime only); severity badges: 🔴 critical · 🟠 non-critical</li>
           <li><b>Placeholder labels</b> — <code>ph</code> checkbox per canvas; individual checkboxes for each placeholder (only non-removed ones shown)</li>
           <li>Diff panel position (left / right / bottom) is persisted</li>
         </ul>

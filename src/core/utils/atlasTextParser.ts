@@ -56,6 +56,21 @@ export interface AtlasPage {
   regions: AtlasRegion[]
 }
 
+/** Estimated GPU memory of all pages, RGBA8 (width × height × 4 bytes each). */
+export function atlasVramBytes(pages: AtlasPage[]): number {
+  return pages.reduce((s, p) => s + p.width * p.height * 4, 0)
+}
+
+/** Region area / page area across all pages; 0 when there is no page area. Not clamped. */
+export function atlasUtilization(pages: AtlasPage[]): number {
+  let used = 0, total = 0
+  for (const page of pages) {
+    total += page.width * page.height
+    for (const r of page.regions) used += r.width * r.height
+  }
+  return total > 0 ? used / total : 0
+}
+
 function ints(value: string): number[] {
   return value.split(',').map(s => parseInt(s.trim(), 10))
 }

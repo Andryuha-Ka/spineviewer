@@ -9,6 +9,7 @@
 import { defineStore } from 'pinia'
 import type { PHImageEntry, PHChildEntry, PHSpineEntry } from '@/core/types/FileSet'
 import { readFileAsDataURL } from '@/core/utils/fileLoader'
+import { withoutFileSets } from '@/core/utils/slotState'
 
 export type { PHImageEntry, PHChildEntry, PHSpineEntry }
 
@@ -179,24 +180,7 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
   }
 
   function setSlotImages(slotId: string, state: Record<string, PHChildEntry[]> | undefined): void {
-    // Rebuild plain objects per entry. PHSpineEntry.fileSet is intentionally excluded:
-    // it is a non-serializable ArrayBuffer that lives in loaderStore.spineSlots, mirroring
-    // how top-level spine slots keep fileSet out of savedState.
-    const result: Record<string, PHChildEntry[]> = {}
-    for (const [ph, entries] of Object.entries(state ?? {})) {
-      result[ph] = entries.map(e => {
-        if (e.kind === 'spine') {
-          return {
-            kind: 'spine', imageId: e.imageId, childSlotId: e.childSlotId,
-            fileName: e.fileName, syncEnabled: e.syncEnabled,
-            posX: e.posX, posY: e.posY, scale: e.scale,
-          } as PHSpineEntry
-        }
-        return { kind: 'image', imageId: e.imageId, fileName: e.fileName, dataURL: e.dataURL,
-          syncEnabled: e.syncEnabled, posX: e.posX, posY: e.posY, scale: e.scale } as PHImageEntry
-      })
-    }
-    children.value[slotId] = result
+    children.value[slotId] = withoutFileSets(state)
   }
 
   function getSlotImages(slotId: string): Record<string, PHChildEntry[]> {

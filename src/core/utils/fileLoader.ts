@@ -10,15 +10,6 @@ import type { FileSet, SpineFileType, SpineSlot } from '@/core/types/FileSet'
 
 // ── Readers ───────────────────────────────────────────────────────────────────
 
-export function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => resolve(r.result as string)
-    r.onerror = () => reject(r.error)
-    r.readAsText(file)
-  })
-}
-
 export function readFileAsDataURL(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader()
@@ -28,24 +19,40 @@ export function readFileAsDataURL(file: File): Promise<string> {
   })
 }
 
-export function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => resolve(r.result as ArrayBuffer)
-    r.onerror = () => reject(r.error)
-    r.readAsArrayBuffer(file)
-  })
-}
-
 // ── Type detection ────────────────────────────────────────────────────────────
 
+const SPINE_EXTENSIONS = {
+  'skeleton-json': ['json'],
+  'skeleton-skel': ['skel'],
+  atlas:           ['atlas'],
+  image:           ['png', 'jpg', 'jpeg', 'webp', 'avif'],
+} as const satisfies Record<SpineFileType, readonly string[]>
+
+/** Image-layer / placeholder drops also accept gif. */
+export const IMAGE_DROP_EXTENSIONS = [...SPINE_EXTENSIONS.image, 'gif'] as const
+
+export const SPINE_ACCEPT_EXTENSIONS: string[] =
+  Object.values(SPINE_EXTENSIONS).flat().map(e => `.${e}`)
+
+function extOf(name: string): string {
+  const i = name.lastIndexOf('.')
+  return i < 0 ? '' : name.slice(i + 1).toLowerCase()
+}
+
 export function guessFileType(filename: string): SpineFileType | null {
-  const name = filename.toLowerCase()
-  if (name.endsWith('.json')) return 'skeleton-json'
-  if (name.endsWith('.skel')) return 'skeleton-skel'
-  if (name.endsWith('.atlas')) return 'atlas'
-  if (/\.(png|jpe?g|webp|avif)$/.test(name)) return 'image'
+  const ext = extOf(filename)
+  for (const [type, exts] of Object.entries(SPINE_EXTENSIONS) as [SpineFileType, readonly string[]][]) {
+    if (exts.includes(ext)) return type
+  }
   return null
+}
+
+export function isTextureFileName(name: string): boolean {
+  return guessFileType(name) === 'image'
+}
+
+export function isImageDropFileName(name: string): boolean {
+  return (IMAGE_DROP_EXTENSIONS as readonly string[]).includes(extOf(name))
 }
 
 // ── Multi-spine grouping ──────────────────────────────────────────────────────
@@ -60,7 +67,7 @@ function parseAtlasImageNames(atlasText: string): string[] {
   return atlasText
     .split('\n')
     .map(l => l.trim())
-    .filter(l => /\.(png|jpe?g|webp|avif)$/i.test(l) && !l.includes(':'))
+    .filter(l => isTextureFileName(l) && !l.includes(':'))
 }
 
 function makeId(): string {
@@ -81,9 +88,10 @@ function makeId(): string {
  *   - If no images found → error slot.
  */
 export async function groupSpineFiles(files: File[]): Promise<GroupSpineResult> {
-  const skeletons = files.filter(f => /\.(json|skel)$/i.test(f.name))
-  const atlases   = files.filter(f => /\.atlas$/i.test(f.name))
-  const images    = files.filter(f => /\.(png|jpe?g|webp|avif)$/i.test(f.name))
+  const types     = files.map(f => guessFileType(f.name))
+  const skeletons = files.filter((_, i) => types[i] === 'skeleton-json' || types[i] === 'skeleton-skel')
+  const atlases   = files.filter((_, i) => types[i] === 'atlas')
+  const images    = files.filter((_, i) => types[i] === 'image')
 
   if (skeletons.length === 0)
     return { slots: [], globalError: 'Missing skeleton file (.json or .skel)' }
@@ -93,7 +101,7 @@ export async function groupSpineFiles(files: File[]): Promise<GroupSpineResult> 
     return { slots: [], globalError: 'Missing image files (.png / .jpg / .webp / .avif)' }
 
   // Read all atlas files upfront (needed for image name extraction)
-  const atlasTexts = await Promise.all(atlases.map(a => readFileAsText(a)))
+  const atlasTexts = await Promise.all(atlases.map(a => a.text()))
 
   // Step 1 — match by base-name
   const atlasUsed = new Set<number>()
@@ -151,7 +159,7 @@ export async function groupSpineFiles(files: File[]): Promise<GroupSpineResult> 
     }
 
     const [skelBody, ...imgBodies] = await Promise.all([
-      isJson ? readFileAsText(skel) : readFileAsArrayBuffer(skel),
+      isJson ? skel.text() : skel.arrayBuffer(),
       ...slotImages.map(f => readFileAsDataURL(f)),
     ])
 

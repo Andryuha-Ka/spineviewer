@@ -9,12 +9,14 @@
 import { defineStore } from 'pinia'
 import { isPalette, type PaletteName } from '@/core/utils/themePalette'
 
-export type Theme    = 'dark' | 'light'
+type Theme    = 'dark' | 'light'
 export type FontSize = 'sm' | 'md' | 'lg'
 
 export const useSettingsStore = defineStore('settings', () => {
-  const theme    = ref<Theme>(   (localStorage.getItem('sv-theme')    as Theme)    ?? 'dark')
-  const fontSize = ref<FontSize>((localStorage.getItem('sv-fontsize') as FontSize) ?? 'sm')
+  const storedTheme    = localStorage.getItem('sv-theme') as Theme
+  const storedFontSize = localStorage.getItem('sv-fontsize') as FontSize
+  const theme    = ref<Theme>(['dark', 'light'].includes(storedTheme) ? storedTheme : 'dark')
+  const fontSize = ref<FontSize>(['sm', 'md', 'lg'].includes(storedFontSize) ? storedFontSize : 'sm')
   const storedPalette = localStorage.getItem('svp:theme:palette')
   const palette  = ref<PaletteName>(isPalette(storedPalette) ? storedPalette : 'darkroom')
 

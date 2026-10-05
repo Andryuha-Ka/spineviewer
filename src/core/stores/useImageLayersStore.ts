@@ -11,7 +11,7 @@ import { useFileLoaderStore } from './useFileLoaderStore'
 import { useViewerStore } from './useViewerStore'
 import { usePlaceholderImagesStore } from './usePlaceholderImagesStore'
 
-export interface ImageLayer {
+interface ImageLayer {
   id: string
   name: string
   dataUrl: string
@@ -22,7 +22,7 @@ export interface ImageLayer {
   background: boolean
 }
 
-export interface LayerRow {
+interface LayerRow {
   kind: 'slot' | 'layer'
   id: string
 }

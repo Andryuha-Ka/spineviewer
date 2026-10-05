@@ -8,7 +8,7 @@
 
 import type { TrackLoopState } from '@/core/overlay/overlayMath'
 
-export const DC_BUCKETS = 300
+const DC_BUCKETS = 300
 
 /**
  * Holds per-track loop state machine and DC sparkline raw sample buffer.
@@ -27,4 +27,4 @@ export function useLoopStateMachine() {
   }
 }
 
-export type LoopStateMachine = ReturnType<typeof useLoopStateMachine>
+export type LoopStateMachine =ReturnType<typeof useLoopStateMachine>

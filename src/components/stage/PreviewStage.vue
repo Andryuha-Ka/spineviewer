@@ -133,6 +133,7 @@ import type { FileSet, PHSpineEntry } from '@/core/types/FileSet'
 import { makeLoopState, computeNorm, resetLoopState } from '@/core/overlay/overlayMath'
 import { queueTrackList, rearmListLoops, playlistPosition, shouldAutoStop } from '@/core/utils/slotState'
 import { fitSequenceScale } from '@/core/utils/exportUtils'
+import { fpsTier } from '@/core/utils/fpsTier'
 
 const versionStore   = useVersionStore()
 const viewerStore    = useViewerStore()
@@ -172,11 +173,7 @@ const loadingText = ref('Initializing Pixi…')
 const spineError  = ref<string | null>(null)
 const spineLoaded = ref(false)
 
-const fpsClass = computed(() => {
-  if (fps.value < 30) return 'fps--bad'
-  if (fps.value < 55) return 'fps--ok'
-  return 'fps--good'
-})
+const fpsClass = computed(() => 'fps--' + fpsTier(fps.value))
 
 // ── Composables ───────────────────────────────────────────────────────────────
 const children = useChildAdapters()
@@ -722,6 +719,7 @@ async function loadSpine(fileSet: FileSet, slotId?: string, resetViewport = true
     const { width, height } = container.getBoundingClientRect()
 
     onStage.adapter.mount(pixiApp.stage)
+    profilerStore.restartWarmup()
     onStage.adapter.setTimeScale(animationStore.isPlaying ? animationStore.speed : 0)
 
     onStage.obj = pixiApp.getLastStageChild()
@@ -1196,7 +1194,7 @@ defineExpose({
 
 .loading-text {
   font-size: 0.8125rem;
-  color: var(--c-text-muted);
+  color: rgba(255,255,255,0.6);
 }
 
 /* ── Selected slot bounds ── */

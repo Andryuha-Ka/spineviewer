@@ -12,7 +12,7 @@ import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 import type { FileSet, PHChildEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 
 // binary skeleton header: hash, then the editor version string
-const skel = (version: string) => new TextEncoder().encode('\u001cFVeOgUJ9Zde9qJlpLOM\u0007' + version + '\u0000\u0000').buffer
+const skel = (version: string) => new TextEncoder().encode('FVeOgUJ9\u0007' + version + '\u0000\u0000').buffer
 
 const FILESET: FileSet = {
   skeleton: { filename: 's.skel', fileBody: skel('4.1.24'), type: 'skeleton-skel', mimeType: '' },
@@ -356,5 +356,15 @@ describe('usePlaceholderActions', () => {
     const txt = new File(['x'], 'a.txt', { type: 'text/plain' })
     await usePlaceholderActions().dropFiles([png, txt], 'a', 'p')
     expect(ph.getPlaceholderImages('a', 'p').map(e => e.fileName)).toEqual(['a.png'])
+  })
+
+  it('accepts images by extension even without a MIME type (B20)', async () => {
+    const ph = usePlaceholderImagesStore()
+    const addImage = vi.spyOn(ph, 'addImage').mockResolvedValue(undefined)
+    const hat = new File(['x'], 'hat.PNG', { type: '' })
+    const bow = new File(['x'], 'bow.gif', { type: 'image/gif' })
+    const notes = new File(['x'], 'notes.txt', { type: 'text/plain' })
+    await usePlaceholderActions().dropFiles([hat, notes, bow], 'a', 'p')
+    expect(addImage.mock.calls.map(c => c[2].name)).toEqual(['hat.PNG', 'bow.gif'])
   })
 })

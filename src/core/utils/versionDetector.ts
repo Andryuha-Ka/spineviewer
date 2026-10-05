@@ -12,6 +12,15 @@ import { spineOptionsMap, type PixiVersion, type SpineVersion } from '@/core/sto
 /** Supported Spine major.minor versions */
 const KNOWN_VERSIONS = ['3.8', '4.0', '4.1', '4.2'] as const
 
+/** "Spine X.Y is newer/older than the supported runtimes (...)" for an unsupported version, else null. */
+export function unsupportedVersionHint(detected: string): string | null {
+  const match = detected.match(/^(\d+)\.(\d+) \(unsupported\)$/)
+  if (!match) return null
+  const [major, minor] = [Number(match[1]), Number(match[2])]
+  const relation = major > 4 || (major === 4 && minor > 2) ? 'newer' : 'older'
+  return `Spine ${match[1]}.${match[2]} is ${relation} than the supported runtimes (${KNOWN_VERSIONS.join(', ')})`
+}
+
 /**
  * Reads the `skeleton.spine` field from a Spine JSON string and returns the
  * matching supported version, or "unknown" if missing/unsupported.
@@ -32,19 +41,39 @@ export function detectSpineVersion(jsonText: string): string {
   }
 }
 
+/** Spine binary string: varint (length + 1, 0 = null) followed by the bytes; null when out of range. */
+function readString(bytes: Uint8Array, offset: number): { text: string; next: number } | null {
+  let value = 0
+  let pos = offset
+  for (let shift = 0; shift < 35; shift += 7) {
+    if (pos >= bytes.length) return null
+    const b = bytes[pos++]
+    value |= (b & 0x7f) << shift
+    if (!(b & 0x80)) break
+    if (shift === 28) return null
+  }
+  if (value === 0) return { text: '', next: pos }
+  const end = pos + value - 1
+  if (value < 0 || end > bytes.length) return null
+  return { text: new TextDecoder('latin1').decode(bytes.subarray(pos, end)), next: end }
+}
+
 /**
- * Scans the first 100 bytes of a binary .skel file for an embedded version
- * string of the form "X.Y.Z" and returns the matching major.minor, or "unknown".
+ * Reads the header version string of a binary .skel file — after the 8-byte hash (4.x)
+ * or after the length-prefixed hash string (3.8) — and returns its major.minor, or "unknown".
  */
 export function detectSpineVersionFromSkel(buffer: ArrayBuffer): string {
   try {
-    const bytes = new Uint8Array(buffer, 0, Math.min(buffer.byteLength, 100))
-    const text  = new TextDecoder('latin1').decode(bytes)
-    const match = text.match(/(\d+\.\d+)\.\d+/)
-    if (!match) return 'unknown'
-
-    const majorMinor = match[1]
-    return KNOWN_VERSIONS.includes(majorMinor as never) ? majorMinor : `${majorMinor} (unsupported)`
+    const bytes = new Uint8Array(buffer)
+    const hash38 = readString(bytes, 0)
+    const candidates = [readString(bytes, 8), hash38 && readString(bytes, hash38.next)]
+    for (const candidate of candidates) {
+      const match = candidate?.text.match(/^(\d+\.\d+)\.\d+/)
+      if (!match) continue
+      const majorMinor = match[1]
+      return KNOWN_VERSIONS.includes(majorMinor as never) ? majorMinor : `${majorMinor} (unsupported)`
+    }
+    return 'unknown'
   } catch {
     return 'unknown'
   }

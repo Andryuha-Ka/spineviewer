@@ -28,13 +28,10 @@ function loadFromStorage(): StoredVersions {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { pixiVersion: null, spineVersion: null }
     const parsed = JSON.parse(raw)
-    const pixi = parsed.pixiVersion as PixiVersion | null
+    const pixi: unknown = parsed?.pixiVersion
+    if (pixi !== 7 && pixi !== 8) return { pixiVersion: null, spineVersion: null }
     const spine = parsed.spineVersion as SpineVersion | null
-    // Validate that saved combination is still valid
-    if (pixi && spine && spineOptionsMap[pixi]?.includes(spine)) {
-      return { pixiVersion: pixi, spineVersion: spine }
-    }
-    return { pixiVersion: pixi ?? null, spineVersion: null }
+    return { pixiVersion: pixi, spineVersion: spineOptionsMap[pixi].includes(spine as SpineVersion) ? spine : null }
   } catch {
     return { pixiVersion: null, spineVersion: null }
   }

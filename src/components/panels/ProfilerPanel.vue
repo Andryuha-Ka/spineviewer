@@ -105,6 +105,8 @@
 import { useProfilerStore } from '@/core/stores/useProfilerStore'
 import { useAtlasStore }    from '@/core/stores/useAtlasStore'
 import { useSettingsStore } from '@/core/stores/useSettingsStore'
+import { atlasVramBytes } from '@/core/utils/atlasTextParser'
+import { fpsTier, type FpsTier } from '@/core/utils/fpsTier'
 
 const profilerStore = useProfilerStore()
 const atlasStore    = useAtlasStore()
@@ -118,6 +120,7 @@ const MAX_FPS  = 90  // upper bound for graph y-axis
 let rafHandle = 0
 
 const colors = { bg: '', success: '', warning: '', error: '' }
+const TIER_COLOR_KEY: Record<FpsTier, 'success' | 'warning' | 'error'> = { good: 'success', ok: 'warning', bad: 'error' }
 
 function readColors() {
   const css = getComputedStyle(document.documentElement)
@@ -167,7 +170,7 @@ function drawGraph() {
   ctx.globalAlpha = 1
 
   // Bars
-  const history = profilerStore.fpsHistory
+  const history = profilerStore.getFpsHistory()
   const barW    = w / 120  // always 120-slot grid
   const offset  = 120 - history.length
 
@@ -176,7 +179,7 @@ function drawGraph() {
     const barH = Math.min(fps / MAX_FPS, 1) * h
     const x    = (offset + i) * barW
 
-    ctx.fillStyle = fps >= 55 ? colors.success : fps >= 30 ? colors.warning : colors.error
+    ctx.fillStyle = colors[TIER_COLOR_KEY[fpsTier(fps)]]
     ctx.fillRect(Math.round(x) + 0.5, h - barH, Math.max(barW - 1, 0.5), barH)
   }
 }
@@ -214,10 +217,7 @@ try {
 
 // ── Computed display values ───────────────────────────────────────────────────
 
-const currentFps = computed(() => {
-  const h = profilerStore.fpsHistory
-  return h.length > 0 ? h[h.length - 1] : 0
-})
+const currentFps = computed(() => profilerStore.latestFps)
 
 const frameMsDisplay = computed(() => `${profilerStore.frameMs.toFixed(1)} ms`)
 
@@ -227,10 +227,7 @@ const drawCallsDisplay = computed(() =>
 
 /** VRAM estimate from atlas page sizes (width × height × 4 bytes per page) */
 const vramDisplay = computed(() => {
-  let bytes = 0
-  for (const p of atlasStore.pages) {
-    bytes += p.width * p.height * 4
-  }
+  const bytes = atlasVramBytes(atlasStore.pages)
   if (bytes === 0) return '—'
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -250,9 +247,7 @@ const heapDisplay = computed(() => {
 const fpsClass = computed(() => {
   const fps = currentFps.value
   if (fps === 0)   return ''
-  if (fps >= 55)   return 'fps--good'
-  if (fps >= 30)   return 'fps--ok'
-  return 'fps--bad'
+  return 'fps--' + fpsTier(fps)
 })
 
 const clippingClass = computed(() =>
@@ -261,8 +256,12 @@ const clippingClass = computed(() =>
     : ''
 )
 
+const TIER_CSS_COLOR: Record<FpsTier, string> = {
+  good: 'var(--c-success)', ok: 'var(--c-warning)', bad: 'var(--c-error)',
+}
+
 function fpsColor(fps: number): string {
-  return fps >= 55 ? 'var(--c-success)' : fps >= 30 ? 'var(--c-warning)' : 'var(--c-error)'
+  return TIER_CSS_COLOR[fpsTier(fps)]
 }
 
 const slowFramesReversed  = computed(() => [...profilerStore.slowFrames].reverse())

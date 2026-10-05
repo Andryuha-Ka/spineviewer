@@ -8,9 +8,13 @@
 
 import type { SpineFile } from '@/core/types/FileSet'
 
-export interface ImageResolverResult<T> {
+interface ImageResolverResult<T> {
   textureMap: Map<string, T>
   resolver: (path: string, callback: (tex: T | null) => void) => void
+}
+
+export function basename(path: string): string {
+  return path.split('/').pop() ?? path
 }
 
 /**
@@ -30,7 +34,7 @@ export function buildImageResolver<T>(
   }
 
   const resolver = (path: string, callback: (tex: T | null) => void): void => {
-    const name = path.split('/').pop() ?? path
+    const name = basename(path)
     const key = [...textureMap.keys()].find(
       k => k === name || k === path || k.endsWith('/' + name),
     )

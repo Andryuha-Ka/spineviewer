@@ -99,6 +99,25 @@ describe('useFileLoaderStore.cloneSlot (N9)', () => {
   })
 })
 
+describe('useFileLoaderStore.patchSlotPlaceholderImages (C23)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('stores placeholder entries without the child FileSet', () => {
+    const loader = useFileLoaderStore()
+    loader.setSlots([slot('a', { savedState: saved() })], '4.1')
+    const entry: PHChildEntry = { kind: 'spine', imageId: 'e1', childSlotId: 'kid', fileName: 'kid', fileSet: FILESET, syncEnabled: true, posX: 0, posY: 0, scale: 1 }
+    loader.patchSlotPlaceholderImages('a', { p: [entry] })
+
+    const state = loader.spineSlots[0].savedState!
+    const [out] = state.placeholderChildren!.p
+    expect('fileSet' in out).toBe(false)
+    expect(out).toMatchObject({ kind: 'spine', imageId: 'e1', childSlotId: 'kid' })
+    const reachable = (v: unknown): boolean =>
+      v === FILESET.skeleton.fileBody || (typeof v === 'object' && v !== null && Object.values(v).some(reachable))
+    expect(reachable(state)).toBe(false)
+  })
+})
+
 describe('useFileLoaderStore.removeSlot (B11)', () => {
   beforeEach(() => setActivePinia(createPinia()))
 

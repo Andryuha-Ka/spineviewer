@@ -22,21 +22,21 @@
         </span>
       </div>
       <div v-if="diff" class="summary-counts">
-        <template v-if="criticalIssuesTotal === 0 && warnIssuesTotal === 0">
+        <template v-if="severity.critical === 0 && severity.warn === 0">
           <span class="count count--ok">reskin ok</span>
           <span class="count-sep">·</span>
         </template>
         <template v-else>
-          <span v-if="criticalIssuesTotal > 0" class="count count--critical">{{ criticalIssuesTotal }} critical</span>
-          <span v-if="criticalIssuesTotal > 0 && warnIssuesTotal > 0" class="count-sep">·</span>
-          <span v-if="warnIssuesTotal > 0" class="count count--warn">{{ warnIssuesTotal }} warn</span>
+          <span v-if="severity.critical > 0" class="count count--critical">{{ severity.critical }} critical</span>
+          <span v-if="severity.critical > 0 && severity.warn > 0" class="count-sep">·</span>
+          <span v-if="severity.warn > 0" class="count count--warn">{{ severity.warn }} warn</span>
           <span class="count-sep">·</span>
         </template>
         <span class="source-badge">{{ diff.source === 'json-full' ? 'JSON' : 'runtime' }}</span>
       </div>
       <div v-else-if="diffStatus === 'running'" class="summary-running">Running diff…</div>
       <div v-else-if="diffStatus === 'error'" class="summary-error">{{ diffError }}</div>
-      <div v-else class="summary-idle">No diff yet — press ⚡ Run Diff</div>
+      <div v-else class="summary-idle">No diff yet — it runs automatically when both sides are loaded</div>
     </div>
 
     <!-- Filter + panel controls -->
@@ -66,18 +66,18 @@
             <span class="ov-toggle">{{ ovExpanded ? '−' : '+' }}</span>
             <span class="ov-title">🎬 Reskin Overview</span>
             <span class="ov-counts">
-              <span v-if="animNameIssues > 0"    class="ov-badge ov-badge--err">{{ animNameIssues }} anim</span>
-              <span v-if="animDurIssues > 0"     class="ov-badge ov-badge--warn">{{ animDurIssues }} dur</span>
-              <span v-if="skinTableIssues > 0"   class="ov-badge ov-badge--err">{{ skinTableIssues }} skin</span>
-              <span v-if="globalEventIssues > 0"      class="ov-badge ov-badge--err">{{ globalEventIssues }} event</span>
-              <span v-if="animEventNameIssues > 0"   class="ov-badge ov-badge--err">{{ animEventNameIssues }} ev name</span>
-              <span v-if="animEventTimingIssues > 0" class="ov-badge ov-badge--warn">{{ animEventTimingIssues }} ev time</span>
-              <span v-if="changedPlaceholders > 0"         class="ov-badge ov-badge--err">{{ changedPlaceholders }} ph</span>
-              <span v-if="constraintCriticalIssues > 0"   class="ov-badge ov-badge--err">{{ constraintCriticalIssues }} cstr</span>
-              <span v-if="constraintParamIssues > 0"      class="ov-badge ov-badge--warn">{{ constraintParamIssues }} cstr param</span>
-              <span v-if="freeBoneIssues > 0"             class="ov-badge ov-badge--warn">{{ freeBoneIssues }} free bone</span>
+              <span v-if="severity.animName > 0"    class="ov-badge ov-badge--err">{{ severity.animName }} anim</span>
+              <span v-if="severity.animDur > 0"     class="ov-badge ov-badge--warn">{{ severity.animDur }} dur</span>
+              <span v-if="severity.skin > 0"   class="ov-badge ov-badge--err">{{ severity.skin }} skin</span>
+              <span v-if="severity.globalEvent > 0"      class="ov-badge ov-badge--err">{{ severity.globalEvent }} event</span>
+              <span v-if="severity.animEventName > 0"   class="ov-badge ov-badge--err">{{ severity.animEventName }} ev name</span>
+              <span v-if="severity.animEventTiming > 0" class="ov-badge ov-badge--warn">{{ severity.animEventTiming }} ev time</span>
+              <span v-if="severity.placeholder > 0"         class="ov-badge ov-badge--err">{{ severity.placeholder }} ph</span>
+              <span v-if="severity.constraintCritical > 0"   class="ov-badge ov-badge--err">{{ severity.constraintCritical }} cstr</span>
+              <span v-if="severity.constraintParam > 0"      class="ov-badge ov-badge--warn">{{ severity.constraintParam }} cstr param</span>
+              <span v-if="severity.freeBone > 0"             class="ov-badge ov-badge--warn">{{ severity.freeBone }} free bone</span>
 
-              <span v-if="animNameIssues === 0 && skinTableIssues === 0 && globalEventIssues === 0 && animEventNameIssues === 0 && changedPlaceholders === 0 && constraintCriticalIssues === 0 && freeBoneIssues === 0" class="ov-badge ov-badge--ok">ok</span>
+              <span v-if="severity.animName === 0 && severity.skin === 0 && severity.globalEvent === 0 && severity.animEventName === 0 && severity.placeholder === 0 && severity.constraintCritical === 0 && severity.freeBone === 0" class="ov-badge ov-badge--ok">ok</span>
             </span>
           </div>
 
@@ -103,7 +103,7 @@
 
             <!-- Skins -->
             <div class="ov-sub-header">
-              <span class="ov-sub-title">{{ skinTableIssues > 0 ? '⚠ ' : '' }}Skins</span>
+              <span class="ov-sub-title">{{ severity.skin > 0 ? '⚠ ' : '' }}Skins</span>
               <span class="ov-sub-hint">{{ diff.skinTable.length }} total</span>
             </div>
             <div v-if="diff.skinTable.length === 0" class="ov-empty">No skins</div>
@@ -123,7 +123,7 @@
 
             <!-- Global events (always visible) -->
             <div class="ov-sub-header ov-sub-header--events">
-              <span class="ov-sub-title">{{ globalEventIssues > 0 ? '⚠ ' : '' }}Events</span>
+              <span class="ov-sub-title">{{ severity.globalEvent > 0 ? '⚠ ' : '' }}Events</span>
               <span class="ov-sub-hint">{{ diff.globalEvents.length }} total</span>
             </div>
             <div v-if="diff.globalEvents.length === 0" class="ov-empty">No events defined</div>
@@ -179,7 +179,7 @@
 
             <!-- Placeholders -->
             <div class="ov-sub-header ov-sub-header--ph">
-              <span class="ov-sub-title">{{ changedPlaceholders > 0 ? '⚠ ' : '' }}Placeholders</span>
+              <span class="ov-sub-title">{{ severity.placeholder > 0 ? '⚠ ' : '' }}Placeholders</span>
               <span class="ov-sub-hint">
                 {{ diff.placeholders.length }} total
                 <template v-if="addedPlaceholders > 0"> · {{ addedPlaceholders }} added</template>
@@ -233,7 +233,7 @@
 
             <!-- Free Bones -->
             <div class="ov-sub-header">
-              <span class="ov-sub-title">{{ freeBoneIssues > 0 ? '⚠ ' : '' }}Free Bones</span>
+              <span class="ov-sub-title">{{ severity.freeBone > 0 ? '⚠ ' : '' }}Free Bones</span>
               <span class="ov-sub-hint">{{ diff.freeBoneTable.length }} total</span>
             </div>
             <template v-if="diff.freeBoneTable.length === 0">
@@ -274,6 +274,7 @@
 import CompareDiffSection from './CompareDiffSection.vue'
 import { useCompareStore } from '@/core/stores/useCompareStore'
 import type { PlaceholderDiff, AnimEventGroup, GlobalEventRow, SkinRow, ConstraintRow, FreeBoneRow } from '@/core/utils/spineCompare'
+import { diffSeverity } from '@/core/utils/compare/diffSeverity'
 
 const compareStore = useCompareStore()
 
@@ -299,35 +300,12 @@ const labelB = computed(() => {
 
 // ── Reskin overview computed ────────────────────────────────────────────────
 
-const animNameIssues = computed(() =>
-  diff.value?.animTable.filter(r => r.status === 'only-a' || r.status === 'only-b').length ?? 0,
-)
+const severity = computed(() => diffSeverity(diff.value))
 
-const animDurIssues = computed(() =>
-  diff.value?.animTable.filter(r => r.status === 'delta').length ?? 0,
-)
-
-const animTableIssues = computed(() => animNameIssues.value + animDurIssues.value)
+const animTableIssues = computed(() => severity.value.animName + severity.value.animDur)
 
 const durAClass = computed(() => compareStore.masterSide === 'left' ? 'anim-row-dur--master' : 'anim-row-dur--variant')
 const durBClass = computed(() => compareStore.masterSide === 'right' ? 'anim-row-dur--master' : 'anim-row-dur--variant')
-
-const skinTableIssues = computed(() =>
-  diff.value?.skinTable.filter(s => s.status !== 'ok').length ?? 0,
-)
-
-const globalEventIssues = computed(() =>
-  diff.value?.globalEvents.filter(e => e.status !== 'ok').length ?? 0,
-)
-
-const animEventNameIssues = computed(() =>
-  diff.value?.animEvents.reduce((sum, g) => sum + g.events.filter(e => e.status === 'only-a' || e.status === 'only-b').length, 0) ?? 0,
-)
-
-const animEventTimingIssues = computed(() =>
-  diff.value?.animEvents.reduce((sum, g) => sum + g.events.filter(e => e.status === 'delta').length, 0) ?? 0,
-)
-
 
 const visibleSkinTable = computed<SkinRow[]>(() => {
   if (!diff.value) return []
@@ -385,11 +363,6 @@ function formatDelta(a: number, b: number): string {
 
 // ── Placeholder computed ────────────────────────────────────────────────────
 
-const changedPlaceholders = computed(() => {
-  if (!diff.value) return 0
-  return diff.value.placeholders.filter(p => p.status !== 'equal').length
-})
-
 const addedPlaceholders   = computed(() => diff.value?.placeholders.filter(p => p.status === 'added').length ?? 0)
 const removedPlaceholders = computed(() => diff.value?.placeholders.filter(p => p.status === 'removed').length ?? 0)
 
@@ -402,29 +375,7 @@ const visiblePlaceholders = computed<PlaceholderDiff[]>(() => {
 
 // ── Constraint table computed ─────────────────────────────────────────────────
 
-const constraintCriticalIssues = computed(() =>
-  diff.value?.constraintTable.filter(r =>
-    r.status === 'only-a' || r.status === 'only-b' ||
-    (r.status === 'changed' && (r.bonesChanged || r.targetChanged)),
-  ).length ?? 0,
-)
-
-const constraintParamIssues = computed(() =>
-  diff.value?.constraintTable.filter(r =>
-    r.status === 'changed' && !r.bonesChanged && !r.targetChanged && r.paramsChanged,
-  ).length ?? 0,
-)
-
-const constraintTableIssues = computed(() => constraintCriticalIssues.value + constraintParamIssues.value)
-
-const criticalIssuesTotal = computed(() =>
-  animNameIssues.value + skinTableIssues.value + globalEventIssues.value +
-  animEventNameIssues.value + changedPlaceholders.value + constraintCriticalIssues.value,
-)
-const warnIssuesTotal = computed(() =>
-  animDurIssues.value + animEventTimingIssues.value + constraintParamIssues.value + freeBoneIssues.value,
-)
-
+const constraintTableIssues = computed(() => severity.value.constraintCritical + severity.value.constraintParam)
 
 const visibleConstraintTable = computed<ConstraintRow[]>(() => {
   if (!diff.value) return []
@@ -434,10 +385,6 @@ const visibleConstraintTable = computed<ConstraintRow[]>(() => {
 })
 
 // ── Free bone table computed ──────────────────────────────────────────────────
-
-const freeBoneIssues = computed(() =>
-  diff.value?.freeBoneTable.filter(r => r.status !== 'ok').length ?? 0,
-)
 
 const visibleFreeBoneTable = computed<FreeBoneRow[]>(() => {
   if (!diff.value) return []

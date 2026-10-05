@@ -154,9 +154,9 @@ function onClickBack() {
 
 onMounted(() => {
   const left = fileLoaderStore.spineSlots.find(s => s.id === props.initLeftSlotId)
-  if (left && !left.error) compareStore.setLeft({ source: 'loaded', slotId: left.id, label: left.name })
+  if (left && !left.error) compareStore.setSide('left', { source: 'loaded', slotId: left.id, label: left.name })
   const right = fileLoaderStore.spineSlots.find(s => s.id === props.initRightSlotId)
-  if (right && !right.error) compareStore.setRight({ source: 'loaded', slotId: right.id, label: right.name })
+  if (right && !right.error) compareStore.setSide('right', { source: 'loaded', slotId: right.id, label: right.name })
 })
 
 </script>

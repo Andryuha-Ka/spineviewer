@@ -9,7 +9,7 @@
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useVersionStore, type SpineVersion } from '@/core/stores/useVersionStore'
 import { groupSpineFiles, getFilesFromDataTransfer } from '@/core/utils/fileLoader'
-import { detectSpineVersion, detectSpineVersionFromSkel, spineVersionProblem } from '@/core/utils/versionDetector'
+import { detectSpineVersion, detectSpineVersionFromSkel, spineVersionProblem, unsupportedVersionHint } from '@/core/utils/versionDetector'
 import { validateSpineFileSet } from '@/core/utils/spineValidator'
 import {
   saveSession,
@@ -17,11 +17,12 @@ import {
   pickFilesViaFSAA,
   pickFolderViaFSAA,
 } from '@/core/utils/fileHistory'
+import type { EmitFn, ShortEmitsToObject } from 'vue'
 import type { SpineFileType } from '@/core/types/FileSet'
 
-type EmitFn = {
-  (event: 'open'): void
-  (event: 'open-compare', payload: { left?: string; right?: string }): void
+export type PickerEmits = {
+  open: []
+  'open-compare': [payload: { left?: string; right?: string }]
 }
 
 export const TYPE_LABELS: Record<SpineFileType, string> = {
@@ -37,13 +38,14 @@ export function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function useFilePickerLogic(emit: EmitFn, onHistorySaved?: () => void) {
+export function useFilePickerLogic(emit: EmitFn<ShortEmitsToObject<PickerEmits>>,onHistorySaved?: () => void) {
   const fileLoaderStore = useFileLoaderStore()
   const store           = useVersionStore()
 
   const isDragging     = ref(false)
   const classifyError  = ref<string | null>(null)
   const versionUnknown = ref(false)
+  const unsupportedHint = ref<string | null>(null)
   const fileInputRef   = ref<HTMLInputElement | null>(null)
   const folderInputRef = ref<HTMLInputElement | null>(null)
 
@@ -63,6 +65,7 @@ export function useFilePickerLogic(emit: EmitFn, onHistorySaved?: () => void) {
     isDragging.value     = false
     classifyError.value  = null
     versionUnknown.value = false
+    unsupportedHint.value = null
 
     fileLoaderStore.setPendingFiles(files)
 
@@ -103,6 +106,7 @@ export function useFilePickerLogic(emit: EmitFn, onHistorySaved?: () => void) {
     } else {
       versionUnknown.value = true
     }
+    unsupportedHint.value = unsupportedVersionHint(version ?? '')
 
     if (!skipHistory && result.slots.some(s => !s.error && !s.validationErrors?.length)) {
       await saveSession(files.map(f => f.name), handles)
@@ -172,6 +176,7 @@ export function useFilePickerLogic(emit: EmitFn, onHistorySaved?: () => void) {
     fileLoaderStore.clear()
     classifyError.value  = null
     versionUnknown.value = false
+    unsupportedHint.value = null
   }
 
   function onOpenCompare(): void {
@@ -189,6 +194,7 @@ export function useFilePickerLogic(emit: EmitFn, onHistorySaved?: () => void) {
     isDragging,
     classifyError,
     versionUnknown,
+    unsupportedHint,
     fileInputRef,
     folderInputRef,
     handleFiles,

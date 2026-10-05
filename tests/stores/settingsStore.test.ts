@@ -23,6 +23,22 @@ describe('useSettingsStore palette', () => {
     expect(useSettingsStore().palette).toBe('darkroom')
   })
 
+  it('falls back to dark / sm on unknown stored theme and font size', () => {
+    localStorage.setItem('sv-theme', 'blue')
+    localStorage.setItem('sv-fontsize', 'xl')
+    const store = useSettingsStore()
+    expect(store.theme).toBe('dark')
+    expect(store.fontSize).toBe('sm')
+  })
+
+  it('restores a valid stored theme and font size', () => {
+    localStorage.setItem('sv-theme', 'light')
+    localStorage.setItem('sv-fontsize', 'lg')
+    const store = useSettingsStore()
+    expect(store.theme).toBe('light')
+    expect(store.fontSize).toBe('lg')
+  })
+
   it('restores a stored palette and persists a change', async () => {
     localStorage.setItem(KEY, 'slate')
     localStorage.setItem('sv-theme', 'light')

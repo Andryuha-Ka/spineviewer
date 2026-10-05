@@ -175,6 +175,7 @@ import { useVersionStore } from '@/core/stores/useVersionStore'
 import { useCompareStore } from '@/core/stores/useCompareStore'
 import { useViewerStore } from '@/core/stores/useViewerStore'
 import AnimationSelect from '@/components/ui/AnimationSelect.vue'
+import { fpsTier } from '@/core/utils/fpsTier'
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -268,11 +269,7 @@ const syncEnabled    = computed(() => compareStore.syncEnabled)
 
 const bgColorHex = computed(() => '#' + bgColor.value.toString(16).padStart(6, '0'))
 
-const fpsClass = computed(() => {
-  if (fps.value < 30) return 'fps--bad'
-  if (fps.value < 55) return 'fps--ok'
-  return 'fps--good'
-})
+const fpsClass = computed(() => 'fps--' + fpsTier(fps.value))
 
 const timeDisplay = computed(() => {
   const t = currentTime.value

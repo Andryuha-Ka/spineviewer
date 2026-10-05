@@ -33,7 +33,7 @@ export interface ActiveStage {
   obj: unknown
 }
 
-export interface SlotSwitchContext {
+interface SlotSwitchContext {
   onStage: ActiveStage
   mountedAdapters: Map<string, ISpineAdapter>
   mountedSpineObjects: Map<string, PixiSpriteObject>

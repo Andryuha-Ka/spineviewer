@@ -9,7 +9,7 @@
 import { defineStore } from 'pinia'
 import type { BoneInfo, SlotInfo, EventInfo, ISpineAdapter, BoneLocalTransform } from '@/core/types/ISpineAdapter'
 
-export interface SkeletonPopulateData {
+interface SkeletonPopulateData {
   animations: string[]
   skins: string[]
   bones: BoneInfo[]

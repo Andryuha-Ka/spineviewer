@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { buildSlotSavedState, playlistPosition, playlistsOf, queueTrackList, rearmListLoops, replaySavedTracks, shouldAutoStop, trackTimesOf } from '@/core/utils/slotState'
 import { makeFakeAdapter, track } from '../helpers/fakeAdapter'
 import type { TrackState } from '@/core/types/ISpineAdapter'
+import type { FileSet, PHSpineEntry } from '@/core/types/FileSet'
 
 const playback = {
   speed: 1.25, selectedAnimation: 'run', currentTrack: 2, loop: true,
@@ -33,6 +34,19 @@ describe('slotState', () => {
     expect(ss.trackEnabled).not.toBe(playback.trackEnabled)
     expect(ss.selectedSkins).not.toBe(skins)
     expect('placeholderChildren' in ss).toBe(false)
+  })
+
+  it('strips fileSet from placeholder spine entries (C23)', () => {
+    const fileSet = {
+      skeleton: { filename: 's.skel', fileBody: new ArrayBuffer(8), type: 'skeleton-skel', mimeType: '' },
+      atlas: { filename: 's.atlas', fileBody: '', type: 'atlas', mimeType: '' },
+      images: [],
+    } as FileSet
+    const entry: PHSpineEntry = { kind: 'spine', imageId: 'e1', childSlotId: 'kid', fileName: 'kid', fileSet, syncEnabled: false, posX: 1, posY: 2, scale: 3 }
+    const ss = buildSlotSavedState({ playback, activeSkins: [], showPlaceholders: true, disabledPlaceholders: [], placeholderChildren: { p: [entry] } })
+    const [out] = ss.placeholderChildren!.p
+    expect('fileSet' in out).toBe(false)
+    expect(out).toEqual({ kind: 'spine', imageId: 'e1', childSlotId: 'kid', fileName: 'kid', syncEnabled: false, posX: 1, posY: 2, scale: 3 })
   })
 
   it('defaults the transform when the slot is unknown', () => {

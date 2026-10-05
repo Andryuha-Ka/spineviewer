@@ -22,13 +22,13 @@ export interface SpineSlotRef {
   label: string
 }
 
-export interface CompareFileSet {
+interface CompareFileSet {
   source: 'direct'
   fileSet: FileSet
   label: string
 }
 
-export type CompareSlot = SpineSlotRef | CompareFileSet | null
+type CompareSlot = SpineSlotRef | CompareFileSet | null
 
 // ── Store ──────────────────────────────────────────────────────────────────────
 
@@ -66,17 +66,10 @@ export const useCompareStore = defineStore('compare', () => {
 
   // --- Actions ---
 
-  function setLeft(slot: CompareSlot) {
-    leftSlot.value   = slot
-    sourceError.value.left = null
-    diff.value       = null
-    diffStatus.value = 'idle'
-    diffError.value  = null
-  }
-
-  function setRight(slot: CompareSlot) {
-    rightSlot.value  = slot
-    sourceError.value.right = null
+  function setSide(side: 'left' | 'right', slot: CompareSlot) {
+    if (side === 'left') leftSlot.value = slot
+    else rightSlot.value = slot
+    sourceError.value[side] = null
     diff.value       = null
     diffStatus.value = 'idle'
     diffError.value  = null
@@ -103,8 +96,7 @@ export const useCompareStore = defineStore('compare', () => {
     if (errors.length > 0) return fail(errors.join('\n'))
 
     const slot: CompareFileSet = { source: 'direct', fileSet, label: fileSet.skeleton.filename }
-    if (side === 'left') setLeft(slot)
-    else setRight(slot)
+    setSide(side, slot)
   }
 
   function setPanelPos(pos: 'left' | 'right' | 'bottom') {
@@ -151,8 +143,7 @@ export const useCompareStore = defineStore('compare', () => {
     diffStatus,
     diffError,
     sourceError,
-    setLeft,
-    setRight,
+    setSide,
     loadDirect,
     setPanelPos,
     setDiff,

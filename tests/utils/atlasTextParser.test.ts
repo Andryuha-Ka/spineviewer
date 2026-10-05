@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseAtlas } from '@/core/utils/atlasTextParser'
+import { parseAtlas, atlasVramBytes, atlasUtilization, type AtlasPage } from '@/core/utils/atlasTextParser'
 
 const ATLAS_3X = [
   'page1.png',
@@ -67,5 +67,31 @@ describe('parseAtlas', () => {
   it('treats rotate:0 and rotate:false as not rotated', () => {
     const [page] = parseAtlas('p.png\nsize:8,8\nr\nbounds:0,0,1,1\nrotate:0\nq\nbounds:0,0,1,1\nrotate:false')
     expect(page.regions.map(r => r.rotate)).toEqual([false, false])
+  })
+})
+
+const pg = (width: number, height: number, regions: [number, number][]): AtlasPage => ({
+  name: 'p.png', width, height,
+  regions: regions.map(([w, h], i) => ({
+    name: `r${i}`, x: 0, y: 0, width: w, height: h, rotate: false,
+    origWidth: w, origHeight: h, offsetX: 0, offsetY: 0, index: -1,
+  })),
+})
+
+describe('atlas stats', () => {
+  it('returns 0 for an empty page list', () => {
+    expect(atlasVramBytes([])).toBe(0)
+    expect(atlasUtilization([])).toBe(0)
+  })
+
+  it('returns 0 utilization for a zero-size page', () => {
+    expect(atlasVramBytes([pg(0, 0, [[4, 4]])])).toBe(0)
+    expect(atlasUtilization([pg(0, 0, [[4, 4]])])).toBe(0)
+  })
+
+  it('sums bytes and areas across pages', () => {
+    const pages = [pg(4, 4, [[2, 2]]), pg(2, 2, [[2, 2]])]
+    expect(atlasVramBytes(pages)).toBe((16 + 4) * 4)
+    expect(atlasUtilization(pages)).toBe(8 / 20)
   })
 })

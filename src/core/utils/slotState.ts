@@ -7,10 +7,29 @@
  */
 
 import type { ISpineAdapter, TrackState, TrackQueueEntry } from '@/core/types/ISpineAdapter'
-import type { PHChildEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
+import type { PHChildEntry, PHImageEntry, PHSpineEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
+
+/** Plain copies of placeholder entries; `PHSpineEntry.fileSet` stays in loaderStore.spineSlots, never in a snapshot. */
+export function withoutFileSets(children: Record<string, PHChildEntry[]> | undefined): Record<string, PHChildEntry[]> {
+  const result: Record<string, PHChildEntry[]> = {}
+  for (const [ph, entries] of Object.entries(children ?? {})) {
+    result[ph] = entries.map(e => {
+      if (e.kind === 'spine') {
+        return {
+          kind: 'spine', imageId: e.imageId, childSlotId: e.childSlotId,
+          fileName: e.fileName, syncEnabled: e.syncEnabled,
+          posX: e.posX, posY: e.posY, scale: e.scale,
+        } as PHSpineEntry
+      }
+      return { kind: 'image', imageId: e.imageId, fileName: e.fileName, dataURL: e.dataURL,
+        syncEnabled: e.syncEnabled, posX: e.posX, posY: e.posY, scale: e.scale } as PHImageEntry
+    })
+  }
+  return result
+}
 
 /** Playback fields of the animation store that a slot snapshot keeps. */
-export interface PlaybackSnapshot {
+interface PlaybackSnapshot {
   speed: number
   selectedAnimation: string | null
   currentTrack: number
@@ -20,7 +39,7 @@ export interface PlaybackSnapshot {
   isPlaying: boolean
 }
 
-export interface SlotSnapshotInput {
+interface SlotSnapshotInput {
   playback: PlaybackSnapshot
   activeSkins: readonly string[]
   showPlaceholders: boolean
@@ -50,7 +69,7 @@ export function buildSlotSavedState(input: SlotSnapshotInput): SpineSlotSavedSta
     indZoom:              slot?.indZoom ?? 1,
   }
   if (input.trackTimes) state.trackTimes = input.trackTimes
-  if (input.placeholderChildren) state.placeholderChildren = input.placeholderChildren
+  if (input.placeholderChildren) state.placeholderChildren = withoutFileSets(input.placeholderChildren)
   return state
 }
 
@@ -92,7 +111,7 @@ export function playlistPosition(length: number, queued: number, atEnd: boolean)
   return (length - 1 - queued + length) % length
 }
 
-export interface AutoStopTrackInfo {
+interface AutoStopTrackInfo {
   isEnabled: (track: number) => boolean
   isListLoop: (track: number) => boolean
   listLength: (track: number) => number

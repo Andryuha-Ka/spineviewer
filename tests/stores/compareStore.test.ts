@@ -26,7 +26,7 @@ describe('useCompareStore.loadDirect (B7)', () => {
     setActivePinia(createPinia())
     validate.mockReturnValue([])
     useVersionStore().selectVersion(8, '4.2')
-    useCompareStore().setLeft(prev)
+    useCompareStore().setSide('left', prev)
   })
 
   it('keeps the previous source on a version mismatch', async () => {
@@ -65,12 +65,25 @@ describe('useCompareStore.loadDirect (B7)', () => {
 
     groupOf()
     await store.loadDirect('left', [])
-    store.setLeft(prev)
+    store.setSide('left', prev)
     expect(store.sourceError.left).toBeNull()
 
     await store.loadDirect('right', [])
     expect(store.sourceError.right).not.toBeNull()
     store.reset()
     expect(store.sourceError).toEqual({ left: null, right: null })
+  })
+
+  it('setSide right sets the right slot and clears its error and the diff', async () => {
+    const store = useCompareStore()
+    groupOf()
+    await store.loadDirect('right', [])
+    store.setDiffStatus('error', 'boom')
+    store.setSide('right', prev)
+    expect(store.rightSlot).toEqual(prev)
+    expect(store.sourceError.right).toBeNull()
+    expect(store.diff).toBeNull()
+    expect(store.diffStatus).toBe('idle')
+    expect(store.diffError).toBeNull()
   })
 })
