@@ -80,9 +80,9 @@
     </section>
 
     <!-- ── Loop ──────────────────────────────────────────── -->
-    <section class="section section--row">
-      <label class="label" title="Default loop for newly selected animations; running tracks keep their own loop">Loop</label>
-      <n-switch v-model:value="animationStore.loop" size="small" :disabled="!skeletonStore.isLoaded" />
+    <section class="section section--row" title="Sets Loop on every track of this skeleton; new animations start with this value">
+      <label class="label">Loop</label>
+      <n-switch :value="animationStore.loop" size="small" :disabled="!skeletonStore.isLoaded" @update:value="onLoopSwitch" />
     </section>
 
     <!-- ── Speed ─────────────────────────────────────────── -->
@@ -382,6 +382,13 @@ function trackLoopOf(track: TrackState): boolean {
   return animationStore.trackPlaylists[track.trackIndex]?.length
     ? animationStore.isTrackListLoop(track.trackIndex)
     : track.loop
+}
+
+function onLoopSwitch(v: boolean) {
+  animationStore.loop = v
+  for (const track of animationStore.tracks) {
+    if (trackLoopOf(track) !== v) emit('setTrackLoop', track.trackIndex, v)
+  }
 }
 
 function trackRows(track: TrackState): TrackRow[] | null {

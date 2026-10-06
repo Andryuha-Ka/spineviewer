@@ -20,7 +20,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 ### Playback
 - **Multi-track** playback (tracks 0–11 simultaneously)
 - Animation **queue** — chain multiple animations per track
-- Per-track **loop** toggle; the global **Loop** switch in the Anim tab sets the loop of newly selected animations, running tracks keep their own
+- Per-track **loop** toggle; the global **Loop** switch in the Anim tab sets Loop on every active track and is the default for newly selected animations
 - **List loop** — with the track Loop on, a queue of several animations plays in a cycle (A → B → C → A…); played entries stay in the Anim tab list greyed out instead of disappearing
 - **Speed control** 0×–3× with fine slider
 - **Frame stepping** in 1/60 s steps — `←` / `→` step the current track, the Anim tab `← 1f` / `1f →` buttons step every running track
@@ -237,6 +237,10 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 ---
 
 ## Changelog
+
+### v1.3.20
+
+- **Global Loop switch applies to every track** — toggling it in the Anim tab sets Loop on every track of the current skeleton (enabled or disabled) and stays the default for newly selected animations
 
 ### v1.3.19
 - **Spine 4.3 support** — Pixi 8 + Spine 4.3 runtime next to 4.2; a detected 4.3 file selects it automatically, and 4.2 and 4.3 skeletons mix in one Pixi 8 session (top-level, pinned, placeholder child spines, Compare canvases)

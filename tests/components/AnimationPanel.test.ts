@@ -80,6 +80,58 @@ describe('AnimationPanel track list', () => {
   })
 })
 
+describe('AnimationPanel global Loop switch', () => {
+  let wrapper: VueWrapper
+  beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => wrapper.unmount())
+
+  function mountTracks() {
+    const anim = useAnimationStore()
+    anim.setTrackPlaylist(2, [{ animationName: 'A', loop: true }, { animationName: 'B', loop: false }])
+    anim.setTrackEnabled(1, false)
+    anim.tracks = [
+      { ...live('A', []), trackIndex: 0 },
+      { ...live('A', []), trackIndex: 1 },
+      { ...live('A', ['B']), trackIndex: 2 },
+    ]
+    wrapper = mount(AnimationPanel)
+    return anim
+  }
+
+  const flip = (v: boolean) => wrapper.findComponent({ name: 'Switch' }).vm.$emit('update:value', v)
+
+  it('sets Loop on every track not already looping', () => {
+    const anim = mountTracks()
+    flip(true)
+    expect(wrapper.emitted('setTrackLoop')).toEqual([[0, true], [1, true]])
+    expect(anim.loop).toBe(true)
+  })
+
+  it('turns Loop off only on looping tracks', () => {
+    const anim = mountTracks()
+    anim.loop = true
+    flip(false)
+    expect(wrapper.emitted('setTrackLoop')).toEqual([[2, false]])
+    expect(anim.loop).toBe(false)
+  })
+
+  it('explains the switch in its tooltip', () => {
+    wrapper = mount(AnimationPanel)
+    const row = wrapper.find('section[title^="Sets Loop"]')
+    expect(row.find('.n-switch').exists()).toBe(true)
+    expect(row.attributes('title'))
+      .toBe('Sets Loop on every track of this skeleton; new animations start with this value')
+  })
+
+  it('only updates the default when there are no tracks', () => {
+    const anim = useAnimationStore()
+    wrapper = mount(AnimationPanel)
+    flip(true)
+    expect(wrapper.emitted('setTrackLoop')).toBeUndefined()
+    expect(anim.loop).toBe(true)
+  })
+})
+
 describe('AnimationPanel track mix options', () => {
   let wrapper: VueWrapper
   beforeEach(() => setActivePinia(createPinia()))

@@ -41,7 +41,7 @@
         <ul class="help-list">
           <li>Pick an animation in the <b>Anim</b> tab flyout — it applies to the current track at once</li>
           <li>Supports <b>tracks 0–11</b> simultaneously — choose the current track in the Anim tab track grid or with <kbd>0</kbd>–<kbd>9</kbd>; with <b>+ Add mode</b> on, a picked animation is appended to the track's list instead of replacing it</li>
-          <li>Per-track <b>Loop</b> toggle and animation <b>Queue</b> (chain animations); the global <b>Loop</b> switch in the Anim tab sets the loop of newly selected animations only</li>
+          <li>Per-track <b>Loop</b> toggle and animation <b>Queue</b> (chain animations); the global <b>Loop</b> switch in the Anim tab sets Loop on every active track and is the default for newly selected animations</li>
           <li><b>List loop</b> — with the track Loop on, a queue of several animations plays in a cycle; played entries stay in the list greyed out</li>
           <li><b>Speed</b> control: 0×–3× with fine slider</li>
           <li><b>Frame stepping</b> in 1/60 s steps — <kbd>←</kbd> <kbd>→</kbd> step the current track, the Anim tab <b>← 1f / 1f →</b> buttons step every running track</li>
@@ -191,6 +191,12 @@
       <section class="help-section">
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.20</span>
+            <ul class="help-list">
+              <li><b>Global Loop switch applies to every track</b> — toggling it in the Anim tab sets Loop on every track of the current skeleton (enabled or disabled) and stays the default for newly selected animations</li>
+            </ul>
+          </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.3.19</span>
             <ul class="help-list">
