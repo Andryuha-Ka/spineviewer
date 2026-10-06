@@ -47,6 +47,7 @@ const diff: SpineDiff = {
     cstr('changed', false, false, true),
     cstr('ok'),
   ],
+  sliderTable: [],
   freeBoneTable: [{ name: 'r', status: 'ok' }, { name: 's', status: 'only-b' }],
   placeholders: [
     { name: 'p1', kind: 'bone', status: 'added' },
@@ -61,7 +62,8 @@ describe('diffSeverity', () => {
   it('returns zeros for no diff', () => {
     expect(diffSeverity(null)).toEqual({
       animName: 0, animDur: 0, skin: 0, globalEvent: 0, animEventName: 0, animEventTiming: 0,
-      placeholder: 0, constraintCritical: 0, constraintParam: 0, freeBone: 0, critical: 0, warn: 0,
+      placeholder: 0, constraintCritical: 0, constraintParam: 0, sliderCritical: 0, sliderParam: 0, freeBone: 0,
+      critical: 0, warn: 0,
     })
   })
 
@@ -70,6 +72,19 @@ describe('diffSeverity', () => {
       animName: 2, animDur: 1, skin: 3, globalEvent: 1, animEventName: 2, animEventTiming: 3,
       placeholder: 3, constraintCritical: 4, constraintParam: 1, freeBone: 1,
     })
+  })
+
+  it('grades a one-sided slider critical and a slider parameter change as a warning', () => {
+    const s = diffSeverity({
+      ...diff,
+      animTable: [], skinTable: [], globalEvents: [], animEvents: [], constraintTable: [], freeBoneTable: [], placeholders: [],
+      sliderTable: [
+        { name: 'blink', status: 'only-a', changes: [] },
+        { name: 'smile', status: 'changed', changes: [{ key: 'mix', a: '1', b: '0.5' }] },
+        { name: 'wink', status: 'ok', changes: [] },
+      ],
+    })
+    expect(s).toMatchObject({ sliderCritical: 1, sliderParam: 1, critical: 1, warn: 1 })
   })
 
   it('sums critical and warn', () => {

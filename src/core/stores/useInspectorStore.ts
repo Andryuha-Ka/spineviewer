@@ -7,15 +7,17 @@
  */
 
 import { defineStore } from 'pinia'
-import type { BoneTransform, AttachmentInfo } from '@/core/types/ISpineAdapter'
+import type { BoneTransform, AttachmentInfo, SliderInfo } from '@/core/types/ISpineAdapter'
 
 export const useInspectorStore = defineStore('inspector', () => {
   const boneTransforms    = ref<BoneTransform[]>([])
   const activeAttachments = ref<AttachmentInfo[]>([])
+  const sliders           = ref<SliderInfo[]>([])
 
-  function update(bones: BoneTransform[], attachments: AttachmentInfo[]) {
+  function update(bones: BoneTransform[], attachments: AttachmentInfo[], liveSliders: SliderInfo[] = []) {
     boneTransforms.value    = bones
     activeAttachments.value = attachments
+    sliders.value           = liveSliders
   }
 
   function updateBones(bones: BoneTransform[]) {
@@ -25,7 +27,8 @@ export const useInspectorStore = defineStore('inspector', () => {
   function clear() {
     boneTransforms.value    = []
     activeAttachments.value = []
+    sliders.value           = []
   }
 
-  return { boneTransforms, activeAttachments, update, updateBones, clear }
+  return { boneTransforms, activeAttachments, sliders, update, updateBones, clear }
 })

@@ -50,3 +50,23 @@ describe('track playlist', () => {
     expect(store.trackPlaylists[0].map(e => e.loop)).toEqual([true, false])
   })
 })
+
+describe('track mix', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('patches onto a 0 s default and merges later patches', () => {
+    const store = useAnimationStore()
+    store.patchTrackMix(1, { additive: true })
+    expect(store.trackMix[1]).toEqual({ mixDuration: 0, additive: true })
+    store.patchTrackMix(1, { mixDuration: 0.4 })
+    store.patchTrackMix(1, { mixInterpolation: 'circle' })
+    expect(store.trackMix).toEqual({ 1: { mixDuration: 0.4, additive: true, mixInterpolation: 'circle' } })
+  })
+
+  it('reset clears it', () => {
+    const store = useAnimationStore()
+    store.patchTrackMix(0, { mixDuration: 0.5 })
+    store.reset()
+    expect(store.trackMix).toEqual({})
+  })
+})

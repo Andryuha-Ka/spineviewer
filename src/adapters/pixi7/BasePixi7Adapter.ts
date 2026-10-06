@@ -8,10 +8,11 @@
 
 import * as PIXI from 'pixi.js'
 import { buildImageResolver, waitForPixi7Textures } from '@/core/utils/buildImageResolver'
+import { applyEntryMixDuration } from '@/core/utils/slotState'
 import type {
   ISpineAdapter, BoneInfo, SlotInfo, EventInfo,
   TrackState, TrackQueueEntry, BoneTransform, BoneLocalTransform, AttachmentInfo, SpineEvent,
-  AnimationEventMarker, SlotBounds,
+  AnimationEventMarker, SlotBounds, TrackMixOptions,
 } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
 
@@ -55,6 +56,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
   // One container per placeholder for images and child spines, under the slot's deepest target.
   // Marked __phSpine so findDeepestTarget never descends into them.
   private _phChildContainers: Map<string, PIXI.Container> = new Map() // phName → Container
+  private _mixDurations = new Map<number, number>() // track → crossfade seconds
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
@@ -149,6 +151,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     }
     this._phImages.clear()
     this._phChildContainers.clear()
+    this._mixDurations.clear()
     this.clearPlaceholderLabels()
     if (this._container && this._spine) {
       this._container.removeChild(this._spine)
@@ -161,11 +164,26 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
   // ── Animation ───────────────────────────────────────────────────────────────
 
   setAnimation(track: number, name: string, loop: boolean): void {
-    this._spine?.state.setAnimation(track, name, loop)
+    const entry = this._spine?.state.setAnimation(track, name, loop)
+    if (entry) applyEntryMixDuration(entry, this._mixDuration(track), false)
   }
 
   addAnimation(track: number, name: string, loop: boolean, delay = 0): void {
-    this._spine?.state.addAnimation(track, name, loop, delay)
+    if (!this._spine) return
+    const queued = this._spine.state.getCurrent(track) != null
+    const entry = this._spine.state.addAnimation(track, name, loop, delay)
+    if (entry) applyEntryMixDuration(entry, this._mixDuration(track), queued && delay <= 0)
+  }
+
+  setTrackMixOptions(track: number, opts: Partial<TrackMixOptions>): void {
+    if (opts.mixDuration === undefined) return
+    const mix = Math.max(0, opts.mixDuration)
+    this._mixDurations.set(track, mix)
+    for (let e = this._spine?.state.getCurrent(track)?.next; e; e = e.next) applyEntryMixDuration(e, mix, true)
+  }
+
+  private _mixDuration(track: number): number {
+    return this._mixDurations.get(track) ?? 0
   }
 
   clearTrack(track: number): void { this._spine?.state.clearTrack(track) }
@@ -256,6 +274,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
         loop: e.loop,
         timeScale: e.timeScale,
         queue,
+        mixDuration: this._mixDuration(i),
       })
     }
     return result

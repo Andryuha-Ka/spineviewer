@@ -1,17 +1,18 @@
 import { describe, it, expect, vi } from 'vitest'
-import { buildSlotSavedState, playlistPosition, playlistsOf, queueTrackList, rearmListLoops, replaySavedTracks, shouldAutoStop, trackTimesOf } from '@/core/utils/slotState'
-import { makeFakeAdapter, track } from '../helpers/fakeAdapter'
-import type { TrackState } from '@/core/types/ISpineAdapter'
+import { applyEntryMixDuration, applySavedTrackMix, buildSlotSavedState, playlistPosition, playlistsOf, queueTrackList, rearmListLoops, replaySavedTracks, shouldAutoStop, trackMixOf, trackTimesOf } from '@/core/utils/slotState'
+import { makeFakeAdapter, track, withSpine43 } from '../helpers/fakeAdapter'
+import type { TrackMixOptions, TrackState } from '@/core/types/ISpineAdapter'
 import type { FileSet, PHSpineEntry } from '@/core/types/FileSet'
 
 const playback = {
   speed: 1.25, selectedAnimation: 'run', currentTrack: 2, loop: true,
   trackEnabled: { 1: false }, trackPlaylists: { 0: [{ animationName: 'run', loop: true }] }, isPlaying: true,
+  trackMix: {},
 }
 
 const states: TrackState[] = [
-  { trackIndex: 0, animationName: 'run', time: 0.5, duration: 1, loop: true, timeScale: 1, queue: [{ animationName: 'stop', loop: false }] },
-  { trackIndex: 3, animationName: 'blink', time: 0.1, duration: 1, loop: false, timeScale: 1, queue: [] },
+  { trackIndex: 0, animationName: 'run', time: 0.5, duration: 1, loop: true, timeScale: 1, queue: [{ animationName: 'stop', loop: false }], mixDuration: 0 },
+  { trackIndex: 3, animationName: 'blink', time: 0.1, duration: 1, loop: false, timeScale: 1, queue: [], mixDuration: 0 },
 ]
 
 describe('slotState', () => {
@@ -62,8 +63,62 @@ describe('slotState', () => {
     })
   })
 
+  it('reads the mix duration of every track and 4.3 options where reported', () => {
+    expect(trackMixOf([{ ...states[0], mixDuration: 0.4 }, states[1]])).toEqual({ 0: { mixDuration: 0.4 }, 3: { mixDuration: 0 } })
+    const mixed: TrackState[] = [
+      { ...states[0], additive: false, mixInterpolation: 'linear' },
+      { ...states[1], mixDuration: 0.2, additive: true, mixInterpolation: 'circle' },
+    ]
+    expect(trackMixOf(mixed)).toEqual({
+      0: { mixDuration: 0, additive: false, mixInterpolation: 'linear' },
+      3: { mixDuration: 0.2, additive: true, mixInterpolation: 'circle' },
+    })
+  })
+
+  it('snapshot copies the store trackMix only when it is non-empty', () => {
+    const base = { activeSkins: [], showPlaceholders: true, disabledPlaceholders: [] }
+    expect('trackMix' in buildSlotSavedState({ ...base, playback })).toBe(false)
+    const trackMix = { 1: { mixDuration: 0.3 }, 2: { mixDuration: 0, additive: true, mixInterpolation: 'circle' } }
+    const ss = buildSlotSavedState({ ...base, playback: { ...playback, trackMix } })
+    expect(ss.trackMix).toEqual(trackMix)
+    expect(ss.trackMix).not.toBe(trackMix)
+    expect(ss.trackMix![1]).not.toBe(trackMix[1])
+  })
+
+  it('applies saved options to every track, disabled ones included, an old record reading as 0', () => {
+    const adapter = makeFakeAdapter([], ['a', 'b'])
+    applySavedTrackMix(adapter, { 0: { mixDuration: 0.5 }, 1: { additive: true, mixInterpolation: 'circle' } as TrackMixOptions })
+    expect(adapter.setTrackMixOptions.mock.calls).toEqual([
+      [0, { mixDuration: 0.5 }],
+      [1, { mixDuration: 0, additive: true, mixInterpolation: 'circle' }],
+    ])
+    applySavedTrackMix(adapter, undefined)
+    expect(adapter.setTrackMixOptions).toHaveBeenCalledTimes(2)
+  })
+
+  it('replay applies saved options to disabled tracks too, before any setAnimation', () => {
+    const adapter = withSpine43(makeFakeAdapter([], ['a', 'b']))
+    replaySavedTracks(adapter, {
+      trackPlaylists: { 0: [{ animationName: 'a', loop: true }], 1: [{ animationName: 'b', loop: true }] },
+      trackEnabled: { 1: false },
+      trackMix: { 0: { mixDuration: 0.25 }, 1: { mixDuration: 0.3, additive: true, mixInterpolation: 'circle' } },
+    })
+    expect(adapter.setTrackMixOptions.mock.calls).toEqual([
+      [0, { mixDuration: 0.25 }],
+      [1, { mixDuration: 0.3, additive: true, mixInterpolation: 'circle' }],
+    ])
+    expect(adapter.setAnimation.mock.calls).toEqual([[0, 'a', true]])
+    expect(adapter.setTrackMixOptions.mock.invocationCallOrder[1]).toBeLessThan(adapter.setAnimation.mock.invocationCallOrder[0])
+  })
+
+  it('queueTrackList does not touch mix options', () => {
+    const adapter = makeFakeAdapter()
+    queueTrackList(adapter, 0, [{ animationName: 'a', loop: true }])
+    expect(adapter.setTrackMixOptions).not.toHaveBeenCalled()
+  })
+
   it('replays enabled tracks with their queues and saved times', () => {
-    const adapter = { animations: ['run', 'stop', 'blink'], setAnimation: vi.fn(), addAnimation: vi.fn(), seekTo: vi.fn() }
+    const adapter = { animations: ['run', 'stop', 'blink'], setAnimation: vi.fn(), addAnimation: vi.fn(), seekTo: vi.fn(), setTrackMixOptions: vi.fn() }
     replaySavedTracks(adapter, {
       trackPlaylists: { 0: [{ animationName: 'run', loop: true }, { animationName: 'stop', loop: false }], 1: [{ animationName: 'blink', loop: true }], 2: [] },
       trackEnabled: { 1: false },
@@ -124,6 +179,13 @@ describe('slotState', () => {
     expect(noop.addAnimation).not.toHaveBeenCalled()
   })
 
+  it('re-arms as soon as a shortened delay makes the last entry current', () => {
+    const list = [{ animationName: 'a', loop: true }, { animationName: 'b', loop: false }]
+    const adapter = makeFakeAdapter()
+    rearmListLoops(adapter, [{ ...track(0, 'b', 0.01, false), mixDuration: 0.5 }], { 0: list }, {})
+    expect(adapter.addAnimation.mock.calls).toEqual([[0, 'a', false], [0, 'b', false]])
+  })
+
   it('finds the playing entry in the list', () => {
     expect(playlistPosition(3, 2, false)).toBe(0)
     expect(playlistPosition(3, 1, false)).toBe(1)
@@ -160,5 +222,40 @@ describe('slotState', () => {
     it('does not stop while an enabled track is mid-animation', () => {
       expect(shouldAutoStop([ended, track(1, 'b', 0.5, false)], info())).toBe(false)
     })
+
+    it('a list entry started early by a shortened delay counts as playing, not ended', () => {
+      // with a 500 ms mix the last entry becomes current while the previous one still fades out
+      const early = { ...track(0, 'b', 0.05, false), mixDuration: 0.5 }
+      expect(shouldAutoStop([early], info())).toBe(false)
+      expect(shouldAutoStop([{ ...early, time: 2 }], info())).toBe(true)
+    })
+  })
+})
+
+describe('applyEntryMixDuration', () => {
+  it('set entry: duration applied, delay untouched', () => {
+    const e = { mixDuration: 0, delay: 0 }
+    applyEntryMixDuration(e, 0.5, false)
+    expect(e).toEqual({ mixDuration: 0.5, delay: 0 })
+  })
+
+  it('queued entry starts mix before its predecessor ends', () => {
+    const e = { mixDuration: 0, delay: 2 } // runtime: complete - queue-time mix 0
+    applyEntryMixDuration(e, 0.5, true)
+    expect(e).toEqual({ mixDuration: 0.5, delay: 1.5 })
+    applyEntryMixDuration(e, 0.2, true) // re-timed from the old mix, not stacked
+    expect(e).toEqual({ mixDuration: 0.2, delay: 1.8 })
+  })
+
+  it('clamps the delay at 0 when mix exceeds the remaining time', () => {
+    const e = { mixDuration: 0, delay: 0.3 }
+    applyEntryMixDuration(e, 1, true)
+    expect(e).toEqual({ mixDuration: 1, delay: 0 })
+  })
+
+  it('not queued (empty track or explicit delay): delay unchanged', () => {
+    const e = { mixDuration: 0, delay: 0.7 }
+    applyEntryMixDuration(e, 0.4, false)
+    expect(e.delay).toBe(0.7)
   })
 })

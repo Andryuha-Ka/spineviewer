@@ -9,15 +9,18 @@
 import type { FileSet } from '@/core/types/FileSet'
 import { spineOptionsMap, type PixiVersion, type SpineVersion } from '@/core/stores/useVersionStore'
 
-/** Supported Spine major.minor versions */
-const KNOWN_VERSIONS = ['3.8', '4.0', '4.1', '4.2'] as const
+/** Supported Spine major.minor versions, ascending */
+export const KNOWN_VERSIONS: readonly SpineVersion[] = Object.values(spineOptionsMap).flat()
+
+const isKnown = (v: string): v is SpineVersion => KNOWN_VERSIONS.includes(v as SpineVersion)
 
 /** "Spine X.Y is newer/older than the supported runtimes (...)" for an unsupported version, else null. */
 export function unsupportedVersionHint(detected: string): string | null {
   const match = detected.match(/^(\d+)\.(\d+) \(unsupported\)$/)
   if (!match) return null
+  const [lastMajor, lastMinor] = KNOWN_VERSIONS[KNOWN_VERSIONS.length - 1].split('.').map(Number)
   const [major, minor] = [Number(match[1]), Number(match[2])]
-  const relation = major > 4 || (major === 4 && minor > 2) ? 'newer' : 'older'
+  const relation = major > lastMajor || (major === lastMajor && minor > lastMinor) ? 'newer' : 'older'
   return `Spine ${match[1]}.${match[2]} is ${relation} than the supported runtimes (${KNOWN_VERSIONS.join(', ')})`
 }
 
@@ -35,7 +38,7 @@ export function detectSpineVersion(jsonText: string): string {
     if (!match) return 'unknown'
 
     const majorMinor = match[1]
-    return KNOWN_VERSIONS.includes(majorMinor as never) ? majorMinor : `${majorMinor} (unsupported)`
+    return isKnown(majorMinor) ? majorMinor : `${majorMinor} (unsupported)`
   } catch {
     return 'unknown'
   }
@@ -71,7 +74,7 @@ export function detectSpineVersionFromSkel(buffer: ArrayBuffer): string {
       const match = candidate?.text.match(/^(\d+\.\d+)\.\d+/)
       if (!match) continue
       const majorMinor = match[1]
-      return KNOWN_VERSIONS.includes(majorMinor as never) ? majorMinor : `${majorMinor} (unsupported)`
+      return isKnown(majorMinor) ? majorMinor : `${majorMinor} (unsupported)`
     }
     return 'unknown'
   } catch {
@@ -102,9 +105,15 @@ export function runtimeSpineVersion(fileSet: FileSet, pixi: PixiVersion, selecte
   return spineOptionsMap[pixi].includes(own) ? own : selected
 }
 
-/** Mismatch message when the file set's skeleton cannot be loaded by the session's Pixi version, else null. */
+/**
+ * Mismatch message when the set's own version is unsupported, or when it cannot be loaded by the
+ * session's Pixi version, else null. An unknown or unsupported session version marks only unsupported sets.
+ */
 export function spineVersionProblem(fileSet: FileSet, sessionVersion: string): string | null {
   const detected = detectFileSetVersion(fileSet)
-  if (isCompatible(detected, sessionVersion)) return null
+  if (detected.endsWith('(unsupported)')) {
+    return `Spine version mismatch: ${fileSet.skeleton.filename} is ${detected}, supported versions are ${KNOWN_VERSIONS.join(', ')}`
+  }
+  if (!isKnown(sessionVersion) || isCompatible(detected, sessionVersion)) return null
   return `Spine version mismatch: ${fileSet.skeleton.filename} is ${detected}, viewer is set to ${sessionVersion}`
 }

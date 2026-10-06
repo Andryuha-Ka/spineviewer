@@ -9,7 +9,7 @@
 import type { ISpineAdapter } from '@/core/types/ISpineAdapter'
 import type { AnyRecord, DiffItem, DiffSection } from './types'
 import {
-  getAnimationDuration, getJsonAnimations, getJsonBones, getJsonConstraints, getJsonEvents,
+  constraintTarget, getAnimationDuration, getJsonAnimations, getJsonBones, getJsonConstraints, getJsonEvents,
   getJsonSkins, getJsonSlots, getSkinAttachmentCount, str,
 } from './jsonAccess'
 
@@ -261,8 +261,10 @@ export function compareConstraintsJson(rawA: AnyRecord, rawB: AnyRecord): DiffSe
       if (bonesA !== bonesB)
         children.push({ key: 'bones', status: 'changed', valueA: bonesA, valueB: bonesB })
       // target
-      if (str(a.target) !== str(b.target))
-        children.push({ key: 'target', status: 'changed', valueA: str(a.target), valueB: str(b.target) })
+      const tA = str(constraintTarget(a))
+      const tB = str(constraintTarget(b))
+      if (tA !== tB)
+        children.push({ key: 'target', status: 'changed', valueA: tA, valueB: tB })
       // mix
       if (a.mix !== undefined && str(a.mix) !== str(b.mix))
         children.push({ key: 'mix', status: 'changed', valueA: str(a.mix), valueB: str(b.mix) })
@@ -272,7 +274,7 @@ export function compareConstraintsJson(rawA: AnyRecord, rawB: AnyRecord): DiffSe
       if (a.bendPositive !== undefined && str(a.bendPositive) !== str(b.bendPositive))
         children.push({ key: 'bendPositive', status: 'changed', valueA: str(a.bendPositive), valueB: str(b.bendPositive) })
       // transform mixes
-      for (const k of ['rotateMix', 'translateMix', 'scaleMix', 'shearMix'] as const) {
+      for (const k of ['rotateMix', 'translateMix', 'scaleMix', 'shearMix', 'mixRotate', 'mixX', 'mixY', 'mixScaleX', 'mixScaleY', 'mixShearY'] as const) {
         if (a[k] !== undefined && str(a[k]) !== str(b[k]))
           children.push({ key: k, status: 'changed', valueA: str(a[k]), valueB: str(b[k]) })
       }

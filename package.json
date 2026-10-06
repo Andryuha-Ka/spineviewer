@@ -28,7 +28,8 @@
     "naive-ui": "^2.40.0",
     "pinia": "^2.2.0",
     "pixi.js": "^7.4.3",
-    "pixi8": "npm:pixi.js@^8.0.0",
+    "pixi8": "npm:pixi.js@^8.16.0",
+    "spine-pixi-v8-43": "npm:@esotericsoftware/spine-pixi-v8@4.3.13",
     "vue": "^3.5.0"
   },
   "devDependencies": {

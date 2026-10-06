@@ -41,6 +41,37 @@ export interface TrackState {
   loop: boolean
   timeScale: number
   queue: TrackQueueEntry[]
+  /** Per-track crossfade setting in seconds (not the current entry's runtime value) */
+  mixDuration: number
+  /** Set only by adapters that support additive / mix interpolation (Spine 4.3) */
+  additive?: boolean
+  mixInterpolation?: string
+}
+
+export type SliderProperty = 'rotate' | 'x' | 'y' | 'scaleX' | 'scaleY' | 'shearY'
+
+export interface SliderInfo {
+  name: string
+  animation: string
+  /** Driver bone; null = time-driven */
+  bone: string | null
+  property: SliderProperty | null
+  /** Live applied values */
+  time: number
+  mix: number
+  setupTime: number
+  setupMix: number
+  loop: boolean
+  additive: boolean
+}
+
+export interface TrackMixOptions {
+  /** Crossfade from the previous entry on the track, seconds (all versions) */
+  mixDuration: number
+  /** Spine 4.3 only */
+  additive?: boolean
+  /** Spine 4.3 only */
+  mixInterpolation?: string
 }
 
 export interface BoneTransform {
@@ -119,6 +150,8 @@ export interface ISpineAdapter {
   setTrackLoop(track: number, loop: boolean): void
   removeQueueEntry(track: number, index: number): void
   seekTo(track: number, time: number): void
+  /** Per-track mix settings; keys a runtime does not support are ignored */
+  setTrackMixOptions(track: number, opts: Partial<TrackMixOptions>): void
 
   // Skeleton
   setSkin(name: string): void
@@ -176,4 +209,11 @@ export interface ISpineAdapter {
   getPlaceholderContainer(phName: string): unknown | null
   // Returns the world transform of the placeholder container (for inverse-matrix drag of child spine).
   getPlaceholderContainerWorldTransform(phName: string): { a: number; b: number; c: number; d: number; tx: number; ty: number } | null
+
+  // Optional (Spine 4.3 only) — presence is the capability flag
+  getSliders?(): SliderInfo[]
+  setSliderPose?(name: string, pose: Partial<Pick<SliderInfo, 'time' | 'mix'>>): void
+  resetSlider?(name: string): void
+  /** Mix interpolation names in runtime declaration order */
+  readonly mixInterpolations?: readonly string[]
 }

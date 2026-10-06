@@ -14,9 +14,9 @@ import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useViewerStore } from '@/core/stores/useViewerStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
-import type { ISpineAdapter } from '@/core/types/ISpineAdapter'
+import type { ISpineAdapter, TrackMixOptions } from '@/core/types/ISpineAdapter'
 import type { PHSpineEntry } from '@/core/types/FileSet'
-import { buildSlotSavedState, playlistsOf, replaySavedTracks, trackTimesOf } from '@/core/utils/slotState'
+import { buildSlotSavedState, playlistsOf, replaySavedTracks, trackMixOf, trackTimesOf } from '@/core/utils/slotState'
 
 export interface ChildAdapterMeta {
   parentSlotId: string
@@ -55,13 +55,14 @@ export function useChildAdapters() {
   function saveChildState(childSlotId: string): void {
     const childSlot = fileLoaderStore.spineSlots.find(s => s.id === childSlotId)
     if (!childSlot || !storeHoldsChild(childSlotId)) return
+    const states = activeChildAdapter.value?.getTrackStates() ?? []
     fileLoaderStore.saveSlotState(childSlotId, buildSlotSavedState({
       playback:             animationStore,
       activeSkins:          skeletonStore.activeSkins,
       showPlaceholders:     viewerStore.showPlaceholders,
       disabledPlaceholders: viewerStore.disabledPlaceholders,
       slot:                 childSlot,
-      trackTimes:           trackTimesOf(activeChildAdapter.value?.getTrackStates() ?? []),
+      trackTimes:           trackTimesOf(states),
       placeholderChildren:  {},
     }))
   }
@@ -78,7 +79,11 @@ export function useChildAdapters() {
         ? prev.trackPlaylists
         : playlistsOf(states)
     const trackTimes = trackTimesOf(states)
+    const trackMix = activeChildAdapter.value === adapter
+      ? JSON.parse(JSON.stringify(animationStore.trackMix)) as Record<number, TrackMixOptions>
+      : { ...prev?.trackMix, ...trackMixOf(states) }
     fileLoaderStore.saveSlotState(childSlotId, {
+      ...(Object.keys(trackMix).length > 0 ? { trackMix } : {}),
       speed:                prev?.speed ?? 1,
       selectedAnimation:    prev?.selectedAnimation ?? null,
       currentTrack:         prev?.currentTrack ?? 0,

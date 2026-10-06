@@ -119,8 +119,8 @@ describe('useViewerKeyboard', () => {
   it('selects tracks with digits, clears with R, toggles loop with L / Shift+L', () => {
     const anim = useAnimationStore()
     anim.tracks = [
-      { trackIndex: 0, animationName: 'a', time: 0, duration: 1, loop: false, timeScale: 1, queue: [] },
-      { trackIndex: 2, animationName: 'b', time: 0, duration: 1, loop: true,  timeScale: 1, queue: [] },
+      { trackIndex: 0, animationName: 'a', time: 0, duration: 1, loop: false, timeScale: 1, queue: [], mixDuration: 0 },
+      { trackIndex: 2, animationName: 'b', time: 0, duration: 1, loop: true,  timeScale: 1, queue: [], mixDuration: 0 },
     ]
     press(document.body, 'Digit2')
     expect(anim.currentTrack).toBe(2)
@@ -136,7 +136,7 @@ describe('useViewerKeyboard', () => {
   it('leaves Ctrl / Meta / Alt combinations to the browser (B9)', () => {
     const anim = useAnimationStore()
     anim.tracks = [
-      { trackIndex: 0, animationName: 'a', time: 0, duration: 1, loop: false, timeScale: 1, queue: [] },
+      { trackIndex: 0, animationName: 'a', time: 0, duration: 1, loop: false, timeScale: 1, queue: [], mixDuration: 0 },
     ]
     press(document.body, 'KeyR', { ctrlKey: true })
     press(document.body, 'KeyL', { metaKey: true })
@@ -151,7 +151,7 @@ describe('useViewerKeyboard', () => {
   it('L toggles the list Loop of a track with a list, not the live entry loop', () => {
     const anim = useAnimationStore()
     anim.tracks = [
-      { trackIndex: 0, animationName: 'b', time: 0, duration: 1, loop: false, timeScale: 1, queue: [] },
+      { trackIndex: 0, animationName: 'b', time: 0, duration: 1, loop: false, timeScale: 1, queue: [], mixDuration: 0 },
     ]
     anim.setTrackPlaylist(0, [{ animationName: 'a', loop: true }, { animationName: 'b', loop: false }])
     anim.currentTrack = 0

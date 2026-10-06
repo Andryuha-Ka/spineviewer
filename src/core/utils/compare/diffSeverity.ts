@@ -18,9 +18,11 @@ interface DiffSeverity {
   placeholder: number
   constraintCritical: number
   constraintParam: number
+  sliderCritical: number
+  sliderParam: number
   freeBone: number
-  critical: number   // animName + skin + globalEvent + animEventName + placeholder + constraintCritical
-  warn: number       // animDur + animEventTiming + constraintParam + freeBone
+  critical: number   // animName + skin + globalEvent + animEventName + placeholder + constraintCritical + sliderCritical
+  warn: number       // animDur + animEventTiming + constraintParam + sliderParam + freeBone
 }
 
 export function diffSeverity(diff: SpineDiff | null): DiffSeverity {
@@ -38,12 +40,14 @@ export function diffSeverity(diff: SpineDiff | null): DiffSeverity {
   const constraintParam = diff?.constraintTable.filter(r =>
     r.status === 'changed' && !r.bonesChanged && !r.targetChanged && r.paramsChanged,
   ).length ?? 0
+  const sliderCritical = diff?.sliderTable.filter(r => r.status === 'only-a' || r.status === 'only-b').length ?? 0
+  const sliderParam = diff?.sliderTable.filter(r => r.status === 'changed').length ?? 0
   const freeBone = diff?.freeBoneTable.filter(r => r.status !== 'ok').length ?? 0
 
   return {
     animName, animDur, skin, globalEvent, animEventName, animEventTiming, placeholder,
-    constraintCritical, constraintParam, freeBone,
-    critical: animName + skin + globalEvent + animEventName + placeholder + constraintCritical,
-    warn: animDur + animEventTiming + constraintParam + freeBone,
+    constraintCritical, constraintParam, sliderCritical, sliderParam, freeBone,
+    critical: animName + skin + globalEvent + animEventName + placeholder + constraintCritical + sliderCritical,
+    warn: animDur + animEventTiming + constraintParam + sliderParam + freeBone,
   }
 }

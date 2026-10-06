@@ -7,9 +7,9 @@
  */
 
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
-import { useVersionStore, type SpineVersion } from '@/core/stores/useVersionStore'
+import { useVersionStore, spineOptionsMap, type PixiVersion, type SpineVersion } from '@/core/stores/useVersionStore'
 import { groupSpineFiles, getFilesFromDataTransfer } from '@/core/utils/fileLoader'
-import { detectSpineVersion, detectSpineVersionFromSkel, spineVersionProblem, unsupportedVersionHint } from '@/core/utils/versionDetector'
+import { KNOWN_VERSIONS, detectSpineVersion, detectSpineVersionFromSkel, spineVersionProblem, unsupportedVersionHint } from '@/core/utils/versionDetector'
 import { validateSpineFileSet } from '@/core/utils/spineValidator'
 import {
   saveSession,
@@ -50,10 +50,8 @@ export function useFilePickerLogic(emit: EmitFn<ShortEmitsToObject<PickerEmits>>
   const folderInputRef = ref<HTMLInputElement | null>(null)
 
   function autoSelectVersion(version: string): void {
-    if      (version === '3.8') store.selectVersion(7, '3.8' as SpineVersion)
-    else if (version === '4.0') store.selectVersion(7, '4.0' as SpineVersion)
-    else if (version === '4.1') store.selectVersion(7, '4.1' as SpineVersion)
-    else if (version === '4.2') store.selectVersion(8, '4.2' as SpineVersion)
+    const entry = Object.entries(spineOptionsMap).find(([, list]) => list.includes(version as SpineVersion))
+    if (entry) store.selectVersion(Number(entry[0]) as PixiVersion, version as SpineVersion)
   }
 
   async function handleFiles(
@@ -89,11 +87,12 @@ export function useFilePickerLogic(emit: EmitFn<ShortEmitsToObject<PickerEmits>>
         : detectSpineVersionFromSkel(skeleton.fileBody as ArrayBuffer)
     }
 
-    const runtimeVersion = version && ['3.8', '4.0', '4.1', '4.2'].includes(version) ? version : null
+    // unknown/unsupported first set: only sets with an unsupported version of their own get marked
+    const runtimeVersion = version && KNOWN_VERSIONS.includes(version as SpineVersion) ? version : 'unknown'
     for (const slot of result.slots) {
       if (slot.fileSet) {
         const errs = validateSpineFileSet(slot.fileSet)
-        const versionProblem = runtimeVersion && spineVersionProblem(slot.fileSet, runtimeVersion)
+        const versionProblem = spineVersionProblem(slot.fileSet, runtimeVersion)
         if (versionProblem) errs.push(versionProblem)
         if (errs.length > 0) slot.validationErrors = errs
       }

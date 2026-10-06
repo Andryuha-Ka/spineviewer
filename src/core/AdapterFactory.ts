@@ -27,10 +27,10 @@ export async function createPixiApp(
     const { Pixi7App } = await import('@/adapters/pixi7/Pixi7App')
     return new Pixi7App(canvas, w, h)
   }
-  // Register SpinePipe extension BEFORE initializing the Pixi8 Application.
-  // spine-pixi-v8's index.js calls extensions.add(SpinePipe) as a side effect,
-  // which must happen before app.init() so the renderer includes the 'spine' pipe.
+  // Register both Spine pipes BEFORE initializing the Pixi8 Application: a renderer builds its
+  // pipes once at init. Order is load-bearing: 4.2 must own 'spine', 4.3 registers as 'spine43'.
   await import('@esotericsoftware/spine-pixi-v8')
+  await import('@/adapters/pixi8/spine43/registerSpine43Pipe')
   const { Pixi8App } = await import('@/adapters/pixi8/Pixi8App')
   return Pixi8App.create(canvas, w, h)
 }
@@ -51,6 +51,7 @@ export async function createSpineAdapter(
     '7-4.0': () => import('@/adapters/pixi7/spine40/Spine40Adapter'),
     '7-4.1': () => import('@/adapters/pixi7/spine41/Spine41Adapter'),
     '8-4.2': () => import('@/adapters/pixi8/spine42/Spine42Adapter'),
+    '8-4.3': () => import('@/adapters/pixi8/spine43/Spine43Adapter'),
   }
 
   const loader = loaders[key]

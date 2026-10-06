@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { ISpineAdapter, TrackState } from '@/core/types/ISpineAdapter'
+import type { ISpineAdapter, SliderInfo, TrackState } from '@/core/types/ISpineAdapter'
 
 export interface FakeSpineObject {
   x: number
@@ -47,6 +47,7 @@ export function makeFakeAdapter(tracks: TrackState[] = [], animations: string[] 
     getAnimationEvents:     vi.fn(() => []),
     onEvent:                vi.fn(() => () => {}),
     setTrackTimeScale:      vi.fn(),
+    setTrackMixOptions:     vi.fn(),
     setPlaceholderLabels:   vi.fn(),
     clearPlaceholderLabels: vi.fn(),
     addImageToPlaceholder:      vi.fn(),
@@ -59,5 +60,25 @@ export function makeFakeAdapter(tracks: TrackState[] = [], animations: string[] 
   return adapter as typeof adapter & ISpineAdapter
 }
 
+/** Mix interpolation names a 4.3 runtime reports, in declaration order. */
+export const FAKE_MIX_INTERPOLATIONS = ['linear', 'smooth', 'slowFast', 'fastSlow', 'circle'] as const
+
+export const slider = (name: string, over: Partial<SliderInfo> = {}): SliderInfo => ({
+  name, animation: name, bone: null, property: null,
+  time: 0, mix: 1, setupTime: 0, setupMix: 1, loop: false, additive: false, ...over,
+})
+
+/** Turns a fake into a Spine 4.3 adapter: sliders, mix interpolations and recording slider setters. */
+export function withSpine43<A extends ReturnType<typeof makeFakeAdapter>>(adapter: A, sliders: SliderInfo[] = []) {
+  const ext = {
+    sliders,
+    mixInterpolations: [...FAKE_MIX_INTERPOLATIONS] as readonly string[],
+    getSliders:         vi.fn(() => ext.sliders),
+    setSliderPose:      vi.fn(),
+    resetSlider:        vi.fn(),
+  }
+  return Object.assign(adapter, ext)
+}
+
 export const track = (trackIndex: number, animationName: string, time = 0, loop = true): TrackState =>
-  ({ trackIndex, animationName, time, duration: 2, loop, timeScale: 1, queue: [] })
+  ({ trackIndex, animationName, time, duration: 2, loop, timeScale: 1, queue: [], mixDuration: 0 })

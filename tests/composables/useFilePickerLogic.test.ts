@@ -81,14 +81,72 @@ describe('useFilePickerLogic.handleFiles (C36)', () => {
   it('shows the unsupported-version hint and keeps the runtime selection (B22)', async () => {
     const versions = useVersionStore()
     versions.selectVersion(7, '4.1')
-    vi.mocked(groupSpineFiles).mockResolvedValue({ slots: [{ id: 'a', name: 'A', fileSet: set('a.json', '4.3.1') }] } as Awaited<ReturnType<typeof groupSpineFiles>>)
+    vi.mocked(groupSpineFiles).mockResolvedValue({ slots: [{ id: 'a', name: 'A', fileSet: set('a.json', '4.4.1') }] } as Awaited<ReturnType<typeof groupSpineFiles>>)
     const picker = useFilePickerLogic(vi.fn())
     await picker.handleFiles([new File([''], 'x')], undefined, true)
-    expect(picker.unsupportedHint.value).toBe('Spine 4.3 is newer than the supported runtimes (3.8, 4.0, 4.1, 4.2)')
+    expect(picker.unsupportedHint.value).toBe('Spine 4.4 is newer than the supported runtimes (3.8, 4.0, 4.1, 4.2, 4.3)')
     expect(picker.versionUnknown.value).toBe(false)
     expect([versions.pixiVersion, versions.spineVersion]).toEqual([7, '4.1'])
     picker.onClear()
     expect(picker.unsupportedHint.value).toBeNull()
+  })
+
+  it('selects Pixi 8 + Spine 4.3 for a 4.3 drop', async () => {
+    useVersionStore().selectVersion(7, '4.1')
+    await load([{ id: 'a', name: 'A', fileSet: set('a.json', '4.3.75-beta') }])
+    expect([useVersionStore().pixiVersion, useVersionStore().spineVersion]).toEqual([8, '4.3'])
+  })
+
+  it('marks a lone unsupported set, keeps Open Viewer disabled and the runtime unchanged (C47)', async () => {
+    useVersionStore().selectVersion(8, '4.2')
+    const slots = await load([{ id: 'hero', name: 'hero', fileSet: set('hero.json', '4.4.1') }])
+    expect(slots[0].validationErrors).toEqual([
+      'Spine version mismatch: hero.json is 4.4 (unsupported), supported versions are 3.8, 4.0, 4.1, 4.2, 4.3',
+    ])
+    expect(useFileLoaderStore().isLoaded).toBe(false)
+    expect([useVersionStore().pixiVersion, useVersionStore().spineVersion]).toEqual([8, '4.2'])
+  })
+
+  it('marks an unsupported set among 4.2 sets and keeps the 4.2 sets valid (B30)', async () => {
+    const slots = await load([
+      ...['a', 'b', 'c', 'd'].map(id => ({ id, name: id, fileSet: set(`${id}.json`, '4.2.40') })),
+      { id: 'legacy', name: 'legacy', fileSet: set('legacy.json', '3.7.94') },
+    ])
+    expect(useFileLoaderStore().detectedVersion).toBe('4.2')
+    expect(slots.map(s => s.validationErrors)).toEqual([
+      undefined, undefined, undefined, undefined,
+      ['Spine version mismatch: legacy.json is 3.7 (unsupported), supported versions are 3.8, 4.0, 4.1, 4.2, 4.3'],
+    ])
+  })
+
+  it('never marks a supported set because the first set is unsupported', async () => {
+    const slots = await load([
+      { id: 'new', name: 'new', fileSet: set('new.json', '4.4.1') },
+      { id: 'a', name: 'A', fileSet: set('a.json', '4.2.40') },
+      { id: 'b', name: 'B', fileSet: set('b.json', '') },
+    ])
+    expect(slots.map(s => s.validationErrors?.length ?? 0)).toEqual([1, 0, 0])
+    expect(useFileLoaderStore().isLoaded).toBe(true)
+  })
+
+  it('keeps a 4.3 set valid among 4.2 sets', async () => {
+    const slots = await load([
+      ...['a', 'b', 'c'].map(id => ({ id, name: id, fileSet: set(`${id}.json`, '4.2.40') })),
+      { id: 'bonus', name: 'bonus', fileSet: set('bonus.json', '4.3.13') },
+    ])
+    expect(useFileLoaderStore().detectedVersion).toBe('4.2')
+    expect(slots.every(s => !s.validationErrors)).toBe(true)
+  })
+
+  it('marks a 4.2 set among 4.1 sets with the session wording', async () => {
+    const slots = await load([
+      ...['a', 'b', 'c', 'd', 'e'].map(id => ({ id, name: id, fileSet: set(`${id}.json`, '4.1.21') })),
+      { id: 'bonus', name: 'bonus', fileSet: set('bonus.json', '4.2.40') },
+    ])
+    expect(slots.map(s => s.validationErrors)).toEqual([
+      undefined, undefined, undefined, undefined, undefined,
+      ['Spine version mismatch: bonus.json is 4.2, viewer is set to 4.1'],
+    ])
   })
 
   it('checks nothing when the detected version is unknown', async () => {

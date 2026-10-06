@@ -7,7 +7,7 @@
  */
 
 import { defineStore } from 'pinia'
-import type { TrackState, TrackQueueEntry } from '@/core/types/ISpineAdapter'
+import type { TrackState, TrackQueueEntry, TrackMixOptions } from '@/core/types/ISpineAdapter'
 
 /** One frame step for the keyboard and the Anim tab buttons. */
 export const FRAME_STEP_SECONDS = 1 / 60
@@ -30,6 +30,14 @@ export const useAnimationStore = defineStore('animation', () => {
   // Master playlists — full intended sequence per track.
   // Persists across animation advancement so Play can replay the whole sequence.
   const trackPlaylists = ref<Record<number, TrackQueueEntry[]>>({})
+
+  // Per-track mix settings — source of truth for saved slots, kept for tracks without a live entry
+  const trackMix = ref<Record<number, TrackMixOptions>>({})
+
+  function patchTrackMix(trackIndex: number, patch: Partial<TrackMixOptions>) {
+    const prev = trackMix.value[trackIndex] ?? { mixDuration: 0 }
+    trackMix.value = { ...trackMix.value, [trackIndex]: { ...prev, ...patch } }
+  }
 
   function isTrackEnabled(trackIndex: number): boolean {
     return trackEnabled.value[trackIndex] !== false
@@ -127,11 +135,12 @@ export const useAnimationStore = defineStore('animation', () => {
     selectedAnimation.value = null
     trackEnabled.value      = {}
     trackPlaylists.value    = {}
+    trackMix.value          = {}
   }
 
   return {
     tracks, speed, loop, currentTrack, isPlaying, isPaused, selectedAnimation,
-    trackEnabled, trackPlaylists,
+    trackEnabled, trackPlaylists, trackMix, patchTrackMix,
     isTrackEnabled, setTrackEnabled,
     setTrackPlaylist, appendToTrackPlaylist, removePlaylistEntry,
     clearTrackPlaylist, clearAllTrackPlaylists, isTrackListLoop, setTrackListLoop,

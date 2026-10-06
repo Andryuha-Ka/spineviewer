@@ -8,6 +8,7 @@
 
 <template>
   <div class="free-bone-panel">
+    <template v-if="skeletonStore.freeBones.length > 0">
     <div class="panel-header">
       <span class="panel-title">Free Bones</span>
       <span class="panel-hint">{{ skeletonStore.freeBones.length }} bone{{ skeletonStore.freeBones.length !== 1 ? 's' : '' }} · not keyframed</span>
@@ -49,11 +50,52 @@
         </div>
       </div>
     </div>
+    </template>
+
+    <template v-if="skeletonStore.sliders.length > 0">
+    <div class="panel-header">
+      <span class="panel-title">Sliders</span>
+      <span class="panel-hint">{{ skeletonStore.sliders.length }} slider{{ skeletonStore.sliders.length !== 1 ? 's' : '' }}</span>
+    </div>
+
+    <div class="bone-list slider-list">
+      <div
+        v-for="s in skeletonStore.sliders"
+        :key="s.name"
+        class="bone-row"
+      >
+        <div class="bone-name">{{ s.name }}</div>
+        <div class="bone-controls">
+          <label class="ctrl-label">Time</label>
+          <input
+            class="ctrl-input"
+            type="number"
+            step="0.01"
+            min="0"
+            :value="getSlider(s).time"
+            @change="onSliderField(s, 'time', $event)"
+          />
+          <label class="ctrl-label">Mix</label>
+          <input
+            class="ctrl-input ctrl-input--rot"
+            type="number"
+            step="0.01"
+            min="0"
+            max="1"
+            :value="getSlider(s).mix"
+            @change="onSliderField(s, 'mix', $event)"
+          />
+          <button class="reset-btn" title="Reset to setup values" @click="onSliderReset(s)">↺</button>
+        </div>
+      </div>
+    </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
+import type { SliderInfo } from '@/core/types/ISpineAdapter'
 
 const skeletonStore = useSkeletonStore()
 
@@ -91,6 +133,31 @@ function onReset(name: string): void {
 
 // When free bones list changes (new spine loaded), clear cached overrides
 watch(() => skeletonStore.freeBones, () => { overrides.value.clear() })
+
+const sliderVals = ref(new Map<string, { time: number; mix: number }>())
+
+function getSlider(s: SliderInfo): { time: number; mix: number } {
+  if (!sliderVals.value.has(s.name)) sliderVals.value.set(s.name, { time: s.setupTime, mix: s.setupMix })
+  return sliderVals.value.get(s.name)!
+}
+
+function onSliderField(s: SliderInfo, field: 'time' | 'mix', e: Event): void {
+  const input = e.target as HTMLInputElement
+  const val = parseFloat(input.value)
+  const cur = getSlider(s)
+  if (!isFinite(val)) { input.value = String(cur[field]); return }
+  const v = field === 'time' ? Math.max(0, val) : Math.min(1, Math.max(0, val))
+  input.value = String(v)
+  sliderVals.value.set(s.name, { ...cur, [field]: v })
+  skeletonStore.setSliderPose(s.name, { [field]: v })
+}
+
+function onSliderReset(s: SliderInfo): void {
+  sliderVals.value.set(s.name, { time: s.setupTime, mix: s.setupMix })
+  skeletonStore.resetSlider(s.name)
+}
+
+watch(() => skeletonStore.sliders, () => { sliderVals.value.clear() })
 </script>
 
 <style scoped>
@@ -127,6 +194,10 @@ watch(() => skeletonStore.freeBones, () => { overrides.value.clear() })
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
+}
+
+.slider-list {
+  flex: 0 1 auto;
 }
 
 .bone-row {

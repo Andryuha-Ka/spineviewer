@@ -6,7 +6,7 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
 
-import type { ISpineAdapter, TrackState, TrackQueueEntry } from '@/core/types/ISpineAdapter'
+import type { ISpineAdapter, TrackState, TrackQueueEntry, TrackMixOptions } from '@/core/types/ISpineAdapter'
 import type { PHChildEntry, PHImageEntry, PHSpineEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 
 /** Plain copies of placeholder entries; `PHSpineEntry.fileSet` stays in loaderStore.spineSlots, never in a snapshot. */
@@ -36,6 +36,7 @@ interface PlaybackSnapshot {
   loop: boolean
   trackEnabled: Record<number, boolean>
   trackPlaylists: Record<number, TrackQueueEntry[]>
+  trackMix: Record<number, TrackMixOptions>
   isPlaying: boolean
 }
 
@@ -69,6 +70,7 @@ export function buildSlotSavedState(input: SlotSnapshotInput): SpineSlotSavedSta
     indZoom:              slot?.indZoom ?? 1,
   }
   if (input.trackTimes) state.trackTimes = input.trackTimes
+  if (Object.keys(playback.trackMix).length > 0) state.trackMix = JSON.parse(JSON.stringify(playback.trackMix))
   if (input.placeholderChildren) state.placeholderChildren = withoutFileSets(input.placeholderChildren)
   return state
 }
@@ -125,11 +127,22 @@ export function shouldAutoStop(states: readonly TrackState[], info: AutoStopTrac
   return enabled.every(t => t.duration > 0 && t.time >= t.duration - 0.02)
 }
 
-/** Puts a saved slot back on an adapter that was mounted without it: enabled tracks, their queues and times. */
-export function replaySavedTracks(
-  adapter: Pick<ISpineAdapter, 'animations' | 'setAnimation' | 'addAnimation' | 'seekTo'>,
-  state: Pick<SpineSlotSavedState, 'trackPlaylists' | 'trackEnabled' | 'trackTimes'>,
+/** Saved per-track options onto the adapter for every track, enabled or not, so a later re-enable or pick uses them. */
+export function applySavedTrackMix(
+  adapter: Pick<ISpineAdapter, 'setTrackMixOptions'>,
+  trackMix: Record<number, Partial<TrackMixOptions>> | undefined,
 ): void {
+  for (const [idxStr, opts] of Object.entries(trackMix ?? {})) {
+    adapter.setTrackMixOptions(Number(idxStr), { ...opts, mixDuration: opts.mixDuration ?? 0 })
+  }
+}
+
+/** Puts a saved slot back on an adapter that was mounted without it: per-track options, enabled tracks, their queues and times. */
+export function replaySavedTracks(
+  adapter: Pick<ISpineAdapter, 'animations' | 'setAnimation' | 'addAnimation' | 'seekTo' | 'setTrackMixOptions'>,
+  state: Pick<SpineSlotSavedState, 'trackPlaylists' | 'trackEnabled' | 'trackTimes' | 'trackMix'>,
+): void {
+  applySavedTrackMix(adapter, state.trackMix)
   for (const [idxStr, playlist] of Object.entries(state.trackPlaylists)) {
     const track = Number(idxStr)
     if (state.trackEnabled[track] === false || !queueTrackList(adapter, track, playlist)) continue
@@ -144,9 +157,27 @@ export function trackTimesOf(states: readonly TrackState[]): Record<number, numb
   return times
 }
 
+/** Mix duration per live track, plus additive / mix interpolation where the adapter reports them (Spine 4.3). */
+export function trackMixOf(states: readonly TrackState[]): Record<number, TrackMixOptions> {
+  const mix: Record<number, TrackMixOptions> = {}
+  for (const ts of states) {
+    const opts: TrackMixOptions = { mixDuration: ts.mixDuration }
+    if (ts.additive !== undefined) opts.additive = ts.additive
+    if (ts.mixInterpolation !== undefined) opts.mixInterpolation = ts.mixInterpolation
+    mix[ts.trackIndex] = opts
+  }
+  return mix
+}
+
 /** Live entry plus its queue per track — what Play would replay. */
 export function playlistsOf(states: readonly TrackState[]): Record<number, TrackQueueEntry[]> {
   const playlists: Record<number, TrackQueueEntry[]> = {}
   for (const ts of states) playlists[ts.trackIndex] = [{ animationName: ts.animationName, loop: ts.loop }, ...ts.queue]
   return playlists
+}
+
+/** Sets an entry's crossfade; a queued entry (caller's delay <= 0) starts `mix` before its predecessor ends, as Spine 4.2+ does. */
+export function applyEntryMixDuration(entry: { mixDuration: number; delay: number }, mix: number, queued: boolean): void {
+  if (queued) entry.delay = Math.max(entry.delay + entry.mixDuration - mix, 0)
+  entry.mixDuration = mix
 }

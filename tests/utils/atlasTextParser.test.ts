@@ -1,5 +1,28 @@
 import { describe, it, expect } from 'vitest'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import path from 'node:path'
 import { parseAtlas, atlasVramBytes, atlasUtilization, type AtlasPage } from '@/core/utils/atlasTextParser'
+
+// Official export layout: tab-indented properties, spaces after ':' and ','
+const ATLAS_OFFICIAL = [
+  'diamond.png',
+  '\tsize: 1024, 512',
+  '\tfilter: Linear, Linear',
+  '\tscale: 0.5',
+  'lower-side',
+  '\tbounds: 585, 78, 77, 78',
+  'gem',
+  '\tbounds: 10, 20, 30, 40',
+  '\toffsets: 1, 2, 33, 44',
+  '\trotate: 90',
+  '\tindex: 2',
+  '',
+  'second.png',
+  '    size: 64, 32',
+  '    pma: true',
+  'r',
+  '    bounds: 0, 0, 8, 8',
+].join('\n')
 
 const ATLAS_3X = [
   'page1.png',
@@ -67,6 +90,52 @@ describe('parseAtlas', () => {
   it('treats rotate:0 and rotate:false as not rotated', () => {
     const [page] = parseAtlas('p.png\nsize:8,8\nr\nbounds:0,0,1,1\nrotate:0\nq\nbounds:0,0,1,1\nrotate:false')
     expect(page.regions.map(r => r.rotate)).toEqual([false, false])
+  })
+
+  it('parses the indented official layout with spaced values', () => {
+    const pages = parseAtlas(ATLAS_OFFICIAL)
+    expect(pages.map(p => [p.name, p.width, p.height])).toEqual([['diamond.png', 1024, 512], ['second.png', 64, 32]])
+    expect(pages[0].regions[0]).toEqual({
+      name: 'lower-side', x: 585, y: 78, width: 77, height: 78, rotate: false,
+      origWidth: 77, origHeight: 78, offsetX: 0, offsetY: 0, index: -1,
+    })
+    expect(pages[0].regions[1]).toEqual({
+      name: 'gem', x: 10, y: 20, width: 30, height: 40, rotate: true,
+      origWidth: 33, origHeight: 44, offsetX: 1, offsetY: 2, index: 2,
+    })
+    expect(pages[1].regions.map(r => r.name)).toEqual(['r'])
+  })
+})
+
+const OFFICIAL_DIRS = ['example/4.3', 'example/4.2-official'].map(d => path.resolve(__dirname, '../..', d))
+
+function atlasFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap(name => {
+    const full = path.join(dir, name)
+    if (statSync(full).isDirectory()) return atlasFiles(full)
+    return name.endsWith('.atlas') ? [full] : []
+  })
+}
+
+// example/ is gitignored, so this runs locally only
+describe.skipIf(!OFFICIAL_DIRS.some(existsSync))('parseAtlas on official sample atlases', () => {
+  const files = OFFICIAL_DIRS.filter(existsSync).flatMap(atlasFiles)
+
+  it.each(files.map(f => [path.relative(path.resolve(__dirname, '../..'), f), f]))('%s', (_rel, file) => {
+    const text = readFileSync(file, 'utf8').replace(/\r/g, '')
+    // each blank-line block is a page; its first "size:" line is the page size
+    const expected = text.split(/\n\s*\n/).filter(b => b.trim()).map(block => {
+      const m = /^\s*size:\s*(\d+)\s*,\s*(\d+)/m.exec(block)
+      return m ? [Number(m[1]), Number(m[2])] : null
+    })
+    const pages = parseAtlas(text)
+    expect(pages.length).toBeGreaterThan(0)
+    for (const page of pages) {
+      expect(page.width).toBeGreaterThan(0)
+      expect(page.height).toBeGreaterThan(0)
+      expect(page.regions.length).toBeGreaterThan(0)
+    }
+    expect(pages.map(p => [p.width, p.height])).toEqual(expected)
   })
 })
 

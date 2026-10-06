@@ -30,10 +30,12 @@
 //   bounds:10,20,64,64   ← region property (not indented, colon) ← KEY DIFFERENCE from 3.x
 //   rotate:90
 //
-// Rule:  non-indented line with NO colon  → always a region name
-//        non-indented line WITH colon, before first region → page property
-//        non-indented line WITH colon, after first region  → region property (4.x)
-//        indented line WITH colon                          → region property (3.x)
+// Official 4.x exports indent every property and put spaces after ':' / ','
+// (e.g. "\tsize: 1024, 512") — indentation and spacing carry no meaning.
+//
+// Rule:  line with NO colon                       → region name
+//        line WITH colon, before first region     → page property
+//        line WITH colon, after first region      → region property
 
 export interface AtlasRegion {
   name: string
@@ -169,7 +171,6 @@ export function parseAtlas(text: string): AtlasPage[] {
       continue
     }
 
-    const isIndented = raw.startsWith(' ') || raw.startsWith('\t')
     const trimmed    = raw.trim()
     const colonIdx   = trimmed.indexOf(':')
     const hasColon   = colonIdx > 0
@@ -182,15 +183,7 @@ export function parseAtlas(text: string): AtlasPage[] {
       continue
     }
 
-    // ── Indented line with colon → always a region property (3.x style) ──
-    if (isIndented && hasColon) {
-      const key = trimmed.slice(0, colonIdx).trim()
-      const val = trimmed.slice(colonIdx + 1).trim()
-      applyRegionProp(key, val)
-      continue
-    }
-
-    // ── Non-indented line with NO colon → region name ─────────────────────
+    // ── Line with NO colon → region name ──────────────────────────────────
     if (!hasColon) {
       commitRegion()
       currentRegion = { name: trimmed }
@@ -198,17 +191,12 @@ export function parseAtlas(text: string): AtlasPage[] {
       continue
     }
 
-    // ── Non-indented line WITH colon ──────────────────────────────────────
+    // ── Line WITH colon: indentation is irrelevant (official 4.x atlases indent page props too)
     const key = trimmed.slice(0, colonIdx).trim()
     const val = trimmed.slice(colonIdx + 1).trim()
 
-    if (!inRegion) {
-      // Before first region → page property (both 3.x and 4.x)
-      applyPageProp(key, val)
-    } else {
-      // After first region → region property (4.x style, no indentation)
-      applyRegionProp(key, val)
-    }
+    if (!inRegion) applyPageProp(key, val)
+    else applyRegionProp(key, val)
   }
 
   commitRegion()

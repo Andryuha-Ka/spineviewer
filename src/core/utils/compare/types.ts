@@ -90,6 +90,12 @@ export interface ConstraintRow {
   paramsChanged: boolean  // mix, direction, mode, etc.
 }
 
+export interface SliderRow {
+  name:    string
+  status:  'ok' | 'only-a' | 'only-b' | 'changed'
+  changes: { key: string; a: string; b: string }[]
+}
+
 export interface FreeBoneRow {
   name:   string
   /** ok = free in both; only-a = free in A but NOT free in B (B has keyframes for it); only-b = vice-versa */
@@ -109,6 +115,7 @@ export interface SpineDiff {
   globalEvents:    GlobalEventRow[]   // available for both runtime and JSON
   animEvents:      AnimEventGroup[]   // per-animation timing; JSON-only
   constraintTable: ConstraintRow[]    // JSON-only
+  sliderTable:     SliderRow[]        // JSON-only
   freeBoneTable:   FreeBoneRow[]      // runtime-only (empty for JSON-only diffs)
   placeholders: PlaceholderDiff[]
   sections:     DiffSection[]

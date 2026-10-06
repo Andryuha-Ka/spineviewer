@@ -8,10 +8,11 @@
 
 import type {
   AnimEventGroup, AnimEventOccurrence, AnimTableRow, AnyRecord, ConstraintRow, FreeBoneRow,
-  GlobalEventRow, SkinRow, SpineData,
+  GlobalEventRow, SkinRow, SliderRow, SpineData,
 } from './types'
 import {
-  getAnimationDuration, getJsonAnimations, getJsonConstraints, getJsonEvents, getJsonSkins, str,
+  constraintTarget, getAnimationDuration, getJsonAnimations, getJsonConstraints, getJsonEvents,
+  getJsonSkins, str,
 } from './jsonAccess'
 
 function presenceRows(
@@ -178,6 +179,7 @@ export function buildAnimEvents(dataA: SpineData, dataB: SpineData): AnimEventGr
 const CONSTRAINT_PARAM_KEYS = [
   'mix', 'bendDirection', 'bendPositive', 'softness', 'compress', 'stretch', 'uniform',
   'rotateMix', 'translateMix', 'scaleMix', 'shearMix',
+  'mixRotate', 'mixX', 'mixY', 'mixScaleX', 'mixScaleY', 'mixShearY',
   'positionMode', 'spacingMode', 'rotateMode',
 ]
 
@@ -204,7 +206,7 @@ export function buildConstraintTable(dataA: SpineData, dataB: SpineData): Constr
       const bonesA      = (Array.isArray(a.bones) ? (a.bones as string[]) : []).join(',')
       const bonesB      = (Array.isArray(b.bones) ? (b.bones as string[]) : []).join(',')
       const bonesChanged  = bonesA !== bonesB
-      const targetChanged = str(a.target) !== str(b.target)
+      const targetChanged = str(constraintTarget(a)) !== str(constraintTarget(b))
       const paramsChanged = CONSTRAINT_PARAM_KEYS.some(k => a[k] !== undefined && str(a[k]) !== str(b[k]))
       const status = (bonesChanged || targetChanged || paramsChanged) ? 'changed' as const : 'ok' as const
       rows.push({ name, kind, status, bonesChanged, targetChanged, paramsChanged })
@@ -217,6 +219,31 @@ export function buildConstraintTable(dataA: SpineData, dataB: SpineData): Constr
     return a.name.localeCompare(b.name)
   })
   return rows
+}
+
+// ── Slider table (JSON-only) ────────────────────────────────────────────────────
+
+const SLIDER_DEFAULTS: Record<string, unknown> = {
+  animation: undefined, loop: false, additive: false, bone: undefined, property: undefined, time: 0, mix: 1,
+}
+
+const issuesFirst = <T extends { name: string; status: string }>(a: T, b: T) =>
+  Number(a.status === 'ok') - Number(b.status === 'ok') || a.name.localeCompare(b.name)
+
+export function buildSliderTable(dataA: SpineData, dataB: SpineData): SliderRow[] {
+  if (dataA.source !== 'json' || dataB.source !== 'json') return []
+  const mapA = new Map(getJsonConstraints(dataA.raw as AnyRecord, 'slider').map(c => [c.name as string, c]))
+  const mapB = new Map(getJsonConstraints(dataB.raw as AnyRecord, 'slider').map(c => [c.name as string, c]))
+  const rows = presenceRows(mapA.keys(), mapB.keys()).map(({ name, status }): SliderRow => {
+    if (status !== 'ok') return { name, status, changes: [] }
+    const a = mapA.get(name)!
+    const b = mapB.get(name)!
+    const changes = Object.entries(SLIDER_DEFAULTS)
+      .map(([key, def]) => ({ key, a: str(a[key] ?? def), b: str(b[key] ?? def) }))
+      .filter(c => c.a !== c.b)
+    return { name, status: changes.length ? 'changed' : 'ok', changes }
+  })
+  return rows.sort(issuesFirst)
 }
 
 export function buildFreeBoneTable(dataA: SpineData, dataB: SpineData): FreeBoneRow[] {

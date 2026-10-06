@@ -21,11 +21,11 @@ import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import type { useChildAdapters } from '@/core/composables/stage/useChildAdapters'
-import type { ISpineAdapter } from '@/core/types/ISpineAdapter'
+import type { ISpineAdapter, TrackState } from '@/core/types/ISpineAdapter'
 import type { IPixiApp } from '@/core/types/IPixiApp'
 import type { PixiSpriteObject } from '@/core/types/PixiSpriteObject'
 import type { FileSet, PHChildEntry } from '@/core/types/FileSet'
-import { buildSlotSavedState, playlistsOf, queueTrackList, replaySavedTracks, trackTimesOf } from '@/core/utils/slotState'
+import { applySavedTrackMix, buildSlotSavedState, playlistsOf, queueTrackList, replaySavedTracks, trackMixOf, trackTimesOf } from '@/core/utils/slotState'
 
 /** The active top-level slot on stage; while a child spine is active this is its parent. */
 export interface ActiveStage {
@@ -102,14 +102,14 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
     }
   }
 
-  function saveLeavingSlot(slotId: string, trackTimes: Record<number, number>): void {
+  function saveLeavingSlot(slotId: string, states: readonly TrackState[]): void {
     fileLoaderStore.saveSlotState(slotId, buildSlotSavedState({
       playback:             animationStore,
       activeSkins:          skeletonStore.activeSkins,
       showPlaceholders:     viewerStore.showPlaceholders,
       disabledPlaceholders: viewerStore.disabledPlaceholders,
       slot:                 fileLoaderStore.spineSlots.find(s => s.id === slotId),
-      trackTimes,
+      trackTimes:           trackTimesOf(states),
       placeholderChildren:  placeholderImagesStore.getSlotImages(slotId),
     }))
   }
@@ -120,14 +120,17 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
       children.activeChildAdapter.value = null
       const parentSs = fileLoaderStore.spineSlots.find(s => s.id === effectiveOldId)?.savedState
       if (parentSs && onStage.adapter) {
+        const states = onStage.adapter.getTrackStates()
+        const trackMix = { ...parentSs.trackMix, ...trackMixOf(states) }
         fileLoaderStore.saveSlotState(effectiveOldId, {
           ...parentSs,
-          trackTimes: trackTimesOf(onStage.adapter.getTrackStates()),
+          trackTimes: trackTimesOf(states),
+          ...(Object.keys(trackMix).length > 0 ? { trackMix } : {}),
           placeholderChildren: placeholderImagesStore.getSlotImages(effectiveOldId),
         })
       }
     } else {
-      saveLeavingSlot(effectiveOldId, trackTimesOf(onStage.adapter?.getTrackStates() ?? []))
+      saveLeavingSlot(effectiveOldId, onStage.adapter?.getTrackStates() ?? [])
     }
   }
 
@@ -191,7 +194,7 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
             saveLeaving(effectiveOldId, _fromId)
             unloadLeaving(effectiveOldId, newId)
           } else if (!children.activeChildAdapter.value && onStage.adapter && effectiveOldId) {
-            saveLeavingSlot(effectiveOldId, trackTimesOf(onStage.adapter.getTrackStates()))
+            saveLeavingSlot(effectiveOldId, onStage.adapter.getTrackStates())
           } else if (children.activeChildAdapter.value && prevSlot?.parentSlotId && _fromId) {
             children.saveChildState(_fromId)
           }
@@ -207,15 +210,7 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
           animationStore.reset()
           eventsStore.clear()
           inspectorStore.clear()
-          skeletonStore.attachAdapter(childAdapterRef)
-          skeletonStore.populate({
-            animations: childAdapterRef.animations,
-            skins:      childAdapterRef.skins,
-            bones:      childAdapterRef.bones,
-            slots:      childAdapterRef.slots,
-            events:     childAdapterRef.events,
-            freeBones:  childAdapterRef.getFreeBones(),
-          })
+          skeletonStore.populateFrom(childAdapterRef)
           childAdapterRef.onEvent(e => eventsStore.push(e))
           if (newSlot.fileSet && typeof newSlot.fileSet.atlas.fileBody === 'string') {
             atlasStore.load(newSlot.fileSet.atlas.fileBody, newSlot.fileSet.images)
@@ -233,6 +228,7 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
           animationStore.currentTrack      = childSs?.currentTrack ?? 0
           animationStore.loop              = childSs?.loop ?? false
           animationStore.trackEnabled      = childSs?.trackEnabled ? { ...childSs.trackEnabled } : {}
+          animationStore.trackMix          = { ...(childSs?.trackMix ?? trackMixOf(childAdapterRef.getTrackStates())) }
           for (const [idxStr, playlist] of Object.entries(liveChildPlaylists)) {
             animationStore.setTrackPlaylist(Number(idxStr), playlist)
           }
@@ -279,9 +275,11 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
           animationStore.currentTrack       = s.currentTrack
           animationStore.loop               = s.loop
           animationStore.trackEnabled       = { ...s.trackEnabled }
+          animationStore.trackMix           = { ...s.trackMix }
           for (const [idxStr, playlist] of Object.entries(s.trackPlaylists)) {
             animationStore.setTrackPlaylist(Number(idxStr), playlist)
           }
+          if (onStage.adapter) applySavedTrackMix(onStage.adapter, s.trackMix)
           for (const [idxStr, playlist] of Object.entries(s.trackPlaylists)) {
             const trackIndex = Number(idxStr)
             if (!onStage.adapter || !animationStore.isTrackEnabled(trackIndex)) continue
@@ -326,15 +324,7 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
             onStage.obj = mountedSpineObjects.get(newId) ?? null
             spineLoaded.value = true
 
-            skeletonStore.attachAdapter(onStage.adapter)
-            skeletonStore.populate({
-              animations: onStage.adapter.animations,
-              skins:      onStage.adapter.skins,
-              bones:      onStage.adapter.bones,
-              slots:      onStage.adapter.slots,
-              events:     onStage.adapter.events,
-              freeBones:  onStage.adapter.getFreeBones(),
-            })
+            skeletonStore.populateFrom(onStage.adapter)
             onStage.adapter.onEvent(e => eventsStore.push(e))
             if (typeof slot.fileSet.atlas.fileBody === 'string') {
               atlasStore.load(slot.fileSet.atlas.fileBody, slot.fileSet.images)
@@ -365,6 +355,7 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
               animationStore.currentTrack      = ss?.currentTrack ?? 0
               animationStore.loop              = ss?.loop ?? false
               animationStore.trackEnabled      = ss?.trackEnabled ? { ...ss.trackEnabled } : {}
+              animationStore.trackMix          = { ...(ss?.trackMix ?? trackMixOf(onStage.adapter.getTrackStates())) }
               for (const [idxStr, playlist] of Object.entries(livePlaylists)) {
                 animationStore.setTrackPlaylist(Number(idxStr), playlist)
               }

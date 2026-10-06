@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { defineComponent, h, ref, watch } from 'vue'
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
-import { makeFakeAdapter, track } from '../helpers/fakeAdapter'
+import { makeFakeAdapter, slider, track, withSpine43 } from '../helpers/fakeAdapter'
 import type { ISpineAdapter } from '@/core/types/ISpineAdapter'
 import type { FileSet, PHChildEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 import type { PixiSpriteObject } from '@/core/types/PixiSpriteObject'
@@ -23,6 +23,10 @@ const { useSlotSelectionStore } = await import('@/core/stores/useSlotSelectionSt
 const { useAnimationStore } = await import('@/core/stores/useAnimationStore')
 const { usePlaceholderImagesStore } = await import('@/core/stores/usePlaceholderImagesStore')
 const { useVersionStore } = await import('@/core/stores/useVersionStore')
+const { useSkeletonStore } = await import('@/core/stores/useSkeletonStore')
+
+/** Adapter the harness's loadSpine puts on stage next. */
+let nextLoad: () => ReturnType<typeof makeFakeAdapter> = () => makeFakeAdapter()
 
 const FILESET: FileSet = {
   skeleton: { filename: 's.skel', fileBody: new ArrayBuffer(8), type: 'skeleton-skel', mimeType: '' },
@@ -71,7 +75,7 @@ function setup(pinia: Pinia): { wrapper: VueWrapper; h: Harness } {
         spineError: ref(null),
         phItems: ref([]),
         loadSpine: async (_fs, slotId) => {
-          const adapter = makeFakeAdapter()
+          const adapter = nextLoad()
           loaded.push({ slotId, adapter })
           onStage.adapter = adapter
           onStage.obj = adapter.spineObj
@@ -105,6 +109,7 @@ describe('useSlotSwitch', () => {
     pinia = createPinia()
     setActivePinia(pinia)
     created.length = 0
+    nextLoad = () => makeFakeAdapter()
     useVersionStore().selectVersion(7, '4.1')
     useFileLoaderStore().setSlots([slot('a'), slot('b')], '4.1')
     ;({ wrapper, h: hs } = setup(pinia))
@@ -354,6 +359,82 @@ describe('useSlotSwitch', () => {
     await activate('b')
     expect(seen.length).toBeGreaterThan(0)
     expect(hs.slotSwitch.isAnimPlaySuppressed()).toBe(false)
+  })
+
+  it('per-track mix of a disabled track survives a switch away and back (C52)', async () => {
+    await loadA()
+    const anim = useAnimationStore()
+    anim.setTrackPlaylist(1, [{ animationName: 'blink', loop: true }])
+    anim.setTrackEnabled(1, false)
+    anim.patchTrackMix(0, { mixDuration: 0.3 })
+    anim.patchTrackMix(1, { mixDuration: 0.3, additive: true, mixInterpolation: 'circle' })
+    const mix = { 0: { mixDuration: 0.3 }, 1: { mixDuration: 0.3, additive: true, mixInterpolation: 'circle' } }
+
+    await activate('b')
+    expect(useFileLoaderStore().spineSlots.find(s => s.id === 'a')!.savedState?.trackMix).toEqual(mix)
+    expect(anim.trackMix).toEqual({})
+
+    await activate('a')
+    const back = hs.loaded[1].adapter
+    expect(back.setTrackMixOptions.mock.calls).toEqual([[0, mix[0]], [1, mix[1]]])
+    expect(back.setTrackMixOptions.mock.invocationCallOrder[1]).toBeLessThan(back.setAnimation.mock.invocationCallOrder[0])
+    expect(back.setAnimation.mock.calls.map(c => c[0])).toEqual([0])
+    expect(anim.trackMix).toEqual(mix)
+  })
+
+  it('a pinned reuse loads the store trackMix from the saved slot, else from live tracks (5a)', async () => {
+    const a = await loadA()
+    a.tracks = [{ ...track(0, 'idle', 0.75), mixDuration: 0.2 }]
+    useSlotSelectionStore().setPinned('a', true)
+    await activate('b')
+    await activate('a')
+    expect(useAnimationStore().trackMix).toEqual({ 0: { mixDuration: 0.2 } })
+
+    useAnimationStore().patchTrackMix(2, { mixDuration: 0.4 })
+    await activate('b')
+    await activate('a')
+    expect(useAnimationStore().trackMix).toEqual({ 0: { mixDuration: 0.2 }, 2: { mixDuration: 0.4 } })
+    expect(a.setTrackMixOptions).not.toHaveBeenCalled()
+  })
+
+  it('activating a child loads the store trackMix from its saved state, else from its live tracks (Guard 1)', async () => {
+    const a = await loadA()
+    addChild()
+    await hs.children.mountChildAdapter(a, 'a', 'p', usePlaceholderImagesStore().getPlaceholderSpineEntries('a', 'p')[0])
+    const kid = created.at(-1)!
+    kid.tracks = [{ ...track(1, 'wave', 0.3), mixDuration: 0.25 }]
+    await activate('kid')
+    expect(useAnimationStore().trackMix).toEqual({ 1: { mixDuration: 0.25 } })
+
+    await activate('a')
+    useFileLoaderStore().saveSlotState('kid', saved({ trackMix: { 4: { mixDuration: 0.5 } } }))
+    await activate('kid')
+    expect(useAnimationStore().trackMix).toEqual({ 4: { mixDuration: 0.5 } })
+  })
+
+  it('leaving an active child keeps the parent saved trackMix and adds its live tracks', async () => {
+    const a = await loadA()
+    useSlotSelectionStore().setPinned('a', true)
+    addChild()
+    await hs.children.mountChildAdapter(a, 'a', 'p', usePlaceholderImagesStore().getPlaceholderSpineEntries('a', 'p')[0])
+    useAnimationStore().patchTrackMix(3, { mixDuration: 0.5 })
+    await activate('kid')
+    a.tracks = [{ ...track(0, 'idle', 0.75), mixDuration: 0.1 }]
+    await activate('b')
+    expect(useFileLoaderStore().spineSlots.find(s => s.id === 'a')!.savedState?.trackMix)
+      .toEqual({ 3: { mixDuration: 0.5 }, 0: { mixDuration: 0.1 } })
+  })
+
+  it('reusing a parked 4.3 adapter fills slider and mix fields and drops leftover slider overrides (5a)', async () => {
+    await loadA()
+    const b = withSpine43(makeFakeAdapter(), [slider('blink')])
+    hs.mountedAdapters.set('b', b)
+    useSlotSelectionStore().setPinned('b', true)
+    await activate('b')
+    expect(hs.onStage.adapter).toBe(b)
+    expect(useSkeletonStore().sliders.map(s => s.name)).toEqual(['blink'])
+    expect(useSkeletonStore().mixInterpolations.length).toBeGreaterThan(0)
+    expect(b.resetSlider).toHaveBeenCalledWith('blink')
   })
 })
 

@@ -90,6 +90,37 @@ describe('usePlaceholderActions', () => {
       expect(usePlaceholderImagesStore().getPlaceholderSpineEntries('a', 'placeholder_1')).toEqual([])
     })
 
+    it('keeps saved track mix options when moving a skeleton into a placeholder', async () => {
+      const loader = useFileLoaderStore()
+      const trackMix = { 1: { mixDuration: 0, additive: true, mixInterpolation: 'circle' } }
+      loader.setSlots([slot('a'), slot('b', { savedState: { ...saved(), trackMix } })], '4.1')
+      await usePlaceholderActions().moveSlotIntoPlaceholder('b', 'a', 'placeholder_1')
+      expect(loader.spineSlots.find(s => s.id === 'b')?.savedState?.trackMix).toEqual(trackMix)
+    })
+
+    it.each([
+      ['4.2', '4.3.75-beta'],
+      ['4.3', '4.2.40'],
+    ] as const)('accepts a child of the other Pixi 8 version (%s session, %s child)', async (session, childVersion) => {
+      useVersionStore().selectVersion(8, session)
+      const loader = useFileLoaderStore()
+      const other: FileSet = { ...FILESET, skeleton: { ...FILESET.skeleton, fileBody: skel(childVersion) } }
+      loader.setSlots([slot('a'), slot('b', { fileSet: other })], session)
+      await usePlaceholderActions().moveSlotIntoPlaceholder('b', 'a', 'placeholder_1')
+      expect(window.alert).not.toHaveBeenCalled()
+      expect(loader.spineSlots.find(s => s.id === 'b')?.parentSlotId).toBe('a')
+    })
+
+    it('refuses an unsupported version in a 4.3 session', async () => {
+      useVersionStore().selectVersion(8, '4.3')
+      const loader = useFileLoaderStore()
+      const v44: FileSet = { ...FILESET, skeleton: { ...FILESET.skeleton, filename: 'next.skel', fileBody: skel('4.4.1') } }
+      loader.setSlots([slot('a'), slot('b', { fileSet: v44 })], '4.3')
+      await usePlaceholderActions().moveSlotIntoPlaceholder('b', 'a', 'placeholder_1')
+      expect(window.alert).toHaveBeenCalledWith('Spine version mismatch: next.skel is 4.4 (unsupported), supported versions are 3.8, 4.0, 4.1, 4.2, 4.3')
+      expect(loader.spineSlots.find(s => s.id === 'b')?.parentSlotId).toBeUndefined()
+    })
+
     it('refuses a spine whose own placeholders hold children, itself, child slots and missing slots', async () => {
       const loader = useFileLoaderStore()
       const ph = usePlaceholderImagesStore()
@@ -209,12 +240,27 @@ describe('usePlaceholderActions', () => {
       loader.setSlots([slot('a'), slot('kid', { parentSlotId: 'a' })], '4.2')
       ph.setSlotImages('a', { p: [spine('e1', 'kid')] })
       useSlotSelectionStore().activeSlotId = 'kid'
-      useAnimationStore().tracks = [{ trackIndex: 0, animationName: 'run', time: 1.25, duration: 2, loop: true, timeScale: 1, queue: [] }]
+      useAnimationStore().tracks = [{ trackIndex: 0, animationName: 'run', time: 1.25, duration: 2, loop: true, timeScale: 1, queue: [], mixDuration: 0 }]
       useSkeletonStore().activeSkins = ['blue']
       usePlaceholderActions().cloneSpineChild('a', 'p', ph.getPlaceholderSpineEntries('a', 'p')[0])
       expect(loader.spineSlots.find(s => s.id === 'kid')!.savedState).toMatchObject({ trackTimes: { 0: 1.25 }, selectedSkins: ['blue'] })
       const cloneId = ph.getPlaceholderSpineEntries('a', 'p')[0].childSlotId
       expect(loader.spineSlots.find(s => s.id === cloneId)!.savedState).toMatchObject({ trackTimes: { 0: 1.25 }, selectedSkins: ['blue'] })
+    })
+
+    it('a clone of an active child keeps the store trackMix, mixDuration included', () => {
+      const loader = useFileLoaderStore()
+      const ph = usePlaceholderImagesStore()
+      loader.setSlots([slot('a'), slot('kid', { parentSlotId: 'a' })], '4.2')
+      ph.setSlotImages('a', { p: [spine('e1', 'kid')] })
+      useSlotSelectionStore().activeSlotId = 'kid'
+      const anim = useAnimationStore()
+      anim.patchTrackMix(0, { mixDuration: 0.35 })
+      anim.patchTrackMix(1, { mixDuration: 0.5, additive: true, mixInterpolation: 'circle' })
+      usePlaceholderActions().cloneSpineChild('a', 'p', ph.getPlaceholderSpineEntries('a', 'p')[0])
+      const cloneId = ph.getPlaceholderSpineEntries('a', 'p')[0].childSlotId
+      expect(loader.spineSlots.find(s => s.id === cloneId)!.savedState!.trackMix)
+        .toEqual({ 0: { mixDuration: 0.35 }, 1: { mixDuration: 0.5, additive: true, mixInterpolation: 'circle' } })
     })
 
     it('toggles sync on both the entry and the child slot', () => {

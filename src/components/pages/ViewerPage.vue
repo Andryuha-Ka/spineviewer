@@ -61,6 +61,7 @@
               @set-animation="onSetAnimation"
               @add-animation="onAddAnimation"
               @set-track-loop="onSetTrackLoop"
+              @set-track-mix-options="onSetTrackMixOptions"
               @remove-queue-entry="onRemoveQueueEntry"
               @clear-track="onClearTrack"
               @clear-tracks="onClearTracks"
@@ -71,7 +72,7 @@
           <n-tab-pane name="inspector" tab="Insp" class="tab-pane">
             <SkeletonPanel />
           </n-tab-pane>
-          <n-tab-pane v-if="skeletonStore.freeBones.length > 0" name="bones" tab="Bones" class="tab-pane">
+          <n-tab-pane v-if="skeletonStore.freeBones.length > 0 || skeletonStore.sliders.length > 0" name="bones" tab="Bones" class="tab-pane">
             <FreeBonePanel />
           </n-tab-pane>
           <n-tab-pane name="atlas" tab="Atlas" class="tab-pane">
@@ -138,6 +139,7 @@ import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
 import { groupSpineFiles, readFileAsDataURL } from '@/core/utils/fileLoader'
 import { validateSpineFileSet } from '@/core/utils/spineValidator'
 import { runtimeSpineVersion, spineVersionProblem } from '@/core/utils/versionDetector'
+import type { TrackMixOptions } from '@/core/types/ISpineAdapter'
 
 const emit = defineEmits<{
   back:           []
@@ -230,6 +232,10 @@ function onAddAnimation(track: number, name: string, loop: boolean) {
 
 function onSetTrackLoop(track: number, loop: boolean) {
   stageRef.value?.setTrackLoop(track, loop)
+}
+
+function onSetTrackMixOptions(track: number, patch: Partial<TrackMixOptions>) {
+  stageRef.value?.setTrackMixOptions(track, patch)
 }
 
 function onRemoveQueueEntry(track: number, index: number) {

@@ -199,6 +199,44 @@
           <n-button size="tiny" @click="emit('clearTrack', track.trackIndex)">✕</n-button>
         </div>
 
+        <div class="track-mix-row">
+          <span class="track-mix-field" :title="MIX_DURATION_TITLE">
+            <span class="track-loop-text">Mix (ms)</span>
+            <n-input-number
+              class="track-mix-duration"
+              size="tiny"
+              :min="0"
+              :max="5000"
+              :step="50"
+              :show-button="false"
+              :value="Math.round((track.mixDuration ?? 0) * 1000)"
+              @update:value="(v: number | null) => onMixDuration(track.trackIndex, v)"
+            />
+          </span>
+          <template v-if="skeletonStore.mixInterpolations.length > 0">
+            <n-checkbox
+              class="track-loop-label track-additive"
+              size="small"
+              :title="ADDITIVE_TITLE"
+              :checked="track.additive ?? false"
+              @update:checked="(v) => emit('setTrackMixOptions', track.trackIndex, { additive: v })"
+            >
+              <span class="track-loop-text">Additive</span>
+            </n-checkbox>
+            <span class="track-mix-field" :title="CURVE_TITLE">
+              <span class="track-loop-text">Curve</span>
+              <n-select
+                class="track-mix-select"
+                size="tiny"
+                :options="mixOptions"
+                :value="track.mixInterpolation ?? skeletonStore.mixInterpolations[0]"
+                :consistent-menu-width="false"
+                @update:value="(v: string) => emit('setTrackMixOptions', track.trackIndex, { mixInterpolation: v })"
+              />
+            </span>
+          </template>
+        </div>
+
         <!-- Full track list: played rows greyed, the playing row keeps the play button -->
         <template v-if="rowsByTrack.get(track.trackIndex)">
           <div
@@ -310,12 +348,13 @@ import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useAnimationStore, FRAME_STEP_SECONDS } from '@/core/stores/useAnimationStore'
 import { useEventsStore } from '@/core/stores/useEventsStore'
 import { playlistPosition } from '@/core/utils/slotState'
-import type { TrackState } from '@/core/types/ISpineAdapter'
+import type { TrackState, TrackMixOptions } from '@/core/types/ISpineAdapter'
 
 const emit = defineEmits<{
   setAnimation:     [track: number, name: string, loop: boolean]
   addAnimation:     [track: number, name: string, loop: boolean]
   setTrackLoop:     [track: number, loop: boolean]
+  setTrackMixOptions: [track: number, patch: Partial<TrackMixOptions>]
   removeQueueEntry: [track: number, index: number]
   clearTrack:       [track: number]
   clearTracks:      []
@@ -358,6 +397,23 @@ function trackRows(track: TrackState): TrackRow[] | null {
     state: index < pos ? 'played' : index === pos ? 'current' : 'upcoming',
     control: index === control,
   }))
+}
+
+const MIX_LABELS: Record<string, string> = {
+  linear: 'Linear', smooth: 'Smooth', slowFast: 'Slow-fast', fastSlow: 'Fast-slow', circle: 'Circle',
+}
+const mixOptions = computed(() =>
+  skeletonStore.mixInterpolations.map(value => ({ value, label: MIX_LABELS[value] ?? value })),
+)
+
+const MIX_DURATION_TITLE = 'Crossfade from the previous animation on this track, in milliseconds. 0 = instant switch'
+const CURVE_TITLE = 'Shapes the crossfade set by Mix (ms). No effect at 0 ms'
+const ADDITIVE_TITLE = "Adds this track's animation on top of lower tracks — visible when tracks key the same bones"
+
+function onMixDuration(track: number, v: number | null) {
+  if (v == null || !Number.isFinite(v)) return
+  // the field is in ms, the runtime takes seconds
+  emit('setTrackMixOptions', track, { mixDuration: Math.round(Math.min(5000, Math.max(0, v))) / 1000 })
 }
 
 const rowsByTrack = computed(() => new Map(animationStore.tracks.map(t => [t.trackIndex, trackRows(t)])))
@@ -682,6 +738,30 @@ function onAnimClear() {
 .track-loop-text {
   font-size: 0.75rem;
   color: var(--c-text-faint);
+}
+
+.track-mix-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  padding: 3px 8px;
+  background: var(--c-raised);
+  border-bottom: 1px solid var(--c-border-dim);
+}
+
+.track-mix-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.track-mix-duration {
+  width: 4em;
+}
+
+.track-mix-select {
+  width: 96px;
 }
 
 /* ── Track entries ───────────────────────── */

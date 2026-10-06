@@ -9,6 +9,7 @@
 import type { ISpineAdapter } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
 import { atlasUtilization, atlasVramBytes, type AtlasPage } from '@/core/utils/atlasTextParser'
+import { getJsonConstraints } from '@/core/utils/compare/jsonAccess'
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -179,13 +180,22 @@ function framesEqual(a: unknown, b: unknown): boolean {
   return true
 }
 
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v)
+
+// a key at time 0 omits `time`, so a list is also keys when nothing nested looks like a key list
+function isKeyframeList(arr: unknown[]): arr is Record<string, unknown>[] {
+  if (arr.length === 0 || !arr.every(isObj)) return false
+  return arr.some(el => typeof el.time === 'number')
+    || !arr.some(el => Object.values(el).some(v => Array.isArray(v) && v.some(isObj)))
+}
+
 function countKf(obj: unknown): KfResult {
   const r: KfResult = { count: 0, redundant: 0, maxTime: 0 }
   if (Array.isArray(obj)) {
-    if (obj.length > 0 && typeof obj[0] === 'object' && obj[0] !== null && 'time' in (obj[0] as object)) {
-      // Keyframe array
+    if (isKeyframeList(obj)) {
       r.count   = obj.length
-      r.maxTime = ((obj[obj.length - 1] as Record<string, unknown>).time as number) ?? 0
+      r.maxTime = Math.max(0, ...obj.map(k => (typeof k.time === 'number' ? k.time : 0)))
       for (let i = 1; i < obj.length; i++) {
         if (framesEqual(obj[i - 1], obj[i])) r.redundant++
       }
@@ -324,6 +334,10 @@ export function analyzeComplexity(
     mkMetric('Skeleton size',     skelBytes / (1024 * 1024),     0.5,       2,
       { displayValue: fmtBytes(skelBytes), thresholdSuffix: ' MB' }),
   ]
+  if (adapter.getSliders) {
+    const sliders = json ? getJsonConstraints(json, 'slider').length : adapter.getSliders().length
+    metrics.push(mkMetric('Sliders', sliders, Infinity, Infinity))
+  }
 
   return {
     metrics,

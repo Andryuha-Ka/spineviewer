@@ -8,8 +8,9 @@ import { readFileSync } from 'fs'
 const pkg = JSON.parse(readFileSync('package.json', 'utf-8')) as { version: string }
 
 /**
- * Redirects `import … from 'pixi.js'` inside @esotericsoftware/* packages to
- * the 'pixi8' alias (pixi.js@8), so the Spine 4.2 adapter and Pixi8App share
+ * Redirects `import … from 'pixi.js'` inside @esotericsoftware/* packages and the
+ * 'spine-pixi-v8-43' alias (Spine 4.3, installed outside @esotericsoftware/) to
+ * the 'pixi8' alias (pixi.js@8), so both Spine adapters and Pixi8App share
  * one Pixi instance.
  *
  * enforce:'pre' is required so the hook runs before Vite's built-in resolver.
@@ -19,7 +20,7 @@ function spinePixi8Redirect(): Plugin {
     name: 'spine-pixi8-redirect',
     enforce: 'pre',
     async resolveId(id, importer) {
-      if (id === 'pixi.js' && importer?.includes('@esotericsoftware')) {
+      if (id === 'pixi.js' && (importer?.includes('@esotericsoftware') || importer?.includes('spine-pixi-v8-43'))) {
         const resolved = await this.resolve('pixi8', importer, { skipSelf: true })
         return resolved
       }
@@ -74,8 +75,12 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['pixi7', 'pixi8'],
-    // Exclude @esotericsoftware so their pixi.js imports reach spinePixi8Redirect.
-    exclude: ['@esotericsoftware/spine-pixi-v8', '@esotericsoftware/spine-core'],
+    // Exclude the Spine runtimes so their pixi.js imports reach spinePixi8Redirect;
+    // spine-canvas exists in two versions (4.2 root, 4.3 nested), so it must not be pre-bundled by id.
+    exclude: [
+      '@esotericsoftware/spine-pixi-v8', '@esotericsoftware/spine-core',
+      '@esotericsoftware/spine-canvas', 'spine-pixi-v8-43',
+    ],
   },
   esbuild: {
     // Preserve class and function names in production so Pixi DevTools extension

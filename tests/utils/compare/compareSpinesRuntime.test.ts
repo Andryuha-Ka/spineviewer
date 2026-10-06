@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { compareSpines, type SpineRuntimeData } from '@/core/utils/spineCompare'
 import type { AnimationEventMarker, BoneInfo, EventInfo, SlotInfo } from '@/core/types/ISpineAdapter'
-import { makeFakeAdapter } from '../../helpers/fakeAdapter'
+import { diffSeverity } from '@/core/utils/compare/diffSeverity'
+import { makeFakeAdapter, slider, withSpine43 } from '../../helpers/fakeAdapter'
 
 interface RuntimeFixture {
   bones: BoneInfo[]
@@ -135,6 +136,7 @@ describe('compareSpines (runtime-partial)', () => {
         },
       ],
       constraintTable: [],
+      sliderTable: [],
       freeBoneTable: [
         { name: 'arm', status: 'only-a' },
         { name: 'extra', status: 'only-b' },
@@ -235,5 +237,18 @@ describe('compareSpines (runtime-partial)', () => {
         },
       ],
     })
+  })
+})
+
+describe('compareSpines (runtime) free bones across 4.2 and 4.3', () => {
+  it('counts a bone a 4.3 slider drives as free on the 4.2 side only', async () => {
+    const empty = { bones: [], slots: [], skins: [], animations: [], events: [], durations: {}, animEvents: {} }
+    const diff = await compareSpines(
+      runtime({ ...empty, freeBones: ['root', 'gem'] }),
+      { source: 'runtime', adapter: withSpine43(runtime({ ...empty, freeBones: ['root'] }).adapter as ReturnType<typeof makeFakeAdapter>, [slider('spin')]) },
+    )
+    expect(diff.freeBoneTable).toEqual([{ name: 'gem', status: 'only-a' }, { name: 'root', status: 'ok' }])
+    expect(diff.sliderTable).toEqual([])
+    expect(diffSeverity(diff)).toMatchObject({ freeBone: 1, warn: 1, critical: 0 })
   })
 })

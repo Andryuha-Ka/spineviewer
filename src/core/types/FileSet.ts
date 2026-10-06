@@ -6,6 +6,8 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
 
+import type { TrackMixOptions } from './ISpineAdapter'
+
 export type SpineFileType = 'skeleton-json' | 'skeleton-skel' | 'atlas' | 'image'
 
 export interface SpineFile {
@@ -60,6 +62,8 @@ export interface SpineSlotSavedState {
   wasPlaying: boolean
   /** Per-track playback position in seconds at the moment the slot was saved */
   trackTimes?: Record<number, number>
+  /** Per-track mix settings, every track incl. disabled ones: mixDuration (all versions), additive / mixInterpolation (Spine 4.3) */
+  trackMix?: Record<number, TrackMixOptions>
   // Skin
   selectedSkins: string[]
   // Placeholders

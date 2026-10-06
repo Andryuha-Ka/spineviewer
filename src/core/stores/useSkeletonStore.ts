@@ -7,7 +7,7 @@
  */
 
 import { defineStore } from 'pinia'
-import type { BoneInfo, SlotInfo, EventInfo, ISpineAdapter, BoneLocalTransform } from '@/core/types/ISpineAdapter'
+import type { BoneInfo, SlotInfo, EventInfo, ISpineAdapter, BoneLocalTransform, SliderInfo } from '@/core/types/ISpineAdapter'
 
 interface SkeletonPopulateData {
   animations: string[]
@@ -16,6 +16,8 @@ interface SkeletonPopulateData {
   slots: SlotInfo[]
   events: EventInfo[]
   freeBones?: string[]
+  sliders?: SliderInfo[]
+  mixInterpolations?: readonly string[]
 }
 
 export const useSkeletonStore = defineStore('skeleton', () => {
@@ -25,6 +27,8 @@ export const useSkeletonStore = defineStore('skeleton', () => {
   const slots        = ref<SlotInfo[]>([])
   const events       = ref<EventInfo[]>([])
   const freeBones    = ref<string[]>([])
+  const sliders      = ref<SliderInfo[]>([])
+  const mixInterpolations = ref<string[]>([])
   /** Currently applied skin names — synced by AnimationPanel, read by PreviewStage for state save */
   const activeSkins     = ref<string[]>([])
   /** Anim tab shows Skin Composer checkboxes instead of radios */
@@ -57,6 +61,14 @@ export const useSkeletonStore = defineStore('skeleton', () => {
     return _adapter?.getBoneSetupTransform(boneName) ?? null
   }
 
+  function setSliderPose(name: string, pose: Partial<Pick<SliderInfo, 'time' | 'mix'>>): void {
+    _adapter?.setSliderPose?.(name, pose)
+  }
+
+  function resetSlider(name: string): void {
+    _adapter?.resetSlider?.(name)
+  }
+
   function populate(data: SkeletonPopulateData) {
     animations.value = data.animations
     skins.value      = data.skins
@@ -64,6 +76,24 @@ export const useSkeletonStore = defineStore('skeleton', () => {
     slots.value      = data.slots
     events.value     = data.events
     freeBones.value  = data.freeBones ?? []
+    sliders.value    = data.sliders ?? []
+    mixInterpolations.value = [...(data.mixInterpolations ?? [])]
+  }
+
+  /** Attaches the adapter and fills the store from it; slider overrides left on a parked adapter are dropped so canvas and inputs start from setup. */
+  function populateFrom(a: ISpineAdapter): void {
+    _adapter = a
+    for (const s of a.getSliders?.() ?? []) a.resetSlider?.(s.name)
+    populate({
+      animations: a.animations,
+      skins:      a.skins,
+      bones:      a.bones,
+      slots:      a.slots,
+      events:     a.events,
+      freeBones:  a.getFreeBones(),
+      sliders:    a.getSliders?.() ?? [],
+      mixInterpolations: a.mixInterpolations ?? [],
+    })
   }
 
   function clear() {
@@ -73,6 +103,8 @@ export const useSkeletonStore = defineStore('skeleton', () => {
     slots.value        = []
     events.value       = []
     freeBones.value    = []
+    sliders.value      = []
+    mixInterpolations.value = []
     activeSkins.value  = []
     composerMode.value = false
     selectedBone.value = null
@@ -81,10 +113,11 @@ export const useSkeletonStore = defineStore('skeleton', () => {
   }
 
   return {
-    animations, skins, bones, slots, events, freeBones, isLoaded,
+    animations, skins, bones, slots, events, freeBones, sliders, mixInterpolations, isLoaded,
     activeSkins, composerMode,
     selectedBone, selectBone, selectedSlot, selectSlot, syncSelection,
     attachAdapter, detachAdapter, setBoneTransform, getBoneSetupTransform,
-    populate, clear,
+    setSliderPose, resetSlider,
+    populate, populateFrom, clear,
   }
 })

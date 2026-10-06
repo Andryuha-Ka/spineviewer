@@ -26,7 +26,7 @@
         <ul class="help-list">
           <li><b>Drag &amp; drop</b> files or a folder onto the drop zone — or use <b>Choose Files / Choose Folder</b></li>
           <li>Supported skeletons: <code>.json</code>, <code>.skel</code></li>
-          <li>Spine version is detected automatically from the file header</li>
+          <li>Spine version is detected automatically from the file header; a Spine 4.3 file selects Pixi 8 + Spine 4.3; a file of an unsupported version is marked with an error and <b>Open Viewer</b> stays disabled</li>
           <li>Supported image formats: PNG · JPG · WebP · AVIF</li>
           <li>Up to <b>30 skeletons</b> can be loaded at once (use the <b>Spines</b> tab to switch)</li>
           <li><b>History sidebar</b> — last 20 sessions on the picker page; click to reload automatically (Chrome/Edge) or reopen the folder; per-session delete available on hover</li>
@@ -46,6 +46,8 @@
           <li><b>Speed</b> control: 0×–3× with fine slider</li>
           <li><b>Frame stepping</b> in 1/60 s steps — <kbd>←</kbd> <kbd>→</kbd> step the current track, the Anim tab <b>← 1f / 1f →</b> buttons step every running track</li>
           <li><b>Toolbar track controls</b> — pick a skin (synced with Anim → Skins; a Composer mix shows as <i>Composite (N)</i>), pick a track (0–11), set its animation, ▶ to enable the track (and start playback of every enabled track when stopped) or ⏸ to freeze only that track, toggle its Loop or clear it (✕) directly in the top toolbar; works for the active skeleton and for a placeholder child spine selected in the Spines tab</li>
+          <li><b>Mix (ms)</b> per track (every Spine version) — each active track in the Anim tab has a Mix (ms) field (0–5000 ms, default 0 = instant) that crossfades every new or queued animation from the previous one on that track; queued animations start blending that many milliseconds before the previous one ends, and the first animation on an empty track starts instantly</li>
+          <li><b>Additive</b> and <b>Curve</b> per track (Spine 4.3 only) — the same row also has an Additive checkbox and a Curve select (Linear, Smooth, Slow-fast, Fast-slow, Circle) that shapes the Mix (ms) crossfade; Mix (ms), Additive and Curve are saved per skeleton like loop and speed</li>
         </ul>
       </section>
 
@@ -84,11 +86,11 @@
           </div>
           <div class="tab-item">
             <span class="tab-badge">Insp</span>
-            <span>Bone hierarchy with live transforms; active attachment list with blend mode badges</span>
+            <span>Bone hierarchy with live transforms; active attachment list with blend mode badges; slider constraints with live time and mix (Spine 4.3)</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Bones</span>
-            <span>Shown only while the skeleton has free (unkeyed) bones — numeric X, Y, R inputs and a reset button (↺) per bone pose it live on the canvas; values are not saved</span>
+            <span>Shown while the skeleton has free (unkeyed) bones or sliders — numeric X, Y, R inputs and a reset button (↺) per bone pose it live on the canvas; <b>Sliders</b> (Spine 4.3) get Time and Mix inputs and a reset (↺); values are not saved</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Atlas</span>
@@ -100,7 +102,7 @@
           </div>
           <div class="tab-item">
             <span class="tab-badge">Compl</span>
-            <span>Complexity analyzer — Bones, Slots, Regions, Mask, Meshes, Mesh vertices, Non-normal blends, Atlas VRAM, Atlas utilization and Skeleton size with OK/warn/critical thresholds, optimization hints and a per-animation keyframe table (JSON skeletons only)</span>
+            <span>Complexity analyzer — Bones, Slots, Regions, Mask, Meshes, Mesh vertices, Non-normal blends, Atlas VRAM, Atlas utilization, Skeleton size and Sliders (Spine 4.3) with OK/warn/critical thresholds, optimization hints and a per-animation keyframe table (JSON skeletons only)</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Export</span>
@@ -121,7 +123,7 @@
           <li><b>Viewport sync</b> (⊞) — mirrors pan and zoom between canvases</li>
           <li><b>Animation / Skin sync</b> — changes on one side auto-apply the same name to the other when sync is on</li>
           <li><b>Diff panel</b> — runs automatically on load; below the Reskin Overview it shows Skeleton · Bones · Slots in JSON mode, or Bones · Slots · Skins · Animations · Events in runtime mode</li>
-          <li><b>Reskin Overview</b> — animation presence + duration delta, skin diff, event diff, event timing diff, placeholder presence, constraints (JSON only), free bones (runtime only); severity badges: 🔴 critical · 🟠 non-critical</li>
+          <li><b>Reskin Overview</b> — animation presence + duration delta, skin diff, event diff, event timing diff, placeholder presence, constraints (JSON only), sliders (Spine 4.3, JSON only), free bones (runtime only); severity badges: 🔴 critical · 🟠 non-critical; the header shows <b>ok</b> when nothing is critical</li>
           <li><b>Placeholder labels</b> — <code>ph</code> checkbox per canvas; individual checkboxes for each placeholder (only non-removed ones shown)</li>
           <li>Diff panel position (left / right / bottom) is persisted</li>
         </ul>
@@ -156,10 +158,10 @@
           </thead>
           <tbody>
             <tr><td>Pixi 7</td><td>Spine 3.8 · 4.0 · 4.1</td></tr>
-            <tr><td>Pixi 8</td><td>Spine 4.2</td></tr>
+            <tr><td>Pixi 8</td><td>Spine 4.2 · 4.3</td></tr>
           </tbody>
         </table>
-        <p class="help-p">Spine 3.8, 4.0 and 4.1 skeletons can be mixed in one Pixi 7 session; Spine 4.2 needs Pixi 8.</p>
+        <p class="help-p">Spine 3.8, 4.0 and 4.1 skeletons can be mixed in one Pixi 7 session; Spine 4.2 and 4.3 skeletons can be mixed in one Pixi 8 session (also on the two Compare canvases).</p>
       </section>
 
       <n-divider class="divider" />
@@ -189,6 +191,16 @@
       <section class="help-section">
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.19</span>
+            <ul class="help-list">
+              <li><b>Spine 4.3 support</b> — Pixi 8 + Spine 4.3 next to 4.2; a detected 4.3 file selects it automatically, and 4.2 and 4.3 skeletons mix in one Pixi 8 session (pinned, as placeholder child spines and on the Compare canvases)</li>
+              <li><b>Sliders</b> (Spine 4.3) — Bones tab Sliders section with live Time and Mix and a reset; sliders are also listed in Insp, counted in Compl and compared in the Compare diff Sliders table</li>
+              <li><b>Mix (ms) per track</b> — Anim tab track rows on every Spine version get a crossfade in milliseconds from the previous animation on that track, saved per skeleton</li>
+              <li><b>Additive and Curve per track</b> (Spine 4.3) — Anim tab track rows get an Additive checkbox and a Curve select that shapes the Mix (ms) crossfade, saved per skeleton</li>
+              <li><b>Unsupported versions blocked</b> — a file of a Spine version the viewer cannot run is marked with an error and Open Viewer stays disabled</li>
+            </ul>
+          </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.3.17</span>
             <ul class="help-list">

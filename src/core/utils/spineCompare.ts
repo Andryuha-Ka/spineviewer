@@ -15,11 +15,11 @@ import {
 import { extractPlaceholders } from './compare/placeholders'
 import {
   buildAnimEvents, buildAnimTable, buildConstraintTable, buildFreeBoneTable, buildGlobalEvents,
-  buildSkinTable,
+  buildSkinTable, buildSliderTable,
 } from './compare/reskin'
 
 export type { SpineJsonData, SpineRuntimeData, SpineData, PlaceholderDiff, DiffItem, DiffSection,
-  AnimEventGroup, GlobalEventRow, SkinRow, ConstraintRow,
+  AnimEventGroup, GlobalEventRow, SkinRow, ConstraintRow, SliderRow,
   FreeBoneRow, SpineDiff } from './compare/types'
 
 function countSummaryChange(items: DiffItem[]): { added: number; removed: number; changed: number; equal: number } {
@@ -69,6 +69,7 @@ export async function compareSpines(dataA: SpineData, dataB: SpineData): Promise
   const globalEvents    = buildGlobalEvents(dataA, dataB)
   const animEvents      = buildAnimEvents(dataA, dataB)
   const constraintTable = buildConstraintTable(dataA, dataB)
+  const sliderTable     = buildSliderTable(dataA, dataB)
   const freeBoneTable   = buildFreeBoneTable(dataA, dataB)
 
   // Build summary
@@ -89,6 +90,7 @@ export async function compareSpines(dataA: SpineData, dataB: SpineData): Promise
     globalEvents,
     animEvents,
     constraintTable,
+    sliderTable,
     freeBoneTable,
     placeholders,
     sections,

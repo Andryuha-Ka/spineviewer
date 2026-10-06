@@ -1,6 +1,6 @@
 # Spine Viewer Pro
 
-Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animations. Supports Spine versions 3.8–4.2 with Pixi.js 7 and 8. Runs entirely in the browser — no installation, no server, no data upload.
+Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animations. Supports Spine versions 3.8–4.3 with Pixi.js 7 and 8. Runs entirely in the browser — no installation, no server, no data upload.
 
 ---
 
@@ -9,7 +9,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 ### File Loading
 - **Drag & drop** files or folders directly onto the picker page
 - **Choose Files / Choose Folder** buttons in every browser — with the File System Access API (Chrome / Edge) the native picker opens and the files are kept for history auto-reload; without it a standard file or folder input opens
-- Automatic Spine version detection from `.json` / `.skel` headers
+- Automatic Spine version detection from `.json` / `.skel` headers (pre-release versions such as `4.3.75-beta` count as 4.3); a detected Spine 4.3 file selects Pixi 8 + Spine 4.3; a file of an unsupported version is marked with an error and **Open Viewer** stays disabled
 - Supports all attachment image formats: PNG, JPG, WebP, AVIF
 - Load **up to 30 skeletons** simultaneously and switch between them
 - **File history sidebar** — last 20 sessions shown on the picker page
@@ -25,6 +25,8 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - **Speed control** 0×–3× with fine slider
 - **Frame stepping** in 1/60 s steps — `←` / `→` step the current track, the Anim tab `← 1f` / `1f →` buttons step every running track
 - Seek to any position
+- **Mix (ms) crossfade per track** (all versions) — each active track in the Anim tab has a **Mix (ms)** field (0–5000 ms, step 50, default 0 = instant) that crossfades every new or queued animation from the previous one on that track; queued entries start blending that many milliseconds before the previous one ends, and the first animation on an empty track starts instantly
+- **Additive and Curve per track** (Spine 4.3 only) — the same row also has an **Additive** checkbox and a **Curve** select (Linear, Smooth, Slow-fast, Fast-slow, Circle) that shapes the Mix (ms) crossfade; Mix (ms), Additive and Curve are kept per skeleton like loop and speed, also for disabled tracks
 - **Toolbar track controls** — Skin picker (folder dropdown, synced with the Anim tab Skins; shows `Composite (N)` for a Skin Composer mix), Track selector (all 12 tracks), animation picker, per-track ▶/⏸, per-track Loop and ✕ clear right in the top toolbar; they drive the active skeleton or the selected placeholder child spine without switching to the Anim tab
 
 ### Animation Dropdown (Anim tab)
@@ -77,6 +79,12 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 ### Inspector (Insp tab)
 - **Bone hierarchy** — live x, y, rotation, scale values; expandable tree; search
 - **Active Attachments** — slot names, attachment types (region / mesh / mask / path), vertex counts, blend mode badges
+- **Sliders** (Spine 4.3) — every slider constraint with its live time and mix
+
+### Bones tab
+- Shown when the skeleton has free bones or slider constraints
+- **Free bones** — bones no animation keys; move and rotate them on stage (on Spine 4.3, bones driven by a slider do not count as free)
+- **Sliders** (Spine 4.3) — live **Time** and **Mix** inputs per slider constraint and a ↺ reset to the setup values; edits are not saved and are dropped when you switch skeletons
 
 ### Atlas Viewer (Atlas tab)
 - Visual preview of all atlas pages
@@ -92,7 +100,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - **Long tasks log** — main thread tasks >50 ms (Chrome PerformanceObserver)
 
 ### Complexity Analyzer (Compl tab)
-- Metrics with OK/warn/critical thresholds: Bones, Slots, Regions, Mask, Meshes, Mesh vertices, Non-normal blends, Atlas VRAM, Atlas utilization, Skeleton size
+- Metrics with OK/warn/critical thresholds: Bones, Slots, Regions, Mask, Meshes, Mesh vertices, Non-normal blends, Atlas VRAM, Atlas utilization, Skeleton size; **Sliders** count on Spine 4.3 skeletons
 - Per-animation keyframe table (duration, keyframe count, keyframes per second, duplicate keyframes) — JSON skeletons only
 - Blending mode breakdown (Normal / Additive / Multiply / Screen)
 - Automatic recommendations for optimization
@@ -138,9 +146,10 @@ Side-by-side visual and structural comparison of two Spine skeletons. Accessible
   - Per-animation event timing diff (JSON only)
   - Placeholder slots / bones / attachments (attachments JSON only): present on both sides, A only or B only (parameters are not compared)
   - IK / Transform / Path constraints with changed bones, target or parameters (JSON only)
+  - Sliders (Spine 4.3): present on both sides, A only or B only, and changed animation, driver bone, property, time, mix, loop or additive (JSON only)
   - Free bones: unkeyed on both sides, A only or B only (runtime only)
 - Sections below the overview: Skeleton · Bones · Slots in JSON mode; Bones · Slots · Skins · Animations · Events in runtime mode
-- Severity badges: 🔴 critical (animation, skin, event, event occurrence, placeholder or constraint present on one side only; constraint with changed bones or target) · 🟠 non-critical (duration delta, timing delta, constraint parameter changes, free-bone status differing between sides)
+- Severity badges: 🔴 critical (animation, skin, event, event occurrence, placeholder, constraint or slider present on one side only; constraint with changed bones or target) · 🟠 non-critical (duration delta, timing delta, constraint or slider parameter changes, free-bone status differing between sides); the header shows **ok** whenever there is nothing critical
 
 **Placeholder Labels**
 - `ph` checkbox in each canvas overlay — show/hide named placeholder overlays
@@ -167,9 +176,9 @@ Shortcuts are ignored while Ctrl, Cmd or Alt is held, so browser combinations li
 | Pixi.js | Spine Runtime |
 |---------|--------------|
 | Pixi 7 | Spine 3.8, 4.0, 4.1 |
-| Pixi 8 | Spine 4.2 |
+| Pixi 8 | Spine 4.2, 4.3 |
 
-Spine 3.8, 4.0 and 4.1 skeletons can be mixed in one Pixi 7 session; Spine 4.2 needs Pixi 8.
+Spine 3.8, 4.0 and 4.1 skeletons can be mixed in one Pixi 7 session; Spine 4.2 and 4.3 skeletons can be mixed in one Pixi 8 session (also on the two Compare canvases). Files of any other version are marked as unsupported and cannot be opened.
 
 ---
 
@@ -213,7 +222,7 @@ CI runs lint, tests and the build on every push to `master` before deploying.
 3. The app auto-detects the Spine version and selects the matching runtime.
 4. Click **Open Viewer**.
 5. Use the **Anim** tab to select animations and control playback.
-6. Explore the other tabs: **Spines**, **Insp**, **Bones** (when the skeleton has free bones), **Atlas**, **Perf**, **Compl**, **Export**.
+6. Explore the other tabs: **Spines**, **Insp**, **Bones** (when the skeleton has free bones or sliders), **Atlas**, **Perf**, **Compl**, **Export**.
 
 ### Multi-Spine Workflow
 When you drop multiple Spine skeletons, all are loaded into slots. Open the **Spines** tab in the viewer and click any entry to switch. The scene pan and zoom are shared; each skeleton's own offsets (when its sync is off), animation, skin, placeholder and playback state are saved independently.
@@ -228,6 +237,13 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 ---
 
 ## Changelog
+
+### v1.3.19
+- **Spine 4.3 support** — Pixi 8 + Spine 4.3 runtime next to 4.2; a detected 4.3 file selects it automatically, and 4.2 and 4.3 skeletons mix in one Pixi 8 session (top-level, pinned, placeholder child spines, Compare canvases)
+- **Sliders** (Spine 4.3) — Bones tab Sliders section with live Time and Mix and a reset; sliders also listed in the Insp tab, counted in the Compl tab and compared in the Compare diff Sliders table
+- **Mix (ms) crossfade per track for all versions** — Anim tab track rows get a Mix (ms) field (0–5000 ms) that crossfades each new or queued animation from the previous one on that track, kept per skeleton
+- **Additive and Curve per track** (Spine 4.3) — Anim tab track rows get an Additive checkbox and a Curve select that shapes the Mix (ms) crossfade, kept per skeleton
+- **Unsupported versions blocked** — a file of a Spine version the viewer cannot run is marked with an error and Open Viewer stays disabled
 
 ### v1.3.17
 - **Studio Mono theme** — monochrome dark/light palette, readable 11px minimum text, larger row buttons
@@ -374,7 +390,7 @@ src/
 │   └── utils/              # file loading, version detection, validation, compare diff, export
 ├── adapters/
 │   ├── pixi7/              # Pixi 7 app, progress overlay, Spine 3.8/4.0/4.1 adapters
-│   └── pixi8/              # Pixi 8 app, progress overlay, Spine 4.2 adapter
+│   └── pixi8/              # Pixi 8 app, progress overlay, shared base, Spine 4.2/4.3 adapters
 └── components/
     ├── pages/              # VersionPickerPage, ViewerPage
     ├── stage/              # PreviewStage (canvas coordinator)
@@ -391,9 +407,9 @@ src/
 - **Pinia** — state management
 - **Naive UI** — component library
 - **Pixi.js 7** — renderer for Spine 3.8–4.1
-- **Pixi.js 8** — renderer for Spine 4.2
+- **Pixi.js 8** — renderer for Spine 4.2 and 4.3
 - **@pixi-spine** (3.8 / 4.0 / 4.1) — Spine runtimes for Pixi 7
-- **@esotericsoftware/spine-pixi-v8** — official Spine 4.2 runtime for Pixi 8
+- **@esotericsoftware/spine-pixi-v8** — official Spine runtimes for Pixi 8: 4.2, and 4.3 (4.3.13, installed as the `spine-pixi-v8-43` alias)
 - **gif.js** — GIF export via Web Worker
 
 ---

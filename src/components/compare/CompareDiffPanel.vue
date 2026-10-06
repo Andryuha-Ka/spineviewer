@@ -75,9 +75,11 @@
               <span v-if="severity.placeholder > 0"         class="ov-badge ov-badge--err">{{ severity.placeholder }} ph</span>
               <span v-if="severity.constraintCritical > 0"   class="ov-badge ov-badge--err">{{ severity.constraintCritical }} cstr</span>
               <span v-if="severity.constraintParam > 0"      class="ov-badge ov-badge--warn">{{ severity.constraintParam }} cstr param</span>
+              <span v-if="severity.sliderCritical > 0"       class="ov-badge ov-badge--err">{{ severity.sliderCritical }} slider</span>
+              <span v-if="severity.sliderParam > 0"          class="ov-badge ov-badge--warn">{{ severity.sliderParam }} slider param</span>
               <span v-if="severity.freeBone > 0"             class="ov-badge ov-badge--warn">{{ severity.freeBone }} free bone</span>
 
-              <span v-if="severity.animName === 0 && severity.skin === 0 && severity.globalEvent === 0 && severity.animEventName === 0 && severity.placeholder === 0 && severity.constraintCritical === 0 && severity.freeBone === 0" class="ov-badge ov-badge--ok">ok</span>
+              <span v-if="severity.critical === 0" class="ov-badge ov-badge--ok">ok</span>
             </span>
           </div>
 
@@ -231,6 +233,32 @@
               <div v-if="diffsOnly && diff.constraintTable.every(r => r.status === 'ok')" class="ov-empty">All constraints match</div>
             </template>
 
+            <!-- Sliders -->
+            <div class="ov-sub-header">
+              <span class="ov-sub-title">{{ sliderTableIssues > 0 ? '⚠ ' : '' }}Sliders</span>
+              <span class="ov-sub-hint">{{ diff.sliderTable.length }} total</span>
+            </div>
+            <template v-if="diff.sliderTable.length === 0">
+              <div class="ov-empty ov-empty--hint">{{ diff.source === 'json-full' ? 'No sliders defined' : 'No sliders (JSON only)' }}</div>
+            </template>
+            <template v-else>
+              <template v-for="row in visibleSliderTable" :key="row.name">
+                <div
+                  class="anim-row"
+                  :class="row.status === 'changed' ? 'anim-row--delta' : `anim-row--${row.status}`"
+                >
+                  <span class="anim-row-icon">{{ animRowIcon(row.status) }}</span>
+                  <span class="anim-row-name">{{ row.name }}</span>
+                  <span v-if="row.status === 'changed'" class="cstr-tag cstr-tag--param">params</span>
+                  <span v-else class="ev-global-status">{{ row.status === 'ok' ? 'both' : row.status === 'only-a' ? 'A only' : 'B only' }}</span>
+                </div>
+                <div v-for="c in row.changes" :key="`${row.name}::${c.key}`" class="ev-row ev-row--delta">
+                  <span class="ev-row-name">{{ c.key }} {{ c.a }} → {{ c.b }}</span>
+                </div>
+              </template>
+              <div v-if="diffsOnly && sliderTableIssues === 0" class="ov-empty">All sliders match</div>
+            </template>
+
             <!-- Free Bones -->
             <div class="ov-sub-header">
               <span class="ov-sub-title">{{ severity.freeBone > 0 ? '⚠ ' : '' }}Free Bones</span>
@@ -273,7 +301,7 @@
 <script setup lang="ts">
 import CompareDiffSection from './CompareDiffSection.vue'
 import { useCompareStore } from '@/core/stores/useCompareStore'
-import type { PlaceholderDiff, AnimEventGroup, GlobalEventRow, SkinRow, ConstraintRow, FreeBoneRow } from '@/core/utils/spineCompare'
+import type { PlaceholderDiff, AnimEventGroup, GlobalEventRow, SkinRow, ConstraintRow, SliderRow, FreeBoneRow } from '@/core/utils/spineCompare'
 import { diffSeverity } from '@/core/utils/compare/diffSeverity'
 
 const compareStore = useCompareStore()
@@ -349,7 +377,8 @@ function toggleEvGroup(animName: string) {
 function animRowIcon(status: string): string {
   switch (status) {
     case 'ok':     return '✓'
-    case 'delta':  return '~'
+    case 'delta':
+    case 'changed': return '~'
     case 'only-a': return '−'
     case 'only-b': return '+'
     default:       return '?'
@@ -382,6 +411,17 @@ const visibleConstraintTable = computed<ConstraintRow[]>(() => {
   return diffsOnly.value
     ? diff.value.constraintTable.filter(r => r.status !== 'ok')
     : diff.value.constraintTable
+})
+
+// ── Slider table computed ─────────────────────────────────────────────────────
+
+const sliderTableIssues = computed(() => severity.value.sliderCritical + severity.value.sliderParam)
+
+const visibleSliderTable = computed<SliderRow[]>(() => {
+  if (!diff.value) return []
+  return diffsOnly.value
+    ? diff.value.sliderTable.filter(r => r.status !== 'ok')
+    : diff.value.sliderTable
 })
 
 // ── Free bone table computed ──────────────────────────────────────────────────

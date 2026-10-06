@@ -17,6 +17,7 @@ function live(name: string, queue: string[], time = 0.5): TrackState {
   return {
     trackIndex: 0, animationName: name, time, duration: 1, loop: false, timeScale: 1,
     queue: queue.map(animationName => ({ animationName, loop: false })),
+    mixDuration: 0,
   }
 }
 
@@ -76,6 +77,78 @@ describe('AnimationPanel track list', () => {
     wrapper = mount(AnimationPanel)
     await wrapper.find('.track-loop-text').trigger('click')
     expect(wrapper.emitted('setTrackLoop')).toEqual([[2, true]])
+  })
+})
+
+describe('AnimationPanel track mix options', () => {
+  let wrapper: VueWrapper
+  beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => wrapper.unmount())
+
+  const INTERP = ['linear', 'smooth', 'slowFast', 'fastSlow', 'circle']
+
+  function mountWith(mixInterpolations: string[], track: Partial<TrackState> = {}) {
+    useSkeletonStore().populate({ animations: ['A'], skins: [], bones: [], slots: [], events: [], mixInterpolations })
+    useAnimationStore().tracks = [{ ...live('A', []), trackIndex: 1, ...track }]
+    wrapper = mount(AnimationPanel)
+  }
+
+  const MIX_TITLE = 'Crossfade from the previous animation on this track, in milliseconds. 0 = instant switch'
+  const CURVE_TITLE = 'Shapes the crossfade set by Mix (ms). No effect at 0 ms'
+  const ADDITIVE_TITLE = "Adds this track's animation on top of lower tracks — visible when tracks key the same bones"
+
+  const labels = () => wrapper.findAll('.track-mix-row .track-loop-text').map(el => el.text())
+  const mixInput = () => wrapper.findComponent({ name: 'InputNumber' })
+
+  it('shows only Mix (ms) before Spine 4.3', () => {
+    mountWith([])
+    expect(labels()).toEqual(['Mix (ms)'])
+    expect(wrapper.find('.track-mix-row [title]').attributes('title')).toBe(MIX_TITLE)
+    expect(mixInput().props('value')).toBe(0)
+    expect(wrapper.findComponent({ name: 'Select' }).exists()).toBe(false)
+  })
+
+  it('shows Mix (ms), Additive and Curve in order with tooltips on 4.3', () => {
+    mountWith(INTERP)
+    expect(labels()).toEqual(['Mix (ms)', 'Additive', 'Curve'])
+    const titles = wrapper.findAll('.track-mix-row > [title]').map(el => el.attributes('title'))
+    expect(titles).toEqual([MIX_TITLE, ADDITIVE_TITLE, CURVE_TITLE])
+    const row = wrapper.find('.track-mix-row')
+    expect(row.find('.n-checkbox').classes()).not.toContain('n-checkbox--checked')
+    expect(row.find('.track-mix-select').text()).toContain('Linear')
+  })
+
+  it('shows the live mixDuration in ms', () => {
+    mountWith([], { mixDuration: 0.4 })
+    expect(mixInput().props('value')).toBe(400)
+  })
+
+  it('emits clamped mixDuration in seconds from ms input and ignores empty input', () => {
+    mountWith([])
+    for (const v of [-1, 12000, 333.4, null, NaN]) mixInput().vm.$emit('update:value', v)
+    expect(wrapper.emitted('setTrackMixOptions')).toEqual([
+      [1, { mixDuration: 0 }], [1, { mixDuration: 5 }], [1, { mixDuration: 0.333 }],
+    ])
+  })
+
+  it('lists the Curve options in runtime order with display labels', () => {
+    mountWith(INTERP)
+    const options = wrapper.findComponent({ name: 'Select' }).props('options') as { label: string }[]
+    expect(options.map(o => o.label)).toEqual(['Linear', 'Smooth', 'Slow-fast', 'Fast-slow', 'Circle'])
+  })
+
+  it('reads live track values', () => {
+    mountWith(INTERP, { additive: true, mixInterpolation: 'circle' })
+    const row = wrapper.find('.track-mix-row')
+    expect(row.find('.n-checkbox').classes()).toContain('n-checkbox--checked')
+    expect(row.find('.track-mix-select').text()).toContain('Circle')
+  })
+
+  it('emits setTrackMixOptions for Additive and Curve', async () => {
+    mountWith(INTERP)
+    await wrapper.find('.track-additive').trigger('click')
+    wrapper.findComponent({ name: 'Select' }).vm.$emit('update:value', 'smooth')
+    expect(wrapper.emitted('setTrackMixOptions')).toEqual([[1, { additive: true }], [1, { mixInterpolation: 'smooth' }]])
   })
 })
 

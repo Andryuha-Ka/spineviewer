@@ -116,6 +116,22 @@
         </div>
       </section>
 
+      <template v-if="inspectorStore.sliders.length > 0">
+        <div class="divider" />
+        <section ref="slidersSectionRef" class="section section--sliders">
+          <label class="label">
+            Sliders
+            <span class="count">({{ inspectorStore.sliders.length }})</span>
+          </label>
+          <div class="slider-list">
+            <div v-for="s in inspectorStore.sliders" :key="s.name" class="slider-row">
+              <span class="slider-name">{{ s.name }}</span>
+              <span class="bone-vals">time {{ s.time.toFixed(2) }} · mix {{ s.mix.toFixed(2) }}</span>
+            </div>
+          </div>
+        </section>
+      </template>
+
       </div><!-- .sections-wrapper -->
     </template>
   </div>
@@ -244,17 +260,20 @@ const boneListRef      = ref<HTMLDivElement | null>(null)
 const attachListRef    = ref<HTMLDivElement | null>(null)
 const wrapperRef       = ref<HTMLDivElement | null>(null)
 const attachSectionRef = ref<HTMLElement | null>(null)
+const slidersSectionRef = ref<HTMLElement | null>(null)
 const boneMaxHeight    = ref<string | undefined>(undefined)
 
 function recalcBoneHeight() {
   const wrapper  = wrapperRef.value
   const attachEl = attachSectionRef.value
   if (!wrapper || !attachEl) return
-  boneMaxHeight.value = Math.max(0, wrapper.clientHeight - attachEl.offsetHeight - 1) + 'px'
+  const slidersH = slidersSectionRef.value ? slidersSectionRef.value.offsetHeight + 1 : 0
+  boneMaxHeight.value = Math.max(0, wrapper.clientHeight - attachEl.offsetHeight - slidersH - 1) + 'px'
 }
 
 watch(visibleBones, () => nextTick(recalcBoneHeight))
 watch(() => inspectorStore.activeAttachments, () => nextTick(recalcBoneHeight))
+watch(() => inspectorStore.sliders.length, () => nextTick(recalcBoneHeight))
 
 let _ro: ResizeObserver | null = null
 onMounted(() => {
@@ -546,6 +565,36 @@ function fmtS(n: number): string {
   cursor: pointer;
   accent-color: var(--c-accent);
   flex-shrink: 0;
+}
+
+/* ── Sliders ── */
+.section--sliders {
+  flex: 0 0 auto;
+  max-height: 25%;
+  overflow: hidden;
+}
+
+.slider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 6px;
+}
+
+.slider-name {
+  color: var(--c-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Attachments grid ── */

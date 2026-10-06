@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { makeFakeAdapter, track } from '../helpers/fakeAdapter'
+import { makeFakeAdapter, track, withSpine43 } from '../helpers/fakeAdapter'
 import type { PHImageEntry, PHSpineEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 
 const created: ReturnType<typeof makeFakeAdapter>[] = []
+let spine43 = false
 vi.mock('@/core/AdapterFactory', () => ({
   createSpineAdapter: vi.fn(async () => {
-    const a = makeFakeAdapter()
+    const a = spine43 ? withSpine43(makeFakeAdapter()) : makeFakeAdapter()
     created.push(a)
     return a
   }),
@@ -42,6 +43,7 @@ describe('useChildAdapters', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     created.length = 0
+    spine43 = false
     useVersionStore().selectVersion(8, '4.2')
     const slots: SpineSlot[] = [
       { id: 'parent', name: 'p', fileSet: FILESET },
@@ -110,6 +112,42 @@ describe('useChildAdapters', () => {
     expect(second.setAnimation).toHaveBeenCalledWith(0, 'run', false)
     expect(second.addAnimation).toHaveBeenCalledWith(0, 'stop', false)
     expect(second.seekTo).toHaveBeenCalledWith(0, 1.25)
+  })
+
+  it('an inactive child snapshot keeps saved trackMix of tracks without a live entry and adds live ones, then remount applies all', async () => {
+    spine43 = true
+    useFileLoaderStore().saveSlotState('child', saved({ trackMix: { 2: { mixDuration: 0.4 } }, trackEnabled: { 2: false } }))
+    const children = useChildAdapters()
+    await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    const mix = { mixDuration: 0.3, additive: true, mixInterpolation: 'circle' }
+    created[0].tracks = [track(0, 'idle', 0.3), { ...track(1, 'blink', 0.1), ...mix }]
+
+    children.moveChildAdapter('e1', null, 'other', 'p')
+    const expected = { 0: { mixDuration: 0 }, 1: mix, 2: { mixDuration: 0.4 } }
+    expect(useFileLoaderStore().spineSlots.find(s => s.id === 'child')!.savedState!.trackMix).toEqual(expected)
+
+    await children.mountChildAdapter(makeFakeAdapter(), 'other', 'p', entry('e1', 'child'))
+    const second = created[1] as ReturnType<typeof withSpine43>
+    expect(second.setTrackMixOptions.mock.calls).toEqual([[0, expected[0]], [1, mix], [2, expected[2]]])
+    expect(second.setAnimation).toHaveBeenCalledWith(1, 'blink', true)
+  })
+
+  it('saveChildState and an active-child snapshot save the store trackMix, disabled tracks included', async () => {
+    const children = useChildAdapters()
+    await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    children.activeChildAdapter.value = created[0]
+    created[0].tracks = [{ ...track(1, 'blink', 0.1), mixDuration: 0.9 }]
+    const anim = useAnimationStore()
+    anim.setTrackEnabled(2, false)
+    anim.patchTrackMix(1, { mixDuration: 0.2 })
+    anim.patchTrackMix(2, { mixDuration: 0.6 })
+    const mix = { 1: { mixDuration: 0.2 }, 2: { mixDuration: 0.6 } }
+
+    children.saveChildState('child')
+    expect(useFileLoaderStore().spineSlots.find(s => s.id === 'child')!.savedState!.trackMix).toEqual(mix)
+
+    children.moveChildAdapter('e1', null, 'other', 'p')
+    expect(useFileLoaderStore().spineSlots.find(s => s.id === 'child')!.savedState!.trackMix).toEqual(mix)
   })
 
   it('keeps saved skins and speed when snapshotting', async () => {

@@ -39,16 +39,27 @@ export function getJsonEvents(raw: AnyRecord): AnyRecord {
   return (raw.events && typeof raw.events === 'object') ? raw.events as AnyRecord : {}
 }
 
-export function getJsonConstraints(raw: AnyRecord, type: 'ik' | 'transform' | 'path'): AnyRecord[] {
+export type JsonConstraintType = 'ik' | 'transform' | 'path' | 'slider'
+
+/** 4.3 keeps one `constraints` list tagged by `type`; 3.8–4.2 keep one list per type. */
+export function getJsonConstraints(raw: AnyRecord, type: JsonConstraintType): AnyRecord[] {
+  if (Array.isArray(raw.constraints)) return raw.constraints.filter((c: AnyRecord) => c?.type === type)
   return Array.isArray(raw[type]) ? raw[type] : []
+}
+
+/** 4.3 renamed the transform `target` to `source` and the path `target` to `slot`. */
+export function constraintTarget(c: AnyRecord): unknown {
+  return c.target ?? c.source ?? c.slot
 }
 
 export function getAnimationDuration(anim: AnyRecord): number {
   let max = 0
   const walk = (node: unknown) => {
     if (Array.isArray(node)) {
-      const last = node[node.length - 1]
-      if (last && typeof last.time === 'number' && last.time > max) max = last.time
+      for (const el of node) {
+        if (el && typeof el.time === 'number' && el.time > max) max = el.time
+        walk(el)
+      }
     } else if (node && typeof node === 'object') {
       for (const v of Object.values(node)) walk(v)
     }

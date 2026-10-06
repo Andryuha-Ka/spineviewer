@@ -128,7 +128,7 @@ import type { PixiSpriteObject } from '@/core/types/PixiSpriteObject'
 import type { IPixiApp } from '@/core/types/IPixiApp'
 import type { IProgressOverlay } from '@/core/types/IProgressOverlay'
 import type { TrackDisplayState, MarkerDisplay } from '@/core/types/IProgressOverlay'
-import type { ISpineAdapter, AnimationEventMarker } from '@/core/types/ISpineAdapter'
+import type { ISpineAdapter, AnimationEventMarker, TrackMixOptions } from '@/core/types/ISpineAdapter'
 import type { FileSet, PHSpineEntry } from '@/core/types/FileSet'
 import { makeLoopState, computeNorm, resetLoopState } from '@/core/overlay/overlayMath'
 import { queueTrackList, rearmListLoops, playlistPosition, shouldAutoStop } from '@/core/utils/slotState'
@@ -473,7 +473,7 @@ onMounted(async () => {
         if (now - lastInspectorTs >= 100) {
           lastInspectorTs = now
           const attachments = uiAd.getActiveAttachments()
-          inspectorStore.update(uiAd.getBoneTransforms(), attachments)
+          inspectorStore.update(uiAd.getBoneTransforms(), attachments, uiAd.getSliders?.() ?? [])
           atlasStore.markSeen(
             attachments
               .filter(a => a.type === 'region' || a.type === 'mesh')
@@ -736,15 +736,7 @@ async function loadSpine(fileSet: FileSet, slotId?: string, resetViewport = true
     applyViewport()
     syncZOrder()
 
-    skeletonStore.attachAdapter(onStage.adapter)
-    skeletonStore.populate({
-      animations: onStage.adapter.animations,
-      skins:      onStage.adapter.skins,
-      bones:      onStage.adapter.bones,
-      slots:      onStage.adapter.slots,
-      events:     onStage.adapter.events,
-      freeBones:  onStage.adapter.getFreeBones(),
-    })
+    skeletonStore.populateFrom(onStage.adapter)
 
     const PH_RE = /placeholder/i
     const phSlotNames = new Set(onStage.adapter.slots.filter(s => PH_RE.test(s.name)).map(s => s.name))
@@ -896,6 +888,10 @@ defineExpose({
     // drop a re-armed cycle: keep only the entries left until the end of the list
     const pos = playlistPosition(length, live.queue.length, false)
     for (let n = live.queue.length; n > length - 1 - pos; n--) ad.removeQueueEntry(track, n - 1)
+  },
+  setTrackMixOptions: (track: number, patch: Partial<TrackMixOptions>) => {
+    animationStore.patchTrackMix(track, patch)
+    _uiAdapter()?.setTrackMixOptions(track, patch)
   },
   removeQueueEntry: (track: number, index: number) => {
     const ad = _uiAdapter()

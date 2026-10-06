@@ -9,13 +9,13 @@
 import { defineStore } from 'pinia'
 
 export type PixiVersion = 7 | 8
-export type SpineVersion = '3.8' | '4.0' | '4.1' | '4.2'
+export type SpineVersion = '3.8' | '4.0' | '4.1' | '4.2' | '4.3'
 
 const STORAGE_KEY = 'svp-version'
 
 export const spineOptionsMap: Record<PixiVersion, SpineVersion[]> = {
   7: ['3.8', '4.0', '4.1'],
-  8: ['4.2'], // @esotericsoftware/spine-pixi-v8 only has 4.2.x releases
+  8: ['4.2', '4.3'],
 }
 
 interface StoredVersions {
