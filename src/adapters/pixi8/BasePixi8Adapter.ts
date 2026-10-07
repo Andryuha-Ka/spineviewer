@@ -9,11 +9,15 @@
 import * as PIXI from 'pixi8'
 import type {
   ISpineAdapter, BoneInfo, SlotInfo, EventInfo,
-  TrackState, TrackQueueEntry, BoneTransform, BoneLocalTransform, AttachmentInfo, SpineEvent,
+  TrackState, TrackQueueEntry, BoneTransform, BoneLocalTransform, BoneLocalState, BoneOverrides,
+  AttachmentInfo, SpineEvent,
   AnimationEventMarker, SlotBounds, TrackMixOptions,
 } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
 import { applyEntryMixDuration } from '@/core/utils/slotState'
+import {
+  applyOverrides, mergeOverride, overridesToRecord, pickLocal, writeLocal, type BoneLike,
+} from '@/core/utils/boneTransform'
 
 /** Track entry fields the base reads and writes; identical on the 4.2 and 4.3 runtimes. */
 export interface Pixi8TrackEntry {
@@ -46,6 +50,17 @@ export interface Pixi8SpineLike {
   }
   skeleton: { slots: ReadonlyArray<{ data: { name: string }; attachment?: { name: string } | null }> }
   destroy(): void
+}
+
+/** Spine internals `_poseNow` drives: the steps of `Spine._updateAndApplyState` minus the clock. */
+interface Pixi8SpineInternals {
+  state: { apply(skeleton: unknown): boolean }
+  skeleton: { updateWorldTransform(physics: number): void }
+  beforeUpdateWorldTransforms(spine: unknown): void
+  afterUpdateWorldTransforms(spine: unknown): void
+  updateSlotObjects(): void
+  onViewUpdate(): void
+  _stateChanged: boolean
 }
 
 /** Label sprite pose in Pixi space (Y-down, CW radians), relative to the Spine container. */
@@ -85,12 +100,15 @@ export abstract class BasePixi8Adapter<TSpine extends Pixi8SpineLike> implements
   // Keeps child Spine objects separate from the addSlotObject mechanism to avoid render pipeline conflicts.
   private _phChildContainers: Map<string, PIXI.Container> = new Map() // phName → images + child spines
   private _mixDurations = new Map<number, number>() // track → crossfade seconds
+  private _boneOverrides = new Map<string, Partial<BoneLocalTransform>>()
 
   // ── Runtime hooks ──────────────────────────────────────────────────────────
 
   abstract load(fileSet: FileSet): Promise<void>
   abstract setSkin(name: string): void
   abstract setSkins(names: string[]): void
+  /** `Physics.pose` of the subclass runtime. */
+  protected abstract readonly _physicsPose: number
   abstract setToSetupPose(): void
   abstract setBonesToSetupPose(): void
   abstract setSlotsToSetupPose(): void
@@ -99,7 +117,8 @@ export abstract class BasePixi8Adapter<TSpine extends Pixi8SpineLike> implements
   abstract getAllAttachments(): AttachmentInfo[]
   abstract getSlotBounds(slotName: string): SlotBounds | null
   abstract getFreeBones(): string[]
-  abstract setBoneLocalTransform(boneName: string, transform: Partial<BoneLocalTransform>): void
+  abstract getBoneLocalTransforms(): BoneLocalState[]
+  abstract toSpineJson(): { json: object; warnings: string[] }
   abstract getBoneSetupTransform(boneName: string): BoneLocalTransform | null
 
   /** Current entry of `track`, or null when the track is empty or nothing is loaded. */
@@ -108,6 +127,8 @@ export abstract class BasePixi8Adapter<TSpine extends Pixi8SpineLike> implements
   protected abstract _labelPose(boneName: string): Pixi8LabelPose | null
   /** Alpha of the slot label for `slotName` (1 when the slot does not exist). */
   protected abstract _slotAlpha(slotName: string): number
+  /** Unconstrained local pose of a live bone: the bone on 4.2, `bone.pose` on 4.3. */
+  protected abstract _poseOf(boneName: string): BoneLike | null
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -139,6 +160,7 @@ export abstract class BasePixi8Adapter<TSpine extends Pixi8SpineLike> implements
     this._container = stage
     stage.addChild(this._spine)
     this._nameSlotContainers()
+    this._poseNow()
   }
 
   private _nameSlotContainers(): void {
@@ -166,6 +188,7 @@ export abstract class BasePixi8Adapter<TSpine extends Pixi8SpineLike> implements
     this._phSlotContainers.clear()
     this._phChildContainers.clear()
     this._mixDurations.clear()
+    this._boneOverrides.clear()
     this.clearPlaceholderLabels()
     for (const tex of this._phTextures.values()) tex.destroy(true)
     this._phTextures.clear()
@@ -244,7 +267,45 @@ export abstract class BasePixi8Adapter<TSpine extends Pixi8SpineLike> implements
 
   seekTo(track: number, time: number): void {
     const entry = this._trackEntry(track)
-    if (entry) entry.trackTime = time
+    if (!entry) return
+    entry.trackTime = time
+    this._poseNow()
+  }
+
+  // ── Bone overrides ─────────────────────────────────────────────────────────
+
+  setBoneOverride(boneName: string, transform: Partial<BoneLocalTransform> | null): void {
+    const pose = this._poseOf(boneName)
+    const setup = this.getBoneSetupTransform(boneName)
+    if (!pose || !setup) return
+    const released = mergeOverride(this._boneOverrides, boneName, transform)
+    writeLocal(pose, pickLocal(setup, released))
+    writeLocal(pose, this._boneOverrides.get(boneName) ?? {})
+    this._poseNow()
+  }
+
+  getBoneOverrides(): BoneOverrides { return overridesToRecord(this._boneOverrides) }
+
+  /**
+   * Poses now instead of on the next tick (the Spine ticker can run after the app renders): state, overrides,
+   * world transforms. Physics.pose, not update(0): a zero-time physics step clamps and swallows inertia.
+   */
+  // ponytail: drives Spine internals (private in the typings), re-check _updateAndApplyState on every spine-pixi-v8 upgrade
+  protected _poseNow(): void {
+    if (!this._spine) return
+    const s = this._spine as unknown as Pixi8SpineInternals
+    s.state.apply(s.skeleton)
+    s.beforeUpdateWorldTransforms(s)
+    s.skeleton.updateWorldTransform(this._physicsPose)
+    s.afterUpdateWorldTransforms(s)
+    s.updateSlotObjects()
+    s._stateChanged = true
+    s.onViewUpdate()
+  }
+
+  /** `Spine.beforeUpdateWorldTransforms`: after state.apply, before constraints and physics. */
+  protected _beforeWorld(): void {
+    if (this._boneOverrides.size) applyOverrides(this._boneOverrides, n => this._poseOf(n))
   }
 
   // ── Live data ──────────────────────────────────────────────────────────────

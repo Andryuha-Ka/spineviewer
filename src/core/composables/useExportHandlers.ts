@@ -10,6 +10,9 @@ import type { Ref } from 'vue'
 import { useExportStore } from '@/core/stores/useExportStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useViewerStore } from '@/core/stores/useViewerStore'
+import { useSkeletonEditStore } from '@/core/stores/useSkeletonEditStore'
+import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
+import { SvpError } from '@/core/api/svpErrors'
 import { downloadBlob, downloadJson, canvasToBlob, buildSpriteSheet, withBackground } from '@/core/utils/exportUtils'
 import type PreviewStage from '@/components/stage/PreviewStage.vue'
 
@@ -23,12 +26,13 @@ interface GIFInstance {
 }
 
 export function useExportHandlers(
-  stageRef: Ref<InstanceType<typeof PreviewStage> | null>
+  stageRef: Ref<InstanceType<typeof PreviewStage> | null> = ref(null),
 ): {
   onCapturePng:   () => Promise<void>
   onCapturePose:  () => Promise<void>
   onCaptureSheet: (opts: { track: number; frameCount: number; cols: number }) => Promise<void>
   onCaptureGif:   (opts: { track: number; fps: number; quality: number }) => Promise<void>
+  onExportSkeleton: () => Promise<void>
   onCancelExport: () => void
 } {
   const exportStore    = useExportStore()
@@ -65,6 +69,23 @@ export function useExportHandlers(
       downloadJson({ bones, timestamp: Date.now() }, 'spine-pose.json')
     } catch (e) {
       exportStore.fail(e instanceof Error ? e.message : 'Failed to export pose')
+      return
+    }
+    exportStore.finish()
+  }
+
+  async function onExportSkeleton() {
+    const slotId = useSlotSelectionStore().activeSlotId
+    if (!slotId) return
+    const signal = exportStore.start('skeleton')
+    try {
+      const { blob, name } = await useSkeletonEditStore().exportSkeleton(slotId, 'zip', signal)
+      exportStore.setProgress(100)
+      downloadBlob(blob, name)
+    } catch (e) {
+      if (signal.aborted) { exportStore.finish(); return }
+      const reason = e instanceof SvpError ? e.message.slice(e.code.length + 2) : e instanceof Error ? e.message : String(e)
+      exportStore.fail(`Export failed: ${reason}`)
       return
     }
     exportStore.finish()
@@ -157,5 +178,5 @@ export function useExportHandlers(
     exportStore.finish()
   }
 
-  return { onCapturePng, onCapturePose, onCaptureSheet, onCaptureGif, onCancelExport }
+  return { onCapturePng, onCapturePose, onCaptureSheet, onCaptureGif, onExportSkeleton, onCancelExport }
 }

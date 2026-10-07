@@ -50,3 +50,63 @@ describe('skeleton store composerMode', () => {
     expect(store.composerMode).toBe(false)
   })
 })
+
+describe('skeleton store bone overrides', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  function attached() {
+    const store = useSkeletonStore()
+    const adapter = makeFakeAdapter()
+    store.populateFrom(adapter)
+    return { store, adapter }
+  }
+
+  it('sets an override through the adapter and mirrors it', () => {
+    const { store, adapter } = attached()
+    store.setBoneOverride('arm', { rotation: 30 })
+    expect(adapter.setBoneOverride).toHaveBeenCalledWith('arm', { rotation: 30 })
+    expect(store.boneOverrides).toEqual({ arm: { rotation: 30 } })
+  })
+
+  it('merges fields per bone', () => {
+    const { store } = attached()
+    store.setBoneOverride('arm', { rotation: 30 })
+    store.setBoneOverride('arm', { x: 5 })
+    expect(store.boneOverrides).toEqual({ arm: { rotation: 30, x: 5 } })
+  })
+
+  it('releases listed fields and keeps the others held', () => {
+    const { store, adapter } = attached()
+    store.setBoneOverride('arm', { rotation: 30, x: 5 })
+    store.releaseBoneOverride('arm', ['rotation'])
+    expect(adapter.setBoneOverride).toHaveBeenCalledWith('arm', null)
+    expect(store.boneOverrides).toEqual({ arm: { x: 5 } })
+  })
+
+  it('releases the whole bone without props, or with null', () => {
+    const { store } = attached()
+    store.setBoneOverride('arm', { rotation: 30 })
+    store.setBoneOverride('leg', { y: 1 })
+    store.releaseBoneOverride('arm')
+    expect(store.boneOverrides).toEqual({ leg: { y: 1 } })
+    store.setBoneOverride('leg', null)
+    expect(store.boneOverrides).toEqual({})
+  })
+
+  it('clear empties the mirror only; reattaching restores it from the adapter', () => {
+    const { store, adapter } = attached()
+    store.setBoneOverride('arm', { rotation: 30 })
+    store.clear()
+    expect(store.boneOverrides).toEqual({})
+    expect(adapter.getBoneOverrides()).toEqual({ arm: { rotation: 30 } })
+    store.attachAdapter(adapter)
+    expect(store.boneOverrides).toEqual({ arm: { rotation: 30 } })
+  })
+
+  it('mirror is a copy, not the adapter map', () => {
+    const { store, adapter } = attached()
+    store.setBoneOverride('arm', { rotation: 30 })
+    store.boneOverrides.arm.rotation = 1
+    expect(adapter.getBoneOverrides()).toEqual({ arm: { rotation: 30 } })
+  })
+})

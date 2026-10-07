@@ -7,7 +7,7 @@
  */
 
 import { defineStore } from 'pinia'
-import type { PHImageEntry, PHChildEntry, PHSpineEntry } from '@/core/types/FileSet'
+import type { FileSet, PHImageEntry, PHChildEntry, PHSpineEntry } from '@/core/types/FileSet'
 import { readFileAsDataURL } from '@/core/utils/fileLoader'
 import { withoutFileSets } from '@/core/utils/slotState'
 
@@ -140,6 +140,15 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     addSpineChild(slotId, phName, { ...src, imageId: crypto.randomUUID(), childSlotId: newChildSlotId, posX: 0, posY: 0, syncEnabled: false }, idx)
   }
 
+  /** An edit replaced the child slot's skeleton: keep the entry's FileSet copy in step. */
+  function setSpineChildFileSet(childSlotId: string, fileSet: FileSet): void {
+    for (const phMap of Object.values(children.value)) {
+      for (const entries of Object.values(phMap)) {
+        for (const e of entries) if (e.kind === 'spine' && e.childSlotId === childSlotId) e.fileSet = fileSet
+      }
+    }
+  }
+
   function getChildContext(imageId: string): { slotId: string; phName: string; entry: PHChildEntry } | null {
     for (const [slotId, phMap] of Object.entries(children.value)) {
       for (const [phName, entries] of Object.entries(phMap)) {
@@ -220,6 +229,7 @@ export const usePlaceholderImagesStore = defineStore('placeholder-images', () =>
     moveChild,
     cloneImage,
     cloneSpineChild,
+    setSpineChildFileSet,
     clearSlotImages,
     setSlotImages,
     reset,

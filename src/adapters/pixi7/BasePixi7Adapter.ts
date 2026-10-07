@@ -9,10 +9,14 @@
 import * as PIXI from 'pixi.js'
 import { buildImageResolver, waitForPixi7Textures } from '@/core/utils/buildImageResolver'
 import { applyEntryMixDuration } from '@/core/utils/slotState'
+import { dialectOf, serializeSkeletonData, type SpineJsonDialect } from '@/core/spineJson/serializeSkeletonData'
+import {
+  applyOverrides, mergeOverride, overridesToRecord, pickLocal, readApplied, readLocal, setupOf, worldShear, writeLocal,
+} from '@/core/utils/boneTransform'
 import type {
   ISpineAdapter, BoneInfo, SlotInfo, EventInfo,
-  TrackState, TrackQueueEntry, BoneTransform, BoneLocalTransform, AttachmentInfo, SpineEvent,
-  AnimationEventMarker, SlotBounds, TrackMixOptions,
+  TrackState, TrackQueueEntry, BoneTransform, BoneLocalTransform, BoneLocalState, BoneOverrides,
+  AttachmentInfo, SpineEvent, AnimationEventMarker, SlotBounds, TrackMixOptions,
 } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
 
@@ -57,6 +61,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
   // Marked __phSpine so findDeepestTarget never descends into them.
   private _phChildContainers: Map<string, PIXI.Container> = new Map() // phName → Container
   private _mixDurations = new Map<number, number>() // track → crossfade seconds
+  private _boneOverrides = new Map<string, Partial<BoneLocalTransform>>()
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
@@ -95,6 +100,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     // 4. Create Spine display object
     this._skeletonData = skeletonData
     this._spine = new mod.Spine(skeletonData)
+    this._hookOverrides(this._spine.skeleton)
 
     // 5. Fill public metadata
     this.animations = skeletonData.animations.map((a: AnySpineModule) => a.name)
@@ -116,6 +122,20 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     }))
   }
 
+  // SpineBase.update has no hook between state.apply and the world update, so wrap the instance method.
+  // ponytail: instance monkey-patch, re-check SpineBase.update on every pixi-spine upgrade
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  protected _hookOverrides(skeleton: any): void {
+    const orig = skeleton.updateWorldTransform
+    skeleton.updateWorldTransform = (...args: unknown[]) => {
+      if (this._boneOverrides.size) applyOverrides(this._boneOverrides, n => skeleton.findBone(n))
+      return orig.apply(skeleton, args)
+    }
+  }
+
+  /** Zero-time update: reads see state, overrides and world transforms before the next render. */
+  protected _poseNow(): void { this._spine?.update(0) }
+
   // ── Mount ───────────────────────────────────────────────────────────────────
 
   mount(container: unknown): void {
@@ -124,6 +144,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     this._container = stage
     stage.addChild(this._spine)
     this._nameSlotContainers()
+    this._poseNow()
   }
 
   private _nameSlotContainers(): void {
@@ -152,6 +173,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     this._phImages.clear()
     this._phChildContainers.clear()
     this._mixDurations.clear()
+    this._boneOverrides.clear()
     this.clearPlaceholderLabels()
     if (this._container && this._spine) {
       this._container.removeChild(this._spine)
@@ -217,7 +239,9 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
 
   seekTo(track: number, time: number): void {
     const entry = this._spine?.state.getCurrent(track)
-    if (entry) entry.trackTime = time
+    if (!entry) return
+    entry.trackTime = time
+    this._poseNow()
   }
 
   // ── Skeleton ─────────────────────────────────────────────────────────────────
@@ -247,8 +271,16 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     }
   }
 
-  setToSetupPose(): void { this._spine?.skeleton.setToSetupPose() }
-  setBonesToSetupPose(): void { this._spine?.skeleton.setBonesToSetupPose() }
+  setToSetupPose(): void {
+    this._spine?.skeleton.setToSetupPose()
+    this._poseNow()
+  }
+
+  setBonesToSetupPose(): void {
+    this._spine?.skeleton.setBonesToSetupPose()
+    this._poseNow()
+  }
+
   setSlotsToSetupPose(): void { this._spine?.skeleton.setSlotsToSetupPose() }
 
   // ── Live data ───────────────────────────────────────────────────────────────
@@ -295,8 +327,16 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
         rotation: -Math.atan2(m.b, m.a) * 180 / Math.PI,
         scaleX: Math.hypot(m.a, m.b),
         scaleY: Math.hypot(m.c, m.d),
+        // pixi matrix b/c are spine c/b; flip the y row back to Y-up
+        shearY: worldShear(m.a, m.c, -m.b, -m.d),
       }
     })
+  }
+
+  getBoneLocalTransforms(): BoneLocalState[] {
+    if (!this._spine) return []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this._spine.skeleton.bones.map((b: any) => ({ name: b.data.name, local: readLocal(b), applied: readApplied(b) }))
   }
 
   getActiveAttachments(): AttachmentInfo[] {
@@ -467,22 +507,27 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     return this.bones.filter(b => !animated.has(b.name)).map(b => b.name)
   }
 
-  setBoneLocalTransform(boneName: string, transform: Partial<BoneLocalTransform>): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bone: any = this._spine?.skeleton.findBone(boneName)
+  setBoneOverride(boneName: string, transform: Partial<BoneLocalTransform> | null): void {
+    const bone = this._spine?.skeleton.findBone(boneName)
     if (!bone) return
-    if (transform.x        !== undefined) bone.x        = transform.x
-    if (transform.y        !== undefined) bone.y        = transform.y
-    if (transform.rotation !== undefined) bone.rotation = transform.rotation
-    if (transform.scaleX   !== undefined) bone.scaleX   = transform.scaleX
-    if (transform.scaleY   !== undefined) bone.scaleY   = transform.scaleY
+    const released = mergeOverride(this._boneOverrides, boneName, transform)
+    writeLocal(bone, pickLocal(setupOf(bone.data, false), released))
+    writeLocal(bone, this._boneOverrides.get(boneName) ?? {})
+    this._poseNow()
   }
+
+  getBoneOverrides(): BoneOverrides { return overridesToRecord(this._boneOverrides) }
 
   getBoneSetupTransform(boneName: string): BoneLocalTransform | null {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bd = (this._skeletonData?.bones as any[])?.find((b: any) => b.name === boneName)
-    if (!bd) return null
-    return { x: bd.x ?? 0, y: bd.y ?? 0, rotation: bd.rotation ?? 0, scaleX: bd.scaleX ?? 1, scaleY: bd.scaleY ?? 1 }
+    return bd ? setupOf(bd, false) : null
+  }
+
+  toSpineJson(): { json: object; warnings: string[] } {
+    const data = this._skeletonData
+    if (!data) throw new Error('No skeleton loaded')
+    return serializeSkeletonData(data, this.spineModule, dialectOf(data.version, this.detectedVersion as SpineJsonDialect))
   }
 
   // ── Placeholder labels ───────────────────────────────────────────────────────

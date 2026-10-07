@@ -1,0 +1,43 @@
+{
+  "name": "spine-viewer-pro-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Spine Viewer Pro: drive the viewer's window.svp API in a dedicated Chrome, load and export Spine skeletons from disk, and round-trip them through keyframe.it.",
+  "type": "module",
+  "bin": {
+    "svp-mcp": "dist/server.js"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.test.js",
+    "!dist/testFakes.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test dist/config.test.js dist/session.test.js dist/runner.test.js dist/tools.test.js",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "author": "Andrii Karpus <andryuha.ka@gmail.com>",
+  "license": "SEE LICENSE IN LICENSE",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "spine",
+    "pixi",
+    "skeletal-animation"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "fflate": "^0.8.3",
+    "playwright-core": "^1.63.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import * as runtime38 from '@pixi-spine/runtime-3.8'
 import * as runtime41 from '@pixi-spine/runtime-4.1'
 import { BasePixi7Adapter } from '@/adapters/pixi7/BasePixi7Adapter'
+import { loadFixtureAdapter, step, local, applied, world } from '../fixtureAdapters'
 
 interface FakeEntry {
   animation: { name: string; duration: number }
@@ -172,5 +173,119 @@ describe.each([['3.8', runtime38], ['4.1', runtime41]] as const)('BasePixi7Adapt
     step(state)
     step(state)
     expect(state.getCurrent(0).trackTime).toBeGreaterThan(0.2)
+  })
+})
+
+describe('BasePixi7Adapter override hook (fake skeleton)', () => {
+  it('writes overrides after state.apply and before the original world update, at once and on every update', () => {
+    const log: string[] = []
+    const bone = { data: { x: 0, y: 0, rotation: 5, scaleX: 1, scaleY: 1, shearX: 0, shearY: 0 }, x: 0, y: 0, rotation: 5, scaleX: 1, scaleY: 1, shearX: 0, shearY: 0 }
+    const skeleton = {
+      findBone: (n: string) => (n === 'c' ? bone : null),
+      updateWorldTransform() { log.push(`world:${bone.rotation}`) },
+    }
+    const state = { apply() { bone.rotation = 20; log.push('apply') } }
+    const a = new TestAdapter(state)
+    // SpineBase.update: state.apply(skeleton) then skeleton.updateWorldTransform()
+    const update = () => { state.apply(); skeleton.updateWorldTransform() }
+    ;(a as unknown as { _spine: unknown })._spine = { state, skeleton, update, destroy() {} }
+    ;(a as unknown as { _hookOverrides(s: unknown): void })._hookOverrides(skeleton)
+
+    a.setBoneOverride('c', { rotation: 45 })
+    expect(log).toEqual(['apply', 'world:45'])
+    a.setBoneOverride('nope', { rotation: 1 }) // unknown bone: ignored
+    expect(a.getBoneOverrides()).toEqual({ c: { rotation: 45 } })
+    log.length = 0
+    update()
+    expect(log).toEqual(['apply', 'world:45'])
+
+    log.length = 0
+    a.setBoneOverride('c', null)
+    expect(log).toEqual(['apply', 'world:20'])
+  })
+})
+
+describe.each(['3.8', '4.0', '4.1'] as const)('BasePixi7Adapter on the %s fixture', ver => {
+  it('reads local shear, applied pose after IK and world shear', async () => {
+    const a = await loadFixtureAdapter(ver)
+    step(a, 0)
+    expect(local(a, 'c')).toEqual({ x: 40, y: 0, rotation: 5, scaleX: 1.2, scaleY: 1, shearX: 10, shearY: -5 })
+    expect(applied(a, 'c')).toEqual(local(a, 'c'))
+    // IK bends a and b away from their unconstrained rotation
+    expect(local(a, 'a').rotation).toBe(90)
+    expect(Math.abs(applied(a, 'a').rotation - 90)).toBeGreaterThan(1)
+    expect(world(a, 'c').shearY).toBeCloseTo(-15, 4)
+    expect(world(a, 'a').shearY).toBeCloseTo(0, 4)
+    expect(a.getBoneSetupTransform('c')).toEqual(local(a, 'c'))
+  })
+
+  it('holds an override over a keyed rotate, while paused and after setToSetupPose; release returns to setup', async () => {
+    const a = await loadFixtureAdapter(ver)
+    a.setAnimation(0, 'anim', true)
+    step(a, 0.6)
+    expect(local(a, 'c').rotation).toBeCloseTo(55, 4) // keyed: setup 5 + 50
+
+    a.setBoneOverride('c', { rotation: 45 })
+    a.setBoneOverride('c', { shearX: 3 })
+    expect(a.getBoneOverrides()).toEqual({ c: { rotation: 45, shearX: 3 } })
+    step(a, 0.1)
+    expect(local(a, 'c')).toMatchObject({ rotation: 45, shearX: 3 })
+    expect(local(a, 'c').x).not.toBe(40) // keyed translate still plays
+
+    a.setTimeScale(0)
+    a.setBoneOverride('c', { rotation: 30 })
+    step(a, 0.016)
+    expect(local(a, 'c').rotation).toBe(30)
+    const worldRot = world(a, 'c').rotation
+
+    // the override and the world transform are back before the next frame
+    a.setToSetupPose()
+    expect(local(a, 'c').rotation).toBe(30)
+    expect(world(a, 'c').rotation).toBeCloseTo(worldRot, 4)
+    a.setBonesToSetupPose()
+    expect(local(a, 'c').rotation).toBe(30)
+    step(a, 0)
+    expect(local(a, 'c').rotation).toBe(30)
+
+    a.clearTracks()
+    a.setBoneOverride('c', null)
+    expect(local(a, 'c')).toMatchObject({ rotation: 5, shearX: 10 })
+    step(a, 0.016)
+    expect(local(a, 'c')).toMatchObject({ rotation: 5, shearX: 10 })
+    expect(a.getBoneOverrides()).toEqual({})
+  })
+
+  // a reload mounts and replays a fresh adapter, then the app may render before the Spine ticker runs
+  it('is posed before its first tick: mount, replayed seek and override, then a setup-pose reset', async () => {
+    const a = await loadFixtureAdapter(ver)
+    const pose = () => a.getBoneTransforms().map(b => [b.name, b.x, b.y, b.rotation])
+    a.mount({ addChild() {}, removeChild() {} })
+    expect(world(a, 'c').x).not.toBe(0)
+    a.setAnimation(0, 'anim', true)
+    a.seekTo(0, 0.6)
+    a.setBoneOverride('c', { shearX: 3 })
+    expect(local(a, 'c')).toMatchObject({ rotation: expect.closeTo(55, 4), shearX: 3 })
+    const posed = pose()
+    step(a, 0)
+    expect(pose()).toEqual(posed)
+
+    a.setBoneOverride('c', { rotation: 33 })
+    a.clearTracks()
+    a.setToSetupPose()
+    expect(local(a, 'c')).toMatchObject({ rotation: 33, shearX: 3, x: 40 })
+    const reset = pose()
+    step(a, 0)
+    expect(pose()).toEqual(reset)
+  })
+
+  it('release on an unkeyed bone writes the setup value once', async () => {
+    const a = await loadFixtureAdapter(ver)
+    a.setBoneOverride('tail', { rotation: 70, x: 5 })
+    step(a, 0.016)
+    expect(local(a, 'tail')).toMatchObject({ rotation: 70, x: 5 })
+    a.setBoneOverride('tail', null)
+    a.setBoneOverride('tail', { x: 5 }) // partial release = release all, then set what stays
+    step(a, 0.016)
+    expect(local(a, 'tail')).toMatchObject({ rotation: 30, x: 5 })
   })
 })

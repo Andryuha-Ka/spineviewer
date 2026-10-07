@@ -11,6 +11,8 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - **Choose Files / Choose Folder** buttons in every browser — with the File System Access API (Chrome / Edge) the native picker opens and the files are kept for history auto-reload; without it a standard file or folder input opens
 - Automatic Spine version detection from `.json` / `.skel` headers (pre-release versions such as `4.3.75-beta` count as 4.3); a detected Spine 4.3 file selects Pixi 8 + Spine 4.3; a file of an unsupported version is marked with an error and **Open Viewer** stays disabled
 - Supports all attachment image formats: PNG, JPG, WebP, AVIF
+- **Zip archives** — a `.zip` (e.g. a keyframe.it or Spine export) is unpacked in the browser in every loading path (picker, folder, Spines drop zone, canvas, history, Compare "Load file…"); skeletons, atlases and images at any folder depth are picked up, other entries, `__MACOSX/`, hidden files and nested archives are ignored; the pending list shows `archive › file`
+- **Folder-aware grouping** — files from a folder pick, a dropped folder or a zip are grouped per directory first, so two subfolders with same-named files (e.g. `skeleton.atlas`, `skeleton.png`) never mix
 - Load **up to 30 skeletons** simultaneously and switch between them
 - **File history sidebar** — last 20 sessions shown on the picker page
   - One-click auto-reload (Chrome/Edge): files reopen without a picker dialog
@@ -80,9 +82,16 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 - **Bone hierarchy** — live x, y, rotation, scale values; expandable tree; search
 - **Active Attachments** — slot names, attachment types (region / mesh / mask / path), vertex counts, blend mode badges
 - **Sliders** (Spine 4.3) — every slider constraint with its live time and mix
+- **Selected bone details** — local (before constraints), applied (after constraints) and world values, shear included, for the bone selected in the tree
 
 ### Bones tab
-- Shown when the skeleton has free bones or slider constraints
+- Shown for every loaded skeleton
+- **Bone editor** for any bone — pick it here (name filter) or in the Insp tab; X, Y, Rotation, Scale X/Y, Shear X/Y show the live local values and **hold an override** on top of the animation when edited (● marks held fields); overrides win every frame, also while paused and after Clear All, are kept per skeleton (slot switch, pin, clone, Compare and back) and are lost on page reload
+- **Release** a field or the bone — keyed bones return to the animation, unkeyed fields to the setup pose
+- **Apply to setup pose** — writes the held values (or the current pose of a bone without an override) into the skeleton's setup pose; playback continues at the same time with the same tracks, skins, placeholders and child spines
+- **Key at current time** — keys the bone into the current track's animation at its current time; **New animation** creates an empty one; durations update in the Anim pickers
+- **Undo / Redo** (last 20 data edits per skeleton) and **Revert skeleton** (back to the loaded file, undoable; overrides stay)
+- **★ Edited** mark in this tab and in the Spines list while the data differs from the loaded file; the tooltip says when the changes are not exported yet; leaving the viewer or Compare, removing a child spine or reloading the page asks before unsaved edits or overrides are lost
 - **Free bones** — bones no animation keys; move and rotate them on stage (on Spine 4.3, bones driven by a slider do not count as free)
 - **Sliders** (Spine 4.3) — live **Time** and **Mix** inputs per slider constraint and a ↺ reset to the setup values; edits are not saved and are dropped when you switch skeletons
 
@@ -117,6 +126,7 @@ Browser-based viewer for [Spine](http://esotericsoftware.com/) skeletal animatio
 | **Pose JSON** | Every bone's world x, y, rotation, scaleX and scaleY (Spine's Y-up convention) plus a timestamp |
 | **Sprite Sheet** | N-frame grid as a single PNG, same content as PNG |
 | **GIF** | Animated GIF with configurable FPS and quality, always on the background colour |
+| **Skeleton (.zip)** | "Export Spine JSON (.zip)" — the (edited) skeleton as Spine JSON in its own version plus the source atlas and page images, ready to load again or import into keyframe.it; binary `.skel` skeletons are converted (warnings listed); exporting clears the "not exported" state, the ★ stays |
 
 - **Scale 1× / 2× / 4×** — PNG, sprite sheet and GIF are rendered at that resolution (not upscaled); a too large result is reduced to the biggest scale the GPU or memory allows, and the Export tab says so
 - **Background colour** — PNG and sprite sheet are transparent unless this is ticked
@@ -222,7 +232,7 @@ CI runs lint, tests and the build on every push to `master` before deploying.
 3. The app auto-detects the Spine version and selects the matching runtime.
 4. Click **Open Viewer**.
 5. Use the **Anim** tab to select animations and control playback.
-6. Explore the other tabs: **Spines**, **Insp**, **Bones** (when the skeleton has free bones or sliders), **Atlas**, **Perf**, **Compl**, **Export**.
+6. Explore the other tabs: **Spines**, **Insp**, **Bones**, **Atlas**, **Perf**, **Compl**, **Export**.
 
 ### Multi-Spine Workflow
 When you drop multiple Spine skeletons, all are loaded into slots. Open the **Spines** tab in the viewer and click any entry to switch. The scene pan and zoom are shared; each skeleton's own offsets (when its sync is off), animation, skin, placeholder and playback state are saved independently.
@@ -236,7 +246,38 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 
 ---
 
+## Scripting & MCP
+
+The viewer exposes a JavaScript API as `window.svp` on every page, for the DevTools console, scripts and AI agents. `svp.help()` lists every method with its arguments; `svp.info()` reports the API and app versions.
+
+- **Session** — `load` (files as text, base64 or zip, optional relative `path`), `reset`, `listSlots`, `selectSlot`, `getSkeleton`
+- **Playback & skins** — `setAnimation`, `addAnimation`, `clearTrack(s)`, `seek`, `play`, `pause`, `setSpeed`, `setTrackOptions`, `getTracks`, `setSkins`, `getSkins`
+- **Bones** — `getBones` (local, applied, world, setup, override), `setBoneOverride`, `applyPose`, `releaseOverride`, `getOverrides`
+- **Editing** — `setSetupPose`, `applyOverridesToSetupPose`, `createAnimation`, `getKeys`, `setKey`, `deleteKey`, `setKeyEasing`, `keyCurrentPose`, `buildAnimation`, `undo`, `redo`, `getEditState`, `revertToSource`
+- **Export** — `capturePng`, `getPose`, `exportSkeleton` (zip or JSON)
+
+Every call returns a Promise, calls run one at a time, and failures reject with an `SvpError` carrying a `code` (`NOT_IN_VIEWER`, `NO_SKELETON`, `NOT_FOUND`, `INVALID_ARGUMENT`, …). Units: skeleton units, degrees counter-clockwise, seconds, y up; bone values are local to the parent bone.
+
+```js
+await svp.setAnimation({ animation: 'walk', loop: true })
+await svp.applyPose({ bones: { head: { rotation: 20 } } })
+const { artifact } = await svp.exportSkeleton({ format: 'zip' })
+```
+
+**MCP server** — `mcp/` holds `spine-viewer-pro-mcp` (command `svp-mcp`), a stdio MCP server that opens the viewer in its own Chrome and exposes the API as tools: load skeletons from disk, play, pose and key bones, capture frames, export edited skeletons to disk and move skeletons to and from [keyframe.it](https://www.keyframe.it.com/). Setup, client configuration and the tool list: [`mcp/README.md`](mcp/README.md).
+
+---
+
 ## Changelog
+
+### v1.3.21
+
+- **Viewer API** — scripts, the DevTools console and AI agents drive the viewer through `window.svp`: load files, play, pose and key bones, edit, export (`svp.help()` lists every method)
+- **MCP server** — `svp-mcp` (`mcp/`) opens the viewer in its own Chrome and exposes the API as MCP tools, including loading from and exporting to disk and a round trip to keyframe.it
+- **Bone overrides on any bone** — the Bones tab is always shown; X, Y, Rotation, Scale and Shear hold a live override on top of the animation, kept per skeleton; the Insp tab shows local, applied and world values of the selected bone
+- **Setup pose, keys and undo** — Apply to setup pose, Key at current time, New animation, Undo / Redo (20 steps) and Revert skeleton; edited skeletons show ★ and leaving asks before unsaved edits or overrides are lost
+- **Zip in and out** — `.zip` archives load in every picking path, and files are grouped per folder so same-named files in different folders never mix
+- **Spine JSON export** — Export tab → Skeleton: `<name>.zip` with the (edited) skeleton as Spine JSON plus atlas and pages; binary `.skel` skeletons are converted
 
 ### v1.3.20
 
@@ -387,6 +428,8 @@ When you drop multiple Spine skeletons, all are loaded into slots. Open the **Sp
 src/
 ├── core/                   # Version-agnostic shared code
 │   ├── AdapterFactory.ts   # Lazy creation of Pixi app + Spine adapter per version combo
+│   ├── api/                # window.svp facade, SvpError, stage command registry
+│   ├── spineJson/          # Pure Spine JSON edits and the .skel → JSON serializer
 │   ├── types/              # ISpineAdapter, IPixiApp, IProgressOverlay, FileSet
 │   ├── stores/             # Pinia stores (slots, animation, placeholders, compare, …)
 │   ├── composables/        # Viewer/picker logic; stage/ holds PreviewStage composables
@@ -401,6 +444,7 @@ src/
     ├── panels/             # Side panel tabs (Spines, Anim, Insp, Bones, Atlas, Perf, Compl, Export)
     ├── compare/            # Compare mode page, canvases, diff panel
     └── ui/                 # Help modal, settings popover
+mcp/                        # spine-viewer-pro-mcp: separate Node package (MCP server), not part of the app build
 ```
 
 ---
@@ -415,6 +459,7 @@ src/
 - **@pixi-spine** (3.8 / 4.0 / 4.1) — Spine runtimes for Pixi 7
 - **@esotericsoftware/spine-pixi-v8** — official Spine runtimes for Pixi 8: 4.2, and 4.3 (4.3.13, installed as the `spine-pixi-v8-43` alias)
 - **gif.js** — GIF export via Web Worker
+- **fflate** — zip in / out, loaded on first use
 
 ---
 

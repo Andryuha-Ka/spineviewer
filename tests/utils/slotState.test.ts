@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { applyEntryMixDuration, applySavedTrackMix, buildSlotSavedState, playlistPosition, playlistsOf, queueTrackList, rearmListLoops, replaySavedTracks, shouldAutoStop, trackMixOf, trackTimesOf } from '@/core/utils/slotState'
+import { applyEntryMixDuration, applySavedBoneOverrides, applySavedTrackMix, buildSlotSavedState, playlistPosition, playlistsOf, queueTrackList, rearmListLoops, replaySavedTracks, shouldAutoStop, trackMixOf, trackTimesOf } from '@/core/utils/slotState'
 import { makeFakeAdapter, track, withSpine43 } from '../helpers/fakeAdapter'
 import type { TrackMixOptions, TrackState } from '@/core/types/ISpineAdapter'
 import type { FileSet, PHSpineEntry } from '@/core/types/FileSet'
@@ -118,7 +118,7 @@ describe('slotState', () => {
   })
 
   it('replays enabled tracks with their queues and saved times', () => {
-    const adapter = { animations: ['run', 'stop', 'blink'], setAnimation: vi.fn(), addAnimation: vi.fn(), seekTo: vi.fn(), setTrackMixOptions: vi.fn() }
+    const adapter = { animations: ['run', 'stop', 'blink'], bones: [], setAnimation: vi.fn(), addAnimation: vi.fn(), seekTo: vi.fn(), setTrackMixOptions: vi.fn(), setBoneOverride: vi.fn() }
     replaySavedTracks(adapter, {
       trackPlaylists: { 0: [{ animationName: 'run', loop: true }, { animationName: 'stop', loop: false }], 1: [{ animationName: 'blink', loop: true }], 2: [] },
       trackEnabled: { 1: false },
@@ -257,5 +257,35 @@ describe('applyEntryMixDuration', () => {
     const e = { mixDuration: 0, delay: 0.7 }
     applyEntryMixDuration(e, 0.4, false)
     expect(e.delay).toBe(0.7)
+  })
+})
+
+describe('slotState bone overrides', () => {
+  const input = (boneOverrides?: Record<string, object>) => ({
+    playback, activeSkins: [], showPlaceholders: true, disabledPlaceholders: [], boneOverrides,
+  })
+
+  it('saves a deep copy of held overrides and omits an empty map', () => {
+    const held = { arm: { rotation: 30 } }
+    const ss = buildSlotSavedState(input(held))
+    held.arm.rotation = 99
+    expect(ss.boneOverrides).toEqual({ arm: { rotation: 30 } })
+    expect(buildSlotSavedState(input({})).boneOverrides).toBeUndefined()
+    expect(buildSlotSavedState(input()).boneOverrides).toBeUndefined()
+  })
+
+  it('replays saved overrides and skips bones the skeleton lacks', () => {
+    const adapter = makeFakeAdapter()
+    Object.assign(adapter, { bones: [{ name: 'arm', parent: null }] })
+    applySavedBoneOverrides(adapter, { boneOverrides: { arm: { rotation: 30, x: 2 }, gone: { y: 1 } } })
+    expect(adapter.setBoneOverride.mock.calls).toEqual([['arm', { rotation: 30, x: 2 }]])
+    expect(adapter.getBoneOverrides()).toEqual({ arm: { rotation: 30, x: 2 } })
+  })
+
+  it('replaySavedTracks replays overrides too', () => {
+    const adapter = makeFakeAdapter()
+    Object.assign(adapter, { bones: [{ name: 'arm', parent: null }] })
+    replaySavedTracks(adapter, { trackPlaylists: {}, trackEnabled: {}, boneOverrides: { arm: { scaleX: 2 } } })
+    expect(adapter.getBoneOverrides()).toEqual({ arm: { scaleX: 2 } })
   })
 })

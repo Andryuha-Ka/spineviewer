@@ -5,9 +5,11 @@ import type { PHImageEntry, PHSpineEntry, SpineSlot, SpineSlotSavedState } from 
 
 const created: ReturnType<typeof makeFakeAdapter>[] = []
 let spine43 = false
+let bones: Array<{ name: string; parent: string | null }> = []
 vi.mock('@/core/AdapterFactory', () => ({
   createSpineAdapter: vi.fn(async () => {
     const a = spine43 ? withSpine43(makeFakeAdapter()) : makeFakeAdapter()
+    Object.assign(a, { bones })
     created.push(a)
     return a
   }),
@@ -44,6 +46,7 @@ describe('useChildAdapters', () => {
     setActivePinia(createPinia())
     created.length = 0
     spine43 = false
+    bones = []
     useVersionStore().selectVersion(8, '4.2')
     const slots: SpineSlot[] = [
       { id: 'parent', name: 'p', fileSet: FILESET },
@@ -69,7 +72,41 @@ describe('useChildAdapters', () => {
     expect(child.addAnimation.mock.calls).toEqual([[0, 'win', false]])
     expect(child.seekTo.mock.calls).toEqual([[0, 0.4]])
     expect(child.setSkins).toHaveBeenCalledWith(['gold'])
+    // skins before the seek that poses the first frame
+    expect(child.setSkins.mock.invocationCallOrder[0]).toBeLessThan(child.seekTo.mock.invocationCallOrder[0])
     expect(child.setTimeScale).toHaveBeenLastCalledWith(2)
+  })
+
+  it('replays saved bone overrides on mount, skipping unknown bones (2.6)', async () => {
+    bones = [{ name: 'arm', parent: null }]
+    useFileLoaderStore().saveSlotState('child', saved({ boneOverrides: { arm: { rotation: 12 }, gone: { x: 1 } } }))
+    await useChildAdapters().mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    expect(created[0].getBoneOverrides()).toEqual({ arm: { rotation: 12 } })
+  })
+
+  it('snapshots the child overrides before destroying it (2.8)', async () => {
+    const children = useChildAdapters()
+    await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    created[0].setBoneOverride('arm', { x: 3 })
+    children.destroyChildAdapter('e1')
+    expect(useFileLoaderStore().spineSlots.find(s => s.id === 'child')!.savedState?.boneOverrides).toEqual({ arm: { x: 3 } })
+  })
+
+  it('destroyAll snapshots every child before destroying it (viewer → compare)', async () => {
+    useFileLoaderStore().addSlot({ id: 'child2', name: 'c2', fileSet: FILESET, parentSlotId: 'parent' })
+    const children = useChildAdapters()
+    await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e1', 'child'))
+    await children.mountChildAdapter(makeFakeAdapter(), 'parent', 'p', entry('e2', 'child2'))
+    const [c1, c2] = created
+    c1.tracks = [track(0, 'idle', 0.4)]
+    c2.setBoneOverride('arm', { y: 2 })
+    children.destroyAll()
+    const ss = (id: string) => useFileLoaderStore().spineSlots.find(s => s.id === id)!.savedState
+    expect(ss('child')?.trackTimes).toEqual({ 0: 0.4 })
+    expect(ss('child2')?.boneOverrides).toEqual({ arm: { y: 2 } })
+    expect(c1.destroy).toHaveBeenCalled()
+    expect(c2.destroy).toHaveBeenCalled()
+    expect(children.childAdapters.size).toBe(0)
   })
 
   it('creates the child adapter for the child slot FileSet (C37)', async () => {

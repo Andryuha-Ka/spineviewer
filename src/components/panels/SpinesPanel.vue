@@ -86,6 +86,11 @@
           <span v-if="slot.parentSlotId" class="spine-child-prefix">↳</span>
           <span class="spine-name">{{ slot.name }}</span>
           <span
+            v-if="editStore.isEdited(slot.id)"
+            class="spine-edited-mark"
+            :title="editStore.isUnsaved(slot.id) ? 'Skeleton data edited — export to keep changes' : 'Skeleton data edited'"
+          >★</span>
+          <span
             v-if="isModified(slot) && !isSlotError(slot)"
             class="spine-modified-dot"
             :title="modifiedHint(slot)"
@@ -253,6 +258,7 @@ import type { SpineSlot } from '@/core/types/FileSet'
 import { buildSlotSavedState, trackTimesOf } from '@/core/utils/slotState'
 import { usePlaceholderActions, SPINE_SLOT_MIME, PH_IMAGE_MIME, PH_SPINE_MIME, IMAGE_LAYER_MIME, type PlaceholderChildRef } from '@/core/composables/usePlaceholderActions'
 import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
+import { useSkeletonEditStore } from '@/core/stores/useSkeletonEditStore'
 
 const fileLoaderStore    = useFileLoaderStore()
 const slotSelectionStore = useSlotSelectionStore()
@@ -264,6 +270,7 @@ const phImagesStore   = usePlaceholderImagesStore()
 const versionStore    = useVersionStore()
 const layersStore     = useImageLayersStore()
 const actions         = usePlaceholderActions()
+const editStore       = useSkeletonEditStore()
 
 // ── Placeholder image activation ────────────────────────────────────────────
 const pendingImageToActivate = ref<string | null>(null)
@@ -387,6 +394,7 @@ function onClone(id: string) {
       disabledPlaceholders: viewerStore.disabledPlaceholders,
       slot:                 src,
       trackTimes:           trackTimesOf(animationStore.tracks),
+      boneOverrides:        skeletonStore.boneOverrides,
     }))
   }
 
@@ -458,7 +466,7 @@ async function onDropzoneFiles(e: DragEvent) {
 async function handleDroppedFiles(files: File[]): Promise<void> {
   if (files.length === 0) return
 
-  const spineExts  = /\.(json|skel|atlas)$/i
+  const spineExts  = /\.(json|skel|atlas|zip)$/i
   const hasImages  = files.some(f => isImageDropFileName(f.name))
   const hasSpine   = files.some(f => spineExts.test(f.name))
 
@@ -706,6 +714,12 @@ function modifiedHint(slot: SpineSlot): string {
 
 .spine-item--active .spine-name {
   color: var(--c-text);
+}
+
+.spine-edited-mark {
+  font-size: 0.75rem;
+  color: var(--c-warning);
+  flex-shrink: 0;
 }
 
 /* Modified indicator — small amber dot on the right */

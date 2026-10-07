@@ -72,8 +72,8 @@
           <n-tab-pane name="inspector" tab="Insp" class="tab-pane">
             <SkeletonPanel />
           </n-tab-pane>
-          <n-tab-pane v-if="skeletonStore.freeBones.length > 0 || skeletonStore.sliders.length > 0" name="bones" tab="Bones" class="tab-pane">
-            <FreeBonePanel />
+          <n-tab-pane v-if="hasSkeleton" name="bones" tab="Bones" class="tab-pane">
+            <FreeBonePanel @set-animation="onSetAnimation" />
           </n-tab-pane>
           <n-tab-pane name="atlas" tab="Atlas" class="tab-pane">
             <AtlasInspector />
@@ -136,9 +136,9 @@ import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { useSlotUIStore } from '@/core/stores/useSlotUIStore'
 import { useExportStore } from '@/core/stores/useExportStore'
 import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
-import { groupSpineFiles, readFileAsDataURL } from '@/core/utils/fileLoader'
-import { validateSpineFileSet } from '@/core/utils/spineValidator'
-import { runtimeSpineVersion, spineVersionProblem } from '@/core/utils/versionDetector'
+import { useSkeletonEditStore } from '@/core/stores/useSkeletonEditStore'
+import { readFileAsDataURL } from '@/core/utils/fileLoader'
+import { runtimeSpineVersion } from '@/core/utils/versionDetector'
 import type { TrackMixOptions } from '@/core/types/ISpineAdapter'
 
 const emit = defineEmits<{
@@ -154,6 +154,7 @@ const slotSelectionStore = useSlotSelectionStore()
 const slotUIStore        = useSlotUIStore()
 const exportStore      = useExportStore()
 const layersStore      = useImageLayersStore()
+const editStore        = useSkeletonEditStore()
 const stageRef         = ref<InstanceType<typeof PreviewStage> | null>(null)
 const activeSpineVersion = computed(() => {
   const fileSet = slotSelectionStore.activeSlot?.fileSet
@@ -171,12 +172,23 @@ watch(() => animationStore.tracks.length, (newLen, oldLen) => {
   }
 })
 
+// slot-based, so the tab survives the store clear of a slot switch or reload
+const hasSkeleton = computed(() => {
+  const slot = slotSelectionStore.activeSlot
+  return !!slot?.fileSet && !slot.error && !slot.validationErrors?.length
+})
+watch(hasSkeleton, has => { if (!has && activeTab.value === 'bones') activeTab.value = 'animation' })
+
 const { panelWidth, onResizeStart } = usePanelResize()
 useViewerKeyboard(stageRef)
 const { onCapturePng, onCapturePose, onCaptureSheet, onCaptureGif, onCancelExport } = useExportHandlers(stageRef)
 
 function onClickBack() {
-  if (!window.confirm('Reset viewer and return to version picker?')) return
+  const unsaved = editStore.unsavedWorkSummary()
+  const text = unsaved.length > 0
+    ? `Reset viewer and return to version picker? Unsaved work will be lost: ${unsaved.join(', ')}.`
+    : 'Reset viewer and return to version picker?'
+  if (!window.confirm(text)) return
   skeletonStore.clear()
   animationStore.reset()
   fileLoaderStore.clear()
@@ -189,7 +201,7 @@ async function onCanvasDrop(e: DragEvent) {
   if (files.length === 0) return
 
   const imageExts = /\.(png|jpe?g|webp|gif|avif)$/i
-  const spineExts = /\.(json|skel|atlas)$/i
+  const spineExts = /\.(json|skel|atlas|zip)$/i
   const hasImages = files.some(f => imageExts.test(f.name))
   const hasSpine  = files.some(f => spineExts.test(f.name))
 
@@ -202,23 +214,8 @@ async function onCanvasDrop(e: DragEvent) {
   }
 
   if (hasSpine) {
-    const result = await groupSpineFiles(files)
-    if (result.globalError) {
-      window.alert(result.globalError)
-      return
-    }
-    const added: string[] = []
-    for (const slot of result.slots) {
-      if (!slot.error && slot.fileSet) {
-        const errs = validateSpineFileSet(slot.fileSet)
-        const versionProblem = versionStore.spineVersion && spineVersionProblem(slot.fileSet, versionStore.spineVersion)
-        if (versionProblem) errs.push(versionProblem)
-        if (errs.length > 0) slot.validationErrors = errs
-      }
-      fileLoaderStore.addSlot(slot)
-      added.push(slot.id)
-    }
-    layersStore.placeOnTop(added.filter(id => fileLoaderStore.spineSlots.some(s => s.id === id)))
+    const result = await fileLoaderStore.addFileList(files)
+    if (result.error) window.alert(result.error)
   }
 }
 

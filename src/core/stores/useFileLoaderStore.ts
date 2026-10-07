@@ -7,11 +7,35 @@
  */
 
 import { defineStore } from 'pinia'
-import { guessFileType } from '@/core/utils/fileLoader'
+import { toRaw } from 'vue'
+import { expandZipFiles, groupSpineFiles } from '@/core/utils/fileLoader'
 import { withoutFileSets } from '@/core/utils/slotState'
-import type { FileSet, PHChildEntry, SpineFile, SpineFileType, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
+import { validateSpineFileSet } from '@/core/utils/spineValidator'
+import { KNOWN_VERSIONS, detectSpineVersion, detectSpineVersionFromSkel, spineVersionProblem, unsupportedVersionHint } from '@/core/utils/versionDetector'
+import { saveSession } from '@/core/utils/fileHistory'
+import type { FileSet, PHChildEntry, SpineFile, SpineSlot, SpineSlotEdit, SpineSlotSavedState } from '@/core/types/FileSet'
 import { useSlotSelectionStore } from './useSlotSelectionStore'
 import { usePlaceholderImagesStore } from './usePlaceholderImagesStore'
+import { useVersionStore, spineOptionsMap, type PixiVersion, type SpineVersion } from './useVersionStore'
+import { useImageLayersStore } from './useImageLayersStore'
+
+export interface LoadFileListResult {
+  slots: SpineSlot[]
+  version: string | null
+  error: string | null
+  versionUnknown: boolean
+  unsupportedHint: string | null
+  historySaved: boolean
+  /** Sets dropped because the slot limit was reached */
+  ignored: number
+}
+
+export interface AddFileListResult {
+  slots: SpineSlot[]
+  /** Sets dropped because the slot limit was reached */
+  ignored: number
+  error: string | null
+}
 
 function newSlotId(): string {
   return crypto.randomUUID()
@@ -39,10 +63,15 @@ function cloneFileSet(fs: FileSet): FileSet {
   }
 }
 
-interface PendingFileInfo {
-  name: string
-  size: number
-  type: SpineFileType
+/** Data differs from the source: the edited document replaced the source skeleton file. */
+export function isSlotEdited(slot: SpineSlot): boolean {
+  return !!slot.edit && !!slot.fileSet && toRaw(slot.fileSet.skeleton) !== toRaw(slot.edit.source)
+}
+
+/** A clone of an edited slot starts edited and unsaved, with an empty history; the source file is shared. */
+function cloneEdit(src: SpineSlot): SpineSlotEdit | undefined {
+  if (!isSlotEdited(src)) return undefined
+  return { source: src.edit!.source, unsaved: true, warnings: [...src.edit!.warnings], undo: [], redo: [] }
 }
 
 /** Hard limit on simultaneously loaded spine slots */
@@ -96,13 +125,6 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
   const placeholderStore = usePlaceholderImagesStore()
 
   // ── Computed ─────────────────────────────────────────────────────────────────
-  /** Recognised files from pendingFiles (ignores unknown extensions) */
-  const pendingFileInfos = computed<PendingFileInfo[]>(() =>
-    pendingFiles.value
-      .map(f => ({ name: f.name, size: f.size, type: guessFileType(f.name) }))
-      .filter((f): f is PendingFileInfo => f.type !== null),
-  )
-
   const hasFiles = computed(() => pendingFiles.value.length > 0)
   /** Slots that passed both classification and content validation */
   const validSlots = computed(() => spineSlots.value.filter(s => !s.error && !(s.validationErrors?.length)))
@@ -226,6 +248,7 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
       indPosY: src.indPosY ?? 0,
       indZoom: src.indZoom ?? 1,
       placeholders: src.placeholders ? [...src.placeholders] : [],
+      edit: cloneEdit(src),
     }
 
     const added = [newSlot]
@@ -268,6 +291,7 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
           indPosY: childSrc.indPosY ?? 0,
           indZoom: childSrc.indZoom ?? 1,
           placeholders: childSrc.placeholders ? [...childSrc.placeholders] : [],
+          edit: cloneEdit(childSrc),
         }
         added.push(child)
         result[phName].push({ ...entry, imageId: crypto.randomUUID(), childSlotId: child.id, fileSet: childSrc.fileSet })
@@ -282,6 +306,93 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
     if (slot) slot.syncEnabled = v
   }
 
+  function selectVersionFor(version: string): void {
+    const entry = Object.entries(spineOptionsMap).find(([, list]) => list.includes(version as SpineVersion))
+    if (entry) useVersionStore().selectVersion(Number(entry[0]) as PixiVersion, version as SpineVersion)
+  }
+
+  /** New session from raw files: group, validate, detect the version, select the runtime, record history. */
+  async function loadFileList(
+    files: File[],
+    opts: { skipHistory?: boolean; handles?: FileSystemFileHandle[] } = {},
+  ): Promise<LoadFileListResult> {
+    const result: LoadFileListResult = {
+      slots: [], version: null, error: null, versionUnknown: false, unsupportedHint: null, historySaved: false, ignored: 0,
+    }
+    if (files.length === 0) return result
+    let expanded: File[]
+    try {
+      expanded = await expandZipFiles(files)
+    } catch (e) {
+      setPendingFiles([])
+      return { ...result, error: (e as Error).message }
+    }
+    setPendingFiles(expanded)
+
+    const grouped = await groupSpineFiles(expanded)
+    if (grouped.globalError) return { ...result, error: grouped.globalError }
+    if (grouped.slots.length === 0) return { ...result, error: 'No valid Spine files found' }
+
+    const firstValid = grouped.slots.find(s => !s.error && s.fileSet)
+    let version: string | null = null
+    if (firstValid?.fileSet) {
+      const { skeleton } = firstValid.fileSet
+      version = skeleton.type === 'skeleton-json'
+        ? detectSpineVersion(skeleton.fileBody as string)
+        : detectSpineVersionFromSkel(skeleton.fileBody as ArrayBuffer)
+    }
+
+    // unknown/unsupported first set: only sets with an unsupported version of their own get marked
+    const runtimeVersion = version && KNOWN_VERSIONS.includes(version as SpineVersion) ? version : 'unknown'
+    for (const slot of grouped.slots) {
+      if (!slot.fileSet) continue
+      const errs = validateSpineFileSet(slot.fileSet)
+      const versionProblem = spineVersionProblem(slot.fileSet, runtimeVersion)
+      if (versionProblem) errs.push(versionProblem)
+      if (errs.length > 0) slot.validationErrors = errs
+    }
+
+    setSlots(grouped.slots, version)
+    if (version && version !== 'unknown') selectVersionFor(version)
+    else result.versionUnknown = true
+    result.unsupportedHint = unsupportedVersionHint(version ?? '')
+    result.version = version
+    result.slots = spineSlots.value
+    result.ignored = grouped.slots.length - spineSlots.value.length
+
+    if (!opts.skipHistory && grouped.slots.some(s => !s.error && !s.validationErrors?.length)) {
+      await saveSession(files.map(f => f.name), opts.handles)
+      result.historySaved = true
+    }
+    return result
+  }
+
+  /** Adds raw files to the open session, on top of the list; sets of another runtime become error rows. */
+  async function addFileList(files: File[]): Promise<AddFileListResult> {
+    const grouped = await groupSpineFiles(files)
+    if (grouped.globalError) return { slots: [], ignored: 0, error: grouped.globalError }
+    const viewerVersion = useVersionStore().spineVersion
+    const added: string[] = []
+    for (const slot of grouped.slots) {
+      if (!slot.error && slot.fileSet) {
+        const errs = validateSpineFileSet(slot.fileSet)
+        const versionProblem = viewerVersion && spineVersionProblem(slot.fileSet, viewerVersion)
+        if (versionProblem) errs.push(versionProblem)
+        if (errs.length > 0) slot.validationErrors = errs
+      }
+      if (spineSlots.value.length >= SPINE_SLOTS_LIMIT) continue
+      addSlot(slot)
+      added.push(slot.id)
+    }
+    // lazy: the layers store reads this store during its own setup
+    useImageLayersStore().placeOnTop(added)
+    return {
+      slots: added.map(id => spineSlots.value.find(s => s.id === id)!),
+      ignored: grouped.slots.length - added.length,
+      error: null,
+    }
+  }
+
   function clear() {
     pendingFiles.value    = []
     spineSlots.value      = []
@@ -294,7 +405,6 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
     pendingFiles,
     spineSlots,
     detectedVersion,
-    pendingFileInfos,
     hasFiles,
     validSlots,
     isLoaded,
@@ -309,6 +419,8 @@ export const useFileLoaderStore = defineStore('file-loader', () => {
     setSyncEnabled,
     setSlotPlaceholders,
     patchSlotPlaceholderImages,
+    loadFileList,
+    addFileList,
     clear,
   }
 })

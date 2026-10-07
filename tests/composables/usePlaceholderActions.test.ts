@@ -197,6 +197,61 @@ describe('usePlaceholderActions', () => {
       expect(loader.spineSlots.map(s => s.id)).toEqual(['a'])
     })
 
+    describe('Remove a posed child spine', () => {
+      function posedChild(extra: Partial<SpineSlot> = {}) {
+        const loader = useFileLoaderStore()
+        const ph = usePlaceholderImagesStore()
+        loader.setSlots([
+          slot('a'),
+          slot('gem', { parentSlotId: 'a', savedState: { ...saved(), boneOverrides: { tip: { rotation: 5 } } }, ...extra }),
+        ], '4.2')
+        ph.setSlotImages('a', { p: [spine('e1', 'gem')] })
+        return { loader, ph, entry: ph.getPlaceholderSpineEntries('a', 'p')[0] }
+      }
+
+      it('asks first; declining changes nothing', async () => {
+        const { loader, ph, entry } = posedChild()
+        const confirm = vi.fn(() => false)
+        vi.stubGlobal('confirm', confirm)
+        await usePlaceholderActions().removeSpineChild('a', 'p', entry)
+        expect(confirm).toHaveBeenCalledWith('Unsaved work will be lost: gem (overrides). Continue?')
+        expect(loader.spineSlots.map(s => s.id)).toEqual(['a', 'gem'])
+        expect(ph.getPlaceholderSpineEntries('a', 'p')).toHaveLength(1)
+      })
+
+      it('removes after confirming and names descendants with their work', async () => {
+        const { loader, entry } = posedChild()
+        const grand = slot('pip', { parentSlotId: 'gem', savedState: { ...saved(), boneOverrides: { b: { x: 1 } } } })
+        loader.addSlot(grand)
+        const confirm = vi.fn(() => true)
+        vi.stubGlobal('confirm', confirm)
+        await usePlaceholderActions().removeSpineChild('a', 'p', entry)
+        expect(confirm).toHaveBeenCalledWith('Unsaved work will be lost: gem (overrides), pip (overrides). Continue?')
+        expect(loader.spineSlots.map(s => s.id)).toEqual(['a'])
+      })
+
+      it('reads live overrides of the active child', async () => {
+        const { entry } = posedChild({ savedState: saved() })
+        useSlotSelectionStore().setActiveSlot('gem')
+        useSkeletonStore().boneOverrides = { tip: { rotation: 9 } }
+        const confirm = vi.fn(() => false)
+        vi.stubGlobal('confirm', confirm)
+        await usePlaceholderActions().removeSpineChild('a', 'p', entry)
+        expect(confirm).toHaveBeenCalledWith('Unsaved work will be lost: gem (overrides). Continue?')
+        expect(useSlotSelectionStore().activeSlotId).toBe('gem')
+      })
+
+      it('does not ask when another entry keeps the child slot', async () => {
+        const { ph } = posedChild()
+        ph.setSlotImages('a', { p: [spine('e1', 'gem'), spine('e2', 'gem')] })
+        const confirm = vi.fn(() => false)
+        vi.stubGlobal('confirm', confirm)
+        await usePlaceholderActions().removeSpineChild('a', 'p', ph.getPlaceholderSpineEntries('a', 'p')[0])
+        expect(confirm).not.toHaveBeenCalled()
+        expect(ph.getPlaceholderSpineEntries('a', 'p')).toHaveLength(1)
+      })
+    })
+
     it('keeps a child slot that another entry still references', async () => {
       const loader = useFileLoaderStore()
       const ph = usePlaceholderImagesStore()

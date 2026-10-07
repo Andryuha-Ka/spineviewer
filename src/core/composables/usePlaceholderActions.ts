@@ -15,6 +15,7 @@ import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useViewerStore } from '@/core/stores/useViewerStore'
 import { useImageLayersStore } from '@/core/stores/useImageLayersStore'
+import { useSkeletonEditStore } from '@/core/stores/useSkeletonEditStore'
 import { buildSlotSavedState, trackTimesOf } from '@/core/utils/slotState'
 import { groupSpineFiles, isImageDropFileName } from '@/core/utils/fileLoader'
 import { spineVersionProblem } from '@/core/utils/versionDetector'
@@ -49,6 +50,7 @@ export function usePlaceholderActions() {
   const skeletonStore      = useSkeletonStore()
   const viewerStore        = useViewerStore()
   const layersStore        = useImageLayersStore()
+  const editStore          = useSkeletonEditStore()
 
   /** A child spine runs on its own version's runtime; only a version of the other Pixi major is refused. */
   function childVersionProblem(fileSet: FileSet): string | null {
@@ -247,16 +249,29 @@ export function usePlaceholderActions() {
     fileLoaderStore.setSyncEnabled(entry.childSlotId, newSync)
   }
 
-  function isChildSlotReferenced(childSlotId: string): boolean {
+  function isChildSlotReferenced(childSlotId: string, exceptImageId?: string): boolean {
     for (const phMap of Object.values(phImagesStore.children)) {
       for (const entries of Object.values(phMap)) {
-        if (entries.some(e => e.kind === 'spine' && e.childSlotId === childSlotId)) return true
+        if (entries.some(e => e.kind === 'spine' && e.childSlotId === childSlotId && e.imageId !== exceptImageId)) return true
       }
     }
     return false
   }
 
+  /** `<name> (edits|overrides|edits and overrides)` for the slot and its descendants that hold unsaved work. */
+  function unsavedWorkOf(rootId: string): string[] {
+    const ids = new Set([rootId])
+    for (let n = 0; n !== ids.size;) {
+      n = ids.size
+      for (const s of fileLoaderStore.spineSlots) if (s.parentSlotId && ids.has(s.parentSlotId)) ids.add(s.id)
+    }
+    return editStore.unsavedWorkSummary(ids)
+  }
+
   async function removeSpineChild(slotId: string, phName: string, entry: PHSpineEntry): Promise<void> {
+    const removesSlot = !isChildSlotReferenced(entry.childSlotId, entry.imageId)
+    const unsaved = removesSlot ? unsavedWorkOf(entry.childSlotId) : []
+    if (unsaved.length > 0 && !window.confirm(`Unsaved work will be lost: ${unsaved.join(', ')}. Continue?`)) return
     // If the child spine slot is currently active, switch to the parent first and let
     // the activeSlotId watcher run (with the child slot still in spineSlots) before
     // removing the slot from the store. Without nextTick the watcher fires after the

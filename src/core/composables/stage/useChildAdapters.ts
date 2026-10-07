@@ -64,6 +64,7 @@ export function useChildAdapters() {
       slot:                 childSlot,
       trackTimes:           trackTimesOf(states),
       placeholderChildren:  {},
+      boneOverrides:        activeChildAdapter.value?.getBoneOverrides(),
     }))
   }
 
@@ -79,11 +80,13 @@ export function useChildAdapters() {
         ? prev.trackPlaylists
         : playlistsOf(states)
     const trackTimes = trackTimesOf(states)
+    const boneOverrides = adapter.getBoneOverrides()
     const trackMix = activeChildAdapter.value === adapter
       ? JSON.parse(JSON.stringify(animationStore.trackMix)) as Record<number, TrackMixOptions>
       : { ...prev?.trackMix, ...trackMixOf(states) }
     fileLoaderStore.saveSlotState(childSlotId, {
       ...(Object.keys(trackMix).length > 0 ? { trackMix } : {}),
+      ...(Object.keys(boneOverrides).length > 0 ? { boneOverrides } : {}),
       speed:                prev?.speed ?? 1,
       selectedAnimation:    prev?.selectedAnimation ?? null,
       currentTrack:         prev?.currentTrack ?? 0,
@@ -213,8 +216,8 @@ export function useChildAdapters() {
       const childSlot = fileLoaderStore.spineSlots.find(s => s.id === entry.childSlotId)
       if (childSlot?.savedState) {
         const ss = childSlot.savedState
-        replaySavedTracks(childAdapter, ss)
         if (ss.selectedSkins.length > 0) childAdapter.setSkins(ss.selectedSkins)
+        replaySavedTracks(childAdapter, ss)
         childAdapter.setTimeScale(ss.wasPlaying ? ss.speed : 0)
       }
     } catch (e) {
@@ -261,8 +264,9 @@ export function useChildAdapters() {
     applyChildTransform(entryId)
   }
 
+  /** Destroys every child adapter, snapshotting each into its slot first. */
   function destroyAll(): void {
-    for (const adapter of childAdapters.values()) adapter.destroy()
+    for (const entryId of [...childAdapters.keys()]) destroyChildAdapter(entryId)
     childAdapters.clear()
     childAdapterMeta.clear()
   }

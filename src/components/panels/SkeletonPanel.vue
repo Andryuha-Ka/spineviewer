@@ -64,6 +64,17 @@
             </span>
           </div>
         </div>
+
+        <div v-if="boneDetails" class="bone-details">
+          <div class="details-head">{{ skeletonStore.selectedBone }}</div>
+          <div v-for="row in boneDetails" :key="row.label" class="details-row" :data-row="row.label">
+            <span class="details-label">{{ row.label }}</span>
+            <span v-for="f in DETAIL_FIELDS" :key="f.prop" class="details-val" :data-prop="f.prop">
+              <span class="details-key">{{ f.key }}</span>{{ f.scale ? fmtS(row.v[f.prop]) : fmt(row.v[f.prop]) }}<span
+                v-if="row.label === 'Local' && heldProp(f.prop)" class="held-dot">●</span>
+            </span>
+          </div>
+        </div>
       </section>
 
       <div class="divider" />
@@ -140,7 +151,7 @@
 <script setup lang="ts">
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useInspectorStore } from '@/core/stores/useInspectorStore'
-import type { BoneTransform } from '@/core/types/ISpineAdapter'
+import type { BoneLocalTransform, BoneTransform } from '@/core/types/ISpineAdapter'
 
 const skeletonStore  = useSkeletonStore()
 const inspectorStore = useInspectorStore()
@@ -150,6 +161,29 @@ const boneSearch = ref('')
 // Tick counter — increments every inspector update so the user can see data IS live
 const updateTick = ref(0)
 watch(() => inspectorStore.boneTransforms, () => { updateTick.value = (updateTick.value + 1) % 100 })
+
+// ── Selected bone details (refreshed with the inspector's per-frame bone update) ──
+const DETAIL_FIELDS: Array<{ prop: keyof BoneLocalTransform; key: string; scale?: boolean }> = [
+  { prop: 'x', key: 'x' }, { prop: 'y', key: 'y' }, { prop: 'rotation', key: 'r' },
+  { prop: 'scaleX', key: 'sx', scale: true }, { prop: 'scaleY', key: 'sy', scale: true },
+  { prop: 'shearX', key: 'hx' }, { prop: 'shearY', key: 'hy' },
+]
+type DetailRow = { label: 'Local' | 'Applied' | 'World'; v: BoneLocalTransform }
+const boneDetails = ref<DetailRow[] | null>(null)
+
+function refreshDetails(): void {
+  const name = skeletonStore.selectedBone
+  const state = name ? skeletonStore.getAdapter()?.getBoneLocalTransforms().find(b => b.name === name) : undefined
+  if (!state) { boneDetails.value = null; return }
+  const w = inspectorStore.boneTransforms.find(b => b.name === name)
+  const rows: DetailRow[] = [{ label: 'Local', v: state.local }, { label: 'Applied', v: state.applied }]
+  if (w) rows.push({ label: 'World', v: { x: w.x, y: w.y, rotation: w.rotation, scaleX: w.scaleX, scaleY: w.scaleY, shearX: 0, shearY: w.shearY } })
+  boneDetails.value = rows
+}
+watch(() => [skeletonStore.selectedBone, inspectorStore.boneTransforms, skeletonStore.boneOverrides], refreshDetails, { immediate: true })
+
+const heldProp = (prop: keyof BoneLocalTransform) =>
+  skeletonStore.selectedBone ? skeletonStore.boneOverrides[skeletonStore.selectedBone]?.[prop] !== undefined : false
 
 // Depth map: bone name → nesting level
 const boneDepthMap = computed(() => {
@@ -568,6 +602,44 @@ function fmtS(n: number): string {
 }
 
 /* ── Sliders ── */
+.bone-details {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+  border-top: 1px solid var(--c-border-dim);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-faint);
+}
+
+.details-head {
+  color: var(--c-text-dim);
+  font-family: monospace;
+}
+
+.details-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.details-label {
+  min-width: 46px;
+  color: var(--c-text-muted);
+}
+
+.details-key {
+  color: var(--c-text-ghost);
+  margin-right: 2px;
+}
+
+.held-dot {
+  color: var(--c-accent);
+  margin-left: 1px;
+}
+
 .section--sliders {
   flex: 0 0 auto;
   max-height: 25%;

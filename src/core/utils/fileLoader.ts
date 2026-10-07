@@ -6,6 +6,7 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
 
+import { toRaw } from 'vue'
 import type { FileSet, SpineFileType, SpineSlot } from '@/core/types/FileSet'
 
 // ── Readers ───────────────────────────────────────────────────────────────────
@@ -32,7 +33,7 @@ const SPINE_EXTENSIONS = {
 export const IMAGE_DROP_EXTENSIONS = [...SPINE_EXTENSIONS.image, 'gif'] as const
 
 export const SPINE_ACCEPT_EXTENSIONS: string[] =
-  Object.values(SPINE_EXTENSIONS).flat().map(e => `.${e}`)
+  [...Object.values(SPINE_EXTENSIONS).flat().map(e => `.${e}`), '.zip']
 
 function extOf(name: string): string {
   const i = name.lastIndexOf('.')
@@ -55,6 +56,60 @@ export function isImageDropFileName(name: string): boolean {
   return (IMAGE_DROP_EXTENSIONS as readonly string[]).includes(extOf(name))
 }
 
+// ── Zip archives ──────────────────────────────────────────────────────────────
+
+/** Source archive name of every file extracted by `expandZipFiles`. */
+export const archiveOf = new WeakMap<File, string>()
+
+/** Relative directory ('' = root, forward slashes) of files whose location is known: zip entries, folder picks, API `path`. */
+export const dirOf = new WeakMap<File, string>()
+
+/** Relative directory of a file; undefined for a loose file (location unknown). */
+export function fileDir(f: File): string | undefined {
+  const raw = toRaw(f)
+  const known = dirOf.get(raw)
+  if (known !== undefined) return known
+  const rel = raw.webkitRelativePath
+  return rel ? rel.slice(0, Math.max(0, rel.lastIndexOf('/'))) : undefined
+}
+
+export const IMAGE_MIME: Record<string, string> = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', avif: 'image/avif',
+}
+
+function keepZipEntry(path: string): boolean {
+  if (path.endsWith('/') || path.startsWith('__MACOSX/')) return false
+  const parts = path.split(/[\\/]/)
+  return !parts.some(p => p.startsWith('.')) && guessFileType(parts[parts.length - 1]) !== null
+}
+
+/** Replaces every `.zip` with its Spine entries (base names); throws "Cannot read archive: <name>". */
+export async function expandZipFiles(files: File[]): Promise<File[]> {
+  if (!files.some(f => extOf(f.name) === 'zip')) return files
+  const { unzipSync } = await import('fflate')
+  const out: File[] = []
+  for (const file of files) {
+    if (extOf(file.name) !== 'zip') { out.push(file); continue }
+    let entries: Record<string, Uint8Array<ArrayBuffer>>
+    try {
+      entries = unzipSync(new Uint8Array(await file.arrayBuffer()), { filter: e => keepZipEntry(e.name) })
+    } catch {
+      throw new Error(`Cannot read archive: ${file.name}`)
+    }
+    const parent = fileDir(file)
+    const root   = parent ? `${parent}/${file.name}` : file.name
+    for (const [path, bytes] of Object.entries(entries)) {
+      const parts     = path.split(/[\\/]/)
+      const name      = parts.pop()!
+      const extracted = new File([bytes], name, { type: IMAGE_MIME[extOf(name)] ?? '' })
+      archiveOf.set(extracted, file.name)
+      dirOf.set(extracted, [root, ...parts].join('/'))
+      out.push(extracted)
+    }
+  }
+  return out
+}
+
 // ── Multi-spine grouping ──────────────────────────────────────────────────────
 
 export interface GroupSpineResult {
@@ -74,21 +129,72 @@ function makeId(): string {
   return crypto.randomUUID()
 }
 
+const isSkeletonFile = (f: File) => {
+  const t = guessFileType(f.name)
+  return t === 'skeleton-json' || t === 'skeleton-skel'
+}
+
+const parentDir = (d: string): string | undefined => d === '' ? undefined : d.slice(0, Math.max(0, d.lastIndexOf('/')))
+
+/**
+ * Splits files by directory: each file goes to the nearest directory (its own or an ancestor) that holds
+ * both a skeleton and an atlas; files without such a directory, or of unknown location, share one bucket.
+ */
+function bucketsByDirectory(files: File[], types: Array<SpineFileType | null>): File[][] {
+  const dirs = files.map(fileDir)
+  const dirsOf = (pick: (t: SpineFileType | null) => boolean) =>
+    new Set(dirs.filter((d, i): d is string => d !== undefined && pick(types[i])))
+  const atlasDirs = dirsOf(t => t === 'atlas')
+  const complete  = [...dirsOf(t => t === 'skeleton-json' || t === 'skeleton-skel')].filter(d => atlasDirs.has(d))
+  if (complete.length === 0) return [files]
+  const buckets = new Map<string | null, File[]>()
+  files.forEach((f, i) => {
+    let d = dirs[i]
+    while (d !== undefined && !complete.includes(d)) d = parentDir(d)
+    const key = d ?? null
+    buckets.set(key, [...(buckets.get(key) ?? []), f])
+  })
+  return [...buckets.values()]
+}
+
+/** Pairs skeletons with atlases: by base name (case-insensitive), then remaining orphans 1-to-1 in order. */
+function pairSkeletons(skeletons: File[], atlases: File[], texts: Map<File, string>) {
+  const free = [...atlases]
+  const matched: Array<{ skel: File; atlas: File; atlasText: string }> = []
+  const orphans: File[] = []
+  for (const skel of skeletons) {
+    const base = skel.name.replace(/\.(json|skel)$/i, '').toLowerCase()
+    const idx  = free.findIndex(a => a.name.replace(/\.atlas$/i, '').toLowerCase() === base)
+    if (idx < 0) { orphans.push(skel); continue }
+    const [atlas] = free.splice(idx, 1)
+    matched.push({ skel, atlas, atlasText: texts.get(atlas)! })
+  }
+  const unmatched: File[] = []
+  for (const skel of orphans) {
+    const atlas = free.shift()
+    if (atlas) matched.push({ skel, atlas, atlasText: texts.get(atlas)! })
+    else unmatched.push(skel)
+  }
+  return { matched, unmatched }
+}
+
 /**
  * Groups an arbitrary list of dropped files into per-spine slots.
  *
- * Matching strategy:
- *   1. Match each skeleton to an atlas by base-name (exact, case-insensitive).
- *   2. Variant B: auto-pair remaining orphan skeletons with remaining orphan atlases (1-to-1).
- *   3. Variant C: create error slots for skeletons that couldn't be paired at all.
- *
- * Image assignment per matched pair:
- *   - Parse atlas text for referenced image names; match by filename (path-stripped).
- *   - Fallback: if atlas references nothing matchable, use ALL dropped images.
- *   - If no images found → error slot.
+ * Files of a known directory (zip entries, folder picks, API `path`) are first split per directory
+ * (`bucketsByDirectory`), so two folders with same-named pages never mix; loose files keep name matching.
+ * Per bucket: skeleton ↔ atlas by base name, then orphans 1-to-1; unpaired skeletons become error slots.
+ * Images per pair: the pages the atlas names (path-stripped) from its bucket, else from all files;
+ * an atlas naming no page takes all images; none found → error slot.
  */
-export async function groupSpineFiles(files: File[]): Promise<GroupSpineResult> {
-  const types     = files.map(f => guessFileType(f.name))
+export async function groupSpineFiles(input: File[]): Promise<GroupSpineResult> {
+  let files: File[]
+  try {
+    files = await expandZipFiles(input)
+  } catch (e) {
+    return { slots: [], globalError: (e as Error).message }
+  }
+  const types    = files.map(f => guessFileType(f.name))
   const skeletons = files.filter((_, i) => types[i] === 'skeleton-json' || types[i] === 'skeleton-skel')
   const atlases   = files.filter((_, i) => types[i] === 'atlas')
   const images    = files.filter((_, i) => types[i] === 'image')
@@ -101,57 +207,29 @@ export async function groupSpineFiles(files: File[]): Promise<GroupSpineResult> 
     return { slots: [], globalError: 'Missing image files (.png / .jpg / .webp / .avif)' }
 
   // Read all atlas files upfront (needed for image name extraction)
-  const atlasTexts = await Promise.all(atlases.map(a => a.text()))
+  const texts = new Map(await Promise.all(atlases.map(async a => [a, await a.text()] as const)))
 
-  // Step 1 — match by base-name
-  const atlasUsed = new Set<number>()
-  const matched: Array<{ skel: File; atlas: File; atlasText: string }> = []
-  const unmatchedSkels: File[] = []
-
-  for (const skel of skeletons) {
-    const base = skel.name.replace(/\.(json|skel)$/i, '').toLowerCase()
-    const idx  = atlases.findIndex((a, i) =>
-      !atlasUsed.has(i) && a.name.replace(/\.atlas$/i, '').toLowerCase() === base,
-    )
-    if (idx >= 0) {
-      atlasUsed.add(idx)
-      matched.push({ skel, atlas: atlases[idx], atlasText: atlasTexts[idx] })
-    } else {
-      unmatchedSkels.push(skel)
-    }
-  }
-
-  // Step 2 (Variant B) — auto-pair remaining orphans
-  const orphanAtlases    = atlases.filter((_, i) => !atlasUsed.has(i))
-  const orphanAtlasTexts = atlasTexts.filter((_, i) => !atlasUsed.has(i))
+  const matched: Array<{ skel: File; atlas: File; atlasText: string; images: File[] }> = []
   const stillUnmatched: File[] = []
-
-  for (const skel of unmatchedSkels) {
-    if (orphanAtlases.length > 0) {
-      matched.push({
-        skel,
-        atlas:     orphanAtlases.shift()!,
-        atlasText: orphanAtlasTexts.shift()!,
-      })
-    } else {
-      stillUnmatched.push(skel)
-    }
+  for (const bucket of bucketsByDirectory(files, types)) {
+    const pairs = pairSkeletons(bucket.filter(isSkeletonFile), bucket.filter(f => texts.has(f)), texts)
+    const bucketImages = bucket.filter(f => isTextureFileName(f.name))
+    matched.push(...pairs.matched.map(m => ({ ...m, images: bucketImages })))
+    stillUnmatched.push(...pairs.unmatched)
   }
 
   // Build slots from matched groups
   const slots: SpineSlot[] = []
 
-  for (const { skel, atlas, atlasText } of matched) {
+  for (const { skel, atlas, atlasText, images: bucketImages } of matched) {
     const name   = skel.name.replace(/\.(json|skel)$/i, '')
     const isJson = skel.name.toLowerCase().endsWith('.json')
 
-    // Find images referenced by this atlas
-    const refs        = parseAtlasImageNames(atlasText)
-    const slotImages  = refs.length > 0
-      ? images.filter(img => refs.some(r =>
-          r.split('/').pop()!.toLowerCase() === img.name.toLowerCase(),
-        ))
-      : images  // fallback: all images (single-spine scenario)
+    // Images referenced by this atlas: its own directory first, then every dropped image
+    const refs   = parseAtlasImageNames(atlasText).map(r => r.split('/').pop()!.toLowerCase())
+    const pick   = (list: File[]) => refs.length > 0 ? list.filter(img => refs.includes(img.name.toLowerCase())) : list
+    const local  = pick(bucketImages)
+    const slotImages = local.length > 0 ? local : pick(images)
 
     if (slotImages.length === 0) {
       slots.push({ id: makeId(), name, error: 'No matching images found in dropped files' })
@@ -221,6 +299,7 @@ export async function getFilesFromDataTransfer(dt: DataTransfer): Promise<File[]
       const file = await new Promise<File>((res, rej) =>
         (entry as FileSystemFileEntry).file(res, rej),
       )
+      dirOf.set(file, entry.fullPath.slice(1, Math.max(1, entry.fullPath.lastIndexOf('/'))))
       files.push(file)
     } else if (entry.isDirectory) {
       const reader = (entry as FileSystemDirectoryEntry).createReader()

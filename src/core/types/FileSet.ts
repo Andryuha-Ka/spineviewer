@@ -6,7 +6,7 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
 
-import type { TrackMixOptions } from './ISpineAdapter'
+import type { BoneOverrides, TrackMixOptions } from './ISpineAdapter'
 
 export type SpineFileType = 'skeleton-json' | 'skeleton-skel' | 'atlas' | 'image'
 
@@ -64,6 +64,8 @@ export interface SpineSlotSavedState {
   trackTimes?: Record<number, number>
   /** Per-track mix settings, every track incl. disabled ones: mixDuration (all versions), additive / mixInterpolation (Spine 4.3) */
   trackMix?: Record<number, TrackMixOptions>
+  /** Held bone overrides (absolute local values per field), plain JSON */
+  boneOverrides?: BoneOverrides
   // Skin
   selectedSkins: string[]
   // Placeholders
@@ -77,10 +79,23 @@ export interface SpineSlotSavedState {
   indZoom: number
 }
 
+/** Data-edit state of a slot; lives next to `fileSet`, never in `savedState`. */
+export interface SpineSlotEdit {
+  /** The original skeleton file; `fileSet.skeleton === source` means the data is back at the source */
+  source: SpineFile
+  unsaved: boolean
+  /** Conversion warnings of a binary source */
+  warnings: string[]
+  /** Previous document texts, oldest first (max 20) */
+  undo: string[]
+  redo: string[]
+}
+
 export interface SpineSlot {
   id: string
   name: string
   fileSet?: FileSet             // undefined when error is set
+  edit?: SpineSlotEdit
   error?: string                // set for unmatched / incomplete slots (classification)
   validationErrors?: string[]   // content validation errors (missing images, regions, etc.)
   savedState?: SpineSlotSavedState

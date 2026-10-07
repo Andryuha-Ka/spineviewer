@@ -6,7 +6,9 @@ import { useVersionStore } from '@/core/stores/useVersionStore'
 import type { FileSet, SpineSlot } from '@/core/types/FileSet'
 import { groupSpineFiles } from '@/core/utils/fileLoader'
 
-vi.mock('@/core/utils/fileLoader', () => ({ groupSpineFiles: vi.fn(), getFilesFromDataTransfer: vi.fn() }))
+vi.mock('@/core/utils/fileLoader', () => ({
+  groupSpineFiles: vi.fn(), getFilesFromDataTransfer: vi.fn(), expandZipFiles: vi.fn(async (f: File[]) => f),
+}))
 vi.mock('@/core/utils/spineValidator', () => ({ validateSpineFileSet: () => [] }))
 vi.mock('@/core/utils/fileHistory', () => ({
   saveSession: vi.fn(),
@@ -147,6 +149,18 @@ describe('useFilePickerLogic.handleFiles (C36)', () => {
       undefined, undefined, undefined, undefined, undefined,
       ['Spine version mismatch: bonus.json is 4.2, viewer is set to 4.1'],
     ])
+  })
+
+  it('delegates to the loader store and reports a recorded history entry', async () => {
+    vi.mocked(groupSpineFiles).mockResolvedValue({ slots: [{ id: 'a', name: 'A', fileSet: set('a.json', '4.2.40') }] } as Awaited<ReturnType<typeof groupSpineFiles>>)
+    const saved = vi.fn()
+    await useFilePickerLogic(vi.fn(), saved).handleFiles([new File([''], 'a.json')])
+    expect(saved).toHaveBeenCalledTimes(1)
+    vi.mocked(groupSpineFiles).mockResolvedValue({ slots: [], globalError: 'Missing atlas file (.atlas)' } as Awaited<ReturnType<typeof groupSpineFiles>>)
+    const picker = useFilePickerLogic(vi.fn(), saved)
+    await picker.handleFiles([new File([''], 'a.json')])
+    expect(picker.classifyError.value).toBe('Missing atlas file (.atlas)')
+    expect(saved).toHaveBeenCalledTimes(1)
   })
 
   it('checks nothing when the detected version is unknown', async () => {

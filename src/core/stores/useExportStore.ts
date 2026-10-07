@@ -8,7 +8,7 @@
 
 import { defineStore } from 'pinia'
 
-type ExportType = 'png' | 'gif' | 'sheet' | 'pose'
+export type ExportType = 'png' | 'gif' | 'sheet' | 'pose' | 'skeleton'
 type ExportScale = 1 | 2 | 4
 
 const SCALE_KEY = 'svp:export:scale'
@@ -33,6 +33,14 @@ export const useExportStore = defineStore('export', () => {
   const progress   = ref(0)
   const error      = ref<string | null>(null)
   const notice     = ref<string | null>(null)
+  const progressLabel = computed(() => {
+    switch (exportType.value) {
+      case 'sheet':    return 'Capturing frames…'
+      case 'gif':      return 'Encoding GIF…'
+      case 'skeleton': return 'Packing zip…'
+      default:         return 'Exporting…'
+    }
+  })
 
   const scale             = ref<ExportScale>(readScale())
   const includeBackground = ref(read(BG_KEY) === 'true')
@@ -74,5 +82,5 @@ export const useExportStore = defineStore('export', () => {
     _abortController = null
   }
 
-  return { exporting, exportType, progress, error, notice, scale, includeBackground, start, cancel, setProgress, finish, fail }
+  return { exporting, exportType, progress, progressLabel, error, notice, scale, includeBackground, start, cancel, setProgress, finish, fail }
 })

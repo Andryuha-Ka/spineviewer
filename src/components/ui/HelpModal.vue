@@ -26,6 +26,7 @@
         <ul class="help-list">
           <li><b>Drag &amp; drop</b> files or a folder onto the drop zone — or use <b>Choose Files / Choose Folder</b></li>
           <li>Supported skeletons: <code>.json</code>, <code>.skel</code></li>
+          <li><b>Zip archives</b> — a <code>.zip</code> (e.g. a keyframe.it or Spine export) is unpacked in the browser; skeletons, atlases and images at any folder depth are picked up, other entries, <code>__MACOSX/</code>, hidden files and nested archives are ignored; zipped and loose files of one drop are grouped together</li>
           <li>Spine version is detected automatically from the file header; a Spine 4.3 file selects Pixi 8 + Spine 4.3; a file of an unsupported version is marked with an error and <b>Open Viewer</b> stays disabled</li>
           <li>Supported image formats: PNG · JPG · WebP · AVIF</li>
           <li>Up to <b>30 skeletons</b> can be loaded at once (use the <b>Spines</b> tab to switch)</li>
@@ -90,7 +91,7 @@
           </div>
           <div class="tab-item">
             <span class="tab-badge">Bones</span>
-            <span>Shown while the skeleton has free (unkeyed) bones or sliders — numeric X, Y, R inputs and a reset button (↺) per bone pose it live on the canvas; <b>Sliders</b> (Spine 4.3) get Time and Mix inputs and a reset (↺); values are not saved</span>
+            <span><b>Bone</b> editor for any bone (pick it here or in the Insp tab): X, Y, Rotation, Scale X/Y, Shear X/Y hold a live <b>override</b> on top of the animation (● marks overridden inputs; saved per skeleton, lost on page reload); <b>Release</b> drops the bone's overrides; <b>Apply to setup pose</b> writes them (or the current pose) into the setup pose; <b>Key at current time</b> keys them into the current track's animation; <b>New animation</b> creates an empty one; <b>Undo / Redo</b> (last 20 data edits) and <b>Revert skeleton</b>. Edited skeletons show <b>★</b> here and in the Spines list until exported. Below: free (unkeyed) bones with X, Y, R and reset (↺), and <b>Sliders</b> (Spine 4.3) with Time and Mix. Units: skeleton units, degrees counter-clockwise, y up, local to the parent bone</span>
           </div>
           <div class="tab-item">
             <span class="tab-badge">Atlas</span>
@@ -106,7 +107,7 @@
           </div>
           <div class="tab-item">
             <span class="tab-badge">Export</span>
-            <span>PNG screenshot · Pose JSON · Sprite Sheet · Animated GIF — visible canvas without overlays, Scale 1× / 2× / 4×, transparent or background colour</span>
+            <span>PNG screenshot · Pose JSON · Sprite Sheet · Animated GIF — visible canvas without overlays, Scale 1× / 2× / 4×, transparent or background colour. <b>Skeleton</b> — <b>Export Spine JSON (.zip)</b> downloads <code>&lt;name&gt;.zip</code> with the (edited) skeleton as Spine JSON in its own version, the source atlas and page images; binary <code>.skel</code> skeletons are converted (warnings listed); exporting keeps the changes and clears the unsaved ★ tooltip</span>
           </div>
         </div>
       </section>
@@ -166,6 +167,27 @@
 
       <n-divider class="divider" />
 
+      <!-- API & MCP -->
+      <section class="help-section">
+        <h3 class="sec-title">API &amp; MCP</h3>
+        <p class="help-p">
+          Scripts, the DevTools console and AI agents drive the viewer through <code>window.svp</code>, API version <b class="api-ver">{{ apiVersion }}</b>.
+          Every method returns a Promise and calls run one at a time; <code>svp.help()</code> lists the methods with their arguments.
+        </p>
+        <ul class="help-list">
+          <li><b>Session</b> — <code>info</code>, <code>help</code>, <code>load</code> (text, base64 or zip), <code>reset</code>, <code>listSlots</code>, <code>selectSlot</code>, <code>getSkeleton</code></li>
+          <li><b>Playback &amp; skins</b> — <code>setAnimation</code>, <code>addAnimation</code>, <code>clearTrack(s)</code>, <code>seek</code>, <code>play</code>, <code>pause</code>, <code>setSpeed</code>, <code>setTrackOptions</code>, <code>getTracks</code>, <code>setSkins</code>, <code>getSkins</code></li>
+          <li><b>Bones</b> — <code>getBones</code>, <code>setBoneOverride</code>, <code>applyPose</code>, <code>releaseOverride</code>, <code>getOverrides</code></li>
+          <li><b>Editing</b> — <code>setSetupPose</code>, <code>applyOverridesToSetupPose</code>, <code>createAnimation</code>, <code>getKeys</code>, <code>setKey</code>, <code>deleteKey</code>, <code>setKeyEasing</code>, <code>keyCurrentPose</code>, <code>buildAnimation</code>, <code>undo</code>, <code>redo</code>, <code>getEditState</code>, <code>revertToSource</code></li>
+          <li><b>Export</b> — <code>capturePng</code>, <code>getPose</code>, <code>exportSkeleton</code></li>
+          <li><b>Units</b> — positions in skeleton units, rotation and shear in degrees counter-clockwise, scale as a factor, times in seconds, y up; bone values are local to the parent bone</li>
+          <li><b>Errors</b> — calls reject with an <code>SvpError</code>: <code>{ name: "SvpError", code, message: "CODE: explanation" }</code>, codes <code>NOT_IN_VIEWER</code>, <code>NO_SKELETON</code>, <code>NOT_FOUND</code>, <code>INVALID_ARGUMENT</code>, <code>INVALID_STATE</code>, <code>UNSAVED_EDITS</code>, <code>LOAD_FAILED</code>, <code>EXPORT_FAILED</code>, <code>UNSUPPORTED</code></li>
+          <li><b>MCP server</b> — <code>svp-mcp</code> opens the viewer in Chrome and exposes the API as MCP tools: <code>npx svp-mcp --url https://andryuha-ka.github.io/spineviewer/ --headed</code> (<code>--url</code> picks the viewer address, <code>--headed</code> shows the browser window)</li>
+        </ul>
+      </section>
+
+      <n-divider class="divider" />
+
       <!-- Pixi DevTools -->
       <section class="help-section">
         <h3 class="sec-title">Pixi DevTools</h3>
@@ -191,6 +213,17 @@
       <section class="help-section">
         <h3 class="sec-title">What's New</h3>
         <div class="changelog">
+          <div class="cl-entry">
+            <span class="cl-ver">v1.3.21</span>
+            <ul class="help-list">
+              <li><b>Viewer API</b> — scripts, the DevTools console and AI agents drive the viewer through <code>window.svp</code>: load files, play, pose and key bones, edit, export (<code>svp.help()</code> lists every method)</li>
+              <li><b>MCP server</b> — <code>svp-mcp</code> opens the viewer in its own Chrome and exposes the API as MCP tools, including loading from and exporting to disk and a round trip to keyframe.it</li>
+              <li><b>Bone overrides on any bone</b> — the Bones tab is always shown; X, Y, Rotation, Scale and Shear hold a live override on top of the animation, kept per skeleton; the Insp tab shows local, applied and world values of the selected bone</li>
+              <li><b>Setup pose, keys and undo</b> — Apply to setup pose, Key at current time, New animation, Undo / Redo (20 steps) and Revert skeleton; edited skeletons show ★ and leaving asks before unsaved edits or overrides are lost</li>
+              <li><b>Zip in and out</b> — <code>.zip</code> archives load in every picking path, and files are grouped per folder so same-named files in different folders never mix</li>
+              <li><b>Spine JSON export</b> — Export tab → Skeleton: <code>&lt;name&gt;.zip</code> with the (edited) skeleton as Spine JSON plus atlas and pages; binary <code>.skel</code> skeletons are converted</li>
+            </ul>
+          </div>
           <div class="cl-entry">
             <span class="cl-ver">v1.3.20</span>
             <ul class="help-list">
@@ -400,8 +433,11 @@
 </template>
 
 <script setup lang="ts">
+import { SVP_API_VERSION } from '@/core/api/svpApi'
+
 const open = ref(false)
 const appVersion = __APP_VERSION__
+const apiVersion = SVP_API_VERSION
 </script>
 
 <style scoped>

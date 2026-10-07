@@ -6,7 +6,7 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
 
-import { SPINE_ACCEPT_EXTENSIONS } from '@/core/utils/fileLoader'
+import { SPINE_ACCEPT_EXTENSIONS, dirOf } from '@/core/utils/fileLoader'
 
 export interface HistorySession {
   id: string
@@ -96,6 +96,9 @@ function makeId(): string {
   return crypto.randomUUID()
 }
 
+/** Folder-relative directory of handles from `pickFolderViaFSAA`, stored with the session so a reload groups the same way. */
+const handleDirs = new WeakMap<FileSystemFileHandle, string>()
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -124,7 +127,7 @@ export async function saveSession(
   if (session.hasHandles && handles) {
     try {
       const db = await openDB()
-      await idbPut(db, { ...session, handles })
+      await idbPut(db, { ...session, handles, dirs: handles.map(h => handleDirs.get(h) ?? null) })
       await idbPrune(db)
     } catch (e) {
       console.warn('[fileHistory] IndexedDB write failed', e)
@@ -158,7 +161,7 @@ export async function reloadSession(session: HistorySession): Promise<File[] | n
   if (!session.hasHandles || !isFileSystemAccessSupported()) return null
   try {
     const db = await openDB()
-    const stored = await idbGet<{ handles: FileSystemFileHandle[] }>(db, session.id)
+    const stored = await idbGet<{ handles: FileSystemFileHandle[]; dirs?: Array<string | null> }>(db, session.id)
     if (!stored?.handles?.length) return null
 
     const files: File[] = []
@@ -167,7 +170,10 @@ export async function reloadSession(session: HistorySession): Promise<File[] | n
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const perm = await (handle as any).requestPermission({ mode: 'read' })
       if (perm !== 'granted') return null
-      files.push(await handle.getFile())
+      const file = await handle.getFile()
+      const dir = stored.dirs?.[files.length]
+      if (typeof dir === 'string') dirOf.set(file, dir)
+      files.push(file)
     }
     return files
   } catch { return null }
@@ -228,14 +234,21 @@ export async function pickFolderViaFSAA(): Promise<{ files: File[]; handles: Fil
     const dirHandle: FileSystemDirectoryHandle = await (window as any).showDirectoryPicker({ mode: 'read' })
     const handles: FileSystemFileHandle[] = []
     const files: File[] = []
-    // TODO: remove cast when File System Access API types are stable in TypeScript lib
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for await (const entry of (dirHandle as any).values()) {
-      if (entry.kind === 'file') {
-        handles.push(entry as FileSystemFileHandle)
-        files.push(await (entry as FileSystemFileHandle).getFile())
+    const walk = async (dir: FileSystemDirectoryHandle, path: string): Promise<void> => {
+      // TODO: remove cast when File System Access API types are stable in TypeScript lib
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for await (const entry of (dir as any).values()) {
+        if (entry.kind === 'directory') await walk(entry as FileSystemDirectoryHandle, `${path}/${entry.name}`)
+        else if (entry.kind === 'file') {
+          const file = await (entry as FileSystemFileHandle).getFile()
+          handleDirs.set(entry, path)
+          dirOf.set(file, path)
+          handles.push(entry as FileSystemFileHandle)
+          files.push(file)
+        }
       }
     }
+    await walk(dirHandle, dirHandle.name)
     return { files, handles }
   } catch (e) {
     if ((e as Error).name !== 'AbortError') console.warn('[fileHistory] showDirectoryPicker failed', e)

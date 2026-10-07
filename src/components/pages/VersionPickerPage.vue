@@ -149,7 +149,7 @@
         <template v-else>
           <div class="drop-icon">⬇</div>
           <p class="drop-text">Drop Spine files or folder here</p>
-          <p class="drop-hint">skeleton.json · skeleton.atlas · images</p>
+          <p class="drop-hint">skeleton.json · skeleton.atlas · images · .zip</p>
         </template>
       </div>
 
@@ -191,7 +191,7 @@
           type="file"
           multiple
           class="hidden-input"
-          accept=".json,.skel,.atlas,.png,.jpg,.jpeg,.webp,.avif"
+          :accept="SPINE_ACCEPT_EXTENSIONS.join(',')"
           @change="onFileInput"
         />
         <input
@@ -203,16 +203,16 @@
         />
       </div>
 
-      <div v-if="fileLoaderStore.pendingFileInfos.length > 0" class="file-list">
+      <div v-if="pendingRows.length > 0" class="file-list">
         <div
-          v-for="info in fileLoaderStore.pendingFileInfos"
-          :key="info.name"
+          v-for="info in pendingRows"
+          :key="info.label"
           class="file-row"
         >
           <span class="file-type-badge" :class="`file-type-badge--${info.type}`">
             {{ TYPE_LABELS[info.type] }}
           </span>
-          <span class="file-name" :title="info.name">{{ info.name }}</span>
+          <span class="file-name" :title="info.label">{{ info.label }}</span>
           <span class="file-size">{{ formatSize(info.size) }}</span>
         </div>
       </div>
@@ -262,6 +262,7 @@ import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useFilePickerLogic, TYPE_LABELS, formatSize, type PickerEmits } from '@/core/composables/useFilePickerLogic'
 import { usePickerHistory as _usePickerHistory } from '@/core/composables/usePickerHistory'
 import type { SpineSlot } from '@/core/types/FileSet'
+import { SPINE_ACCEPT_EXTENSIONS, archiveOf, guessFileType } from '@/core/utils/fileLoader'
 import SettingsPopover from '@/components/ui/SettingsPopover.vue'
 import HelpModal from '@/components/ui/HelpModal.vue'
 
@@ -274,6 +275,12 @@ const fileLoaderStore = useFileLoaderStore()
 
 const slotHasIssue = (s: SpineSlot) => !!(s.error || s.validationErrors?.length)
 const issueCount = computed(() => fileLoaderStore.spineSlots.filter(slotHasIssue).length)
+
+const pendingRows = computed(() => fileLoaderStore.pendingFiles.flatMap(f => {
+  const type = guessFileType(f.name)
+  const archive = archiveOf.get(toRaw(f))
+  return type ? [{ type, size: f.size, label: archive ? `${archive} › ${f.name}` : f.name }] : []
+}))
 
 // Forward-reference pattern: picker is created first; history callback captures `history` by closure.
 // By the time any user interaction triggers onHistorySaved(), history is fully initialised.

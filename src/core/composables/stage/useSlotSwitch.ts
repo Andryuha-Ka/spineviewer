@@ -21,11 +21,11 @@ import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import type { useChildAdapters } from '@/core/composables/stage/useChildAdapters'
-import type { ISpineAdapter, TrackState } from '@/core/types/ISpineAdapter'
+import type { BoneOverrides, ISpineAdapter, TrackMixOptions, TrackState } from '@/core/types/ISpineAdapter'
 import type { IPixiApp } from '@/core/types/IPixiApp'
 import type { PixiSpriteObject } from '@/core/types/PixiSpriteObject'
 import type { FileSet, PHChildEntry } from '@/core/types/FileSet'
-import { applySavedTrackMix, buildSlotSavedState, playlistsOf, queueTrackList, replaySavedTracks, trackMixOf, trackTimesOf } from '@/core/utils/slotState'
+import { applySavedBoneOverrides, applySavedTrackMix, buildSlotSavedState, playlistsOf, queueTrackList, replaySavedTracks, trackMixOf, trackTimesOf } from '@/core/utils/slotState'
 
 /** The active top-level slot on stage; while a child spine is active this is its parent. */
 export interface ActiveStage {
@@ -44,6 +44,9 @@ interface SlotSwitchContext {
   spineError: Ref<string | null>
   phItems: Ref<Array<{ name: string; kind: 'bone' | 'slot' | 'attachment' }>>
   loadSpine: (fileSet: FileSet, slotId?: string, resetViewport?: boolean) => Promise<void>
+  /** loadSpine = createLoadedAdapter + attachLoaded; reloadSlot uses the halves for its double-buffered swap */
+  createLoadedAdapter: (fileSet: FileSet) => Promise<ISpineAdapter>
+  attachLoaded: (adapter: ISpineAdapter, fileSet: FileSet, slotId?: string, resetViewport?: boolean) => void
   applySkins: () => void
   applyPlaceholderLabels: () => void
   drainPlaceholderActions: () => Promise<void>
@@ -63,7 +66,8 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
   const {
     onStage, mountedAdapters, mountedSpineObjects, children, getPixiApp,
     loading, spineLoaded, spineError, phItems,
-    loadSpine, applySkins, applyPlaceholderLabels, drainPlaceholderActions, applyViewport, syncZOrder,
+    loadSpine, createLoadedAdapter, attachLoaded,
+    applySkins, applyPlaceholderLabels, drainPlaceholderActions, applyViewport, syncZOrder,
   } = ctx
 
   const versionStore           = useVersionStore()
@@ -84,6 +88,7 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
   let _redirectedFromSlotId: string | null = null
   let _suppressAnimPlay = false
   let _pendingSeekTimes: Record<number, number> | null = null
+  let _uiReloading = false
 
   // The live store wins over the saved snapshot: it also holds edits made while the slot was not on stage.
   function restoreSlotImages(adapter: ISpineAdapter | null, slotId: string, saved: Record<string, PHChildEntry[]> | undefined): void {
@@ -111,6 +116,7 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
       slot:                 fileLoaderStore.spineSlots.find(s => s.id === slotId),
       trackTimes:           trackTimesOf(states),
       placeholderChildren:  placeholderImagesStore.getSlotImages(slotId),
+      boneOverrides:        onStage.adapter?.getBoneOverrides(),
     }))
   }
 
@@ -122,10 +128,12 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
       if (parentSs && onStage.adapter) {
         const states = onStage.adapter.getTrackStates()
         const trackMix = { ...parentSs.trackMix, ...trackMixOf(states) }
+        const boneOverrides = onStage.adapter.getBoneOverrides()
         fileLoaderStore.saveSlotState(effectiveOldId, {
           ...parentSs,
           trackTimes: trackTimesOf(states),
           ...(Object.keys(trackMix).length > 0 ? { trackMix } : {}),
+          boneOverrides: Object.keys(boneOverrides).length > 0 ? boneOverrides : undefined,
           placeholderChildren: placeholderImagesStore.getSlotImages(effectiveOldId),
         })
       }
@@ -279,7 +287,11 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
           for (const [idxStr, playlist] of Object.entries(s.trackPlaylists)) {
             animationStore.setTrackPlaylist(Number(idxStr), playlist)
           }
-          if (onStage.adapter) applySavedTrackMix(onStage.adapter, s.trackMix)
+          if (onStage.adapter) {
+            applySavedTrackMix(onStage.adapter, s.trackMix)
+            applySavedBoneOverrides(onStage.adapter, s)
+            skeletonStore.refreshBoneOverrides()
+          }
           for (const [idxStr, playlist] of Object.entries(s.trackPlaylists)) {
             const trackIndex = Number(idxStr)
             if (!onStage.adapter || !animationStore.isTrackEnabled(trackIndex)) continue
@@ -477,8 +489,244 @@ export function useSlotSwitch(ctx: SlotSwitchContext) {
     )
   }
 
+  /** Snapshots the slot on stage (and its active child) before the stage goes away, e.g. viewer → compare. */
+  function saveActive(): void {
+    const activeId = slotSelectionStore.activeSlotId
+    if (!activeId || !onStage.adapter) return
+    const active = fileLoaderStore.spineSlots.find(s => s.id === activeId)
+    saveLeaving(active?.parentSlotId ?? activeId, activeId)
+  }
+
+  /** Rebuilds the live track chains on a fresh adapter: current entry, queued entries and times; animations it lacks are skipped. */
+  function replayChains(
+    to: ISpineAdapter,
+    states: readonly TrackState[],
+    trackMix: Record<number, TrackMixOptions> | undefined,
+    overrides: BoneOverrides,
+    isEnabled: (track: number) => boolean,
+  ): void {
+    applySavedTrackMix(to, trackMix)
+    applySavedBoneOverrides(to, { boneOverrides: overrides })
+    const known = new Set(to.animations)
+    for (const ts of states) {
+      if (!known.has(ts.animationName)) continue
+      to.setAnimation(ts.trackIndex, ts.animationName, ts.loop)
+      for (const q of ts.queue) if (known.has(q.animationName)) to.addAnimation(ts.trackIndex, q.animationName, q.loop)
+      to.seekTo(ts.trackIndex, ts.time)
+      if (!isEnabled(ts.trackIndex)) to.setTrackTimeScale(ts.trackIndex, 0)
+    }
+  }
+
+  type SliderPoses = Array<{ name: string; time: number; mix: number }>
+
+  /** 4.3 slider poses that differ from setup; empty on runtimes without sliders. */
+  function posedSliders(adapter: ISpineAdapter): SliderPoses {
+    return (adapter.getSliders?.() ?? [])
+      .filter(sl => sl.time !== sl.setupTime || sl.mix !== sl.setupMix)
+      .map(sl => ({ name: sl.name, time: sl.time, mix: sl.mix }))
+  }
+
+  /** Re-poses sliders the new data still has; the UI copy is refreshed when `adapter` is the UI adapter. */
+  function applySliders(adapter: ISpineAdapter, poses: SliderPoses, ui: boolean): void {
+    if (!adapter.setSliderPose || poses.length === 0) return
+    const known = new Set((adapter.getSliders?.() ?? []).map(sl => sl.name))
+    for (const p of poses) if (known.has(p.name)) adapter.setSliderPose(p.name, { time: p.time, mix: p.mix })
+    if (ui) skeletonStore.sliders = adapter.getSliders?.() ?? []
+  }
+
+  /** Drops list entries and the selection the reloaded skeleton no longer has (a revert removes created animations). */
+  function pruneMissingAnimations(adapter: ISpineAdapter): void {
+    const known = new Set(adapter.animations)
+    for (const [idxStr, list] of Object.entries(animationStore.trackPlaylists)) {
+      const kept = list.filter(e => known.has(e.animationName))
+      if (kept.length === list.length) continue
+      if (kept.length > 0) animationStore.setTrackPlaylist(Number(idxStr), kept)
+      else animationStore.clearTrackPlaylist(Number(idxStr))
+    }
+    if (animationStore.selectedAnimation && !known.has(animationStore.selectedAnimation)) animationStore.selectedAnimation = null
+  }
+
+  /** populateFrom keeps the selection; a bone or slot the new data lacks is deselected. */
+  function keepSelection(adapter: ISpineAdapter): void {
+    if (skeletonStore.selectedBone && !adapter.bones.some(b => b.name === skeletonStore.selectedBone)) skeletonStore.selectedBone = null
+    if (skeletonStore.selectedSlot && !adapter.slots.some(s => s.name === skeletonStore.selectedSlot)) skeletonStore.selectedSlot = null
+    pruneMissingAnimations(adapter)
+  }
+
+  function attachUi(adapter: ISpineAdapter): void {
+    skeletonStore.populateFrom(adapter)
+    adapter.onEvent(e => eventsStore.push(e))
+    keepSelection(adapter)
+  }
+
+  function childEntryOf(childSlotId: string): { entryId: string; adapter: ISpineAdapter } | null {
+    for (const [entryId, meta] of children.childAdapterMeta) {
+      const adapter = children.childAdapters.get(entryId)
+      if (meta.childSlotId === childSlotId && adapter) return { entryId, adapter }
+    }
+    return null
+  }
+
+  function relinkActiveChild(childSlotId: string): void {
+    const mounted = childEntryOf(childSlotId)
+    if (!mounted) return
+    children.activeChildAdapter.value = mounted.adapter
+    attachUi(mounted.adapter)
+    const slot = fileLoaderStore.spineSlots.find(s => s.id === childSlotId)
+    if (slot?.fileSet) complexityStore.analyze(mounted.adapter, slot.fileSet, atlasStore.pages)
+  }
+
+  /** The active top-level slot: the new adapter loads while the old one renders, then one synchronous swap. */
+  async function reloadOnStage(slotId: string, fileSet: FileSet): Promise<void> {
+    const old = onStage.adapter!
+    const fresh = await createLoadedAdapter(fileSet)
+    if (onStage.adapter !== old || children.activeChildAdapter.value || slotSelectionStore.activeSlotId !== slotId) {
+      fresh.destroy()
+      return
+    }
+    // snapshot after the load, so the times are those of the last frame the old adapter rendered
+    const states = old.getTrackStates()
+    const overrides = old.getBoneOverrides()
+    const sliders = posedSliders(old)
+    saveLeavingSlot(slotId, states)
+
+    _suppressAnimPlay = true
+    children.destroyChildAdaptersForSlot(slotId)
+    old.destroy()
+    mountedAdapters.delete(slotId)
+    mountedSpineObjects.delete(slotId)
+    onStage.adapter = null
+    onStage.obj = null
+    inspectorStore.clear()
+    complexityStore.clear()
+    attachLoaded(fresh, fileSet, slotId, false)
+    keepSelection(fresh)
+    // skins first: setSkins resets slot attachments, the replayed seek then poses the first rendered frame
+    applySkins()
+    replayChains(fresh, states, animationStore.trackMix, overrides, t => animationStore.isTrackEnabled(t))
+    fresh.setTimeScale(animationStore.isPlaying ? animationStore.speed : 0)
+    applySliders(fresh, sliders, true)
+    skeletonStore.refreshBoneOverrides()
+    applyPlaceholderLabels()
+    restoreSlotImages(fresh, slotId, undefined)
+    await nextTick()
+    _suppressAnimPlay = false
+
+    await drainPlaceholderActions()
+    if (onStage.adapter === fresh) await children.reloadChildAdaptersForSlot(fresh, slotId)
+  }
+
+  /** A child spine: destroy + mount from its new FileSet (the snapshot and replay already exist); a short pop is accepted. */
+  async function reloadChild(childSlotId: string): Promise<void> {
+    const mounted = childEntryOf(childSlotId)
+    if (!mounted) return
+    const meta = children.childAdapterMeta.get(mounted.entryId)!
+    const parent = mountedAdapters.get(meta.parentSlotId) ?? onStage.adapter
+    const entry = placeholderImagesStore.getPlaceholderSpineEntries(meta.parentSlotId, meta.phName)
+      .find(e => e.imageId === mounted.entryId)
+    if (!parent || !entry) return
+    const wasActive = children.activeChildAdapter.value === mounted.adapter
+    const sliders = posedSliders(mounted.adapter)
+    if (wasActive) children.saveChildState(childSlotId)
+    _uiReloading = wasActive
+    try {
+      children.destroyChildAdapter(mounted.entryId)
+      if (wasActive) children.activeChildAdapter.value = null
+      await children.mountChildAdapter(parent, meta.parentSlotId, meta.phName, entry)
+      if (wasActive) relinkActiveChild(childSlotId)
+      const fresh = childEntryOf(childSlotId)?.adapter
+      if (fresh) applySliders(fresh, sliders, wasActive)
+    } finally {
+      _uiReloading = false
+    }
+    if (!childEntryOf(childSlotId)) throw new Error('The edited skeleton could not be loaded')
+  }
+
+  /** A slot that renders but is not the UI adapter (pinned, or the parent of the active child); replays from its saved state. */
+  async function reloadParked(slotId: string, fileSet: FileSet, old: ISpineAdapter): Promise<void> {
+    const pixiApp = getPixiApp()
+    if (!pixiApp) return
+    const fresh = await createLoadedAdapter(fileSet)
+    if (mountedAdapters.get(slotId) !== old && onStage.adapter !== old) {
+      fresh.destroy()
+      return
+    }
+    const ss = fileLoaderStore.spineSlots.find(s => s.id === slotId)?.savedState
+    const states = old.getTrackStates()
+    const overrides = old.getBoneOverrides()
+    const sliders = posedSliders(old)
+    const childSliders = new Map<string, SliderPoses>()
+    for (const meta of children.childAdapterMeta.values()) {
+      if (meta.parentSlotId !== slotId) continue
+      const kid = childEntryOf(meta.childSlotId)?.adapter
+      if (kid) childSliders.set(meta.childSlotId, posedSliders(kid))
+    }
+    if (ss) {
+      fileLoaderStore.saveSlotState(slotId, {
+        ...ss,
+        trackTimes: trackTimesOf(states),
+        boneOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
+      })
+    }
+    const active = slotSelectionStore.activeSlot
+    const activeChildId = active?.parentSlotId === slotId && children.activeChildAdapter.value ? active.id : null
+    if (activeChildId) children.saveChildState(activeChildId)
+
+    _uiReloading = !!activeChildId
+    try {
+      children.destroyChildAdaptersForSlot(slotId)
+      if (activeChildId) children.activeChildAdapter.value = null
+      old.destroy()
+      fresh.mount(pixiApp.stage)
+      const obj = pixiApp.getLastStageChild()
+      mountedAdapters.set(slotId, fresh)
+      if (obj) mountedSpineObjects.set(slotId, obj as PixiSpriteObject)
+      if (onStage.adapter === old) {
+        onStage.adapter = fresh
+        onStage.obj = obj
+      }
+      if (ss?.selectedSkins?.length) fresh.setSkins(ss.selectedSkins)
+      replayChains(fresh, states, ss?.trackMix, overrides, t => ss?.trackEnabled[t] !== false)
+      fresh.setTimeScale(ss && !ss.wasPlaying ? 0 : (ss?.speed ?? 1))
+      applySliders(fresh, sliders, false)
+      restoreSlotImages(fresh, slotId, ss?.placeholderChildren)
+      applyViewport()
+      syncZOrder()
+      await children.reloadChildAdaptersForSlot(fresh, slotId)
+      if (activeChildId) relinkActiveChild(activeChildId)
+      for (const [kidId, poses] of childSliders) {
+        const kid = childEntryOf(kidId)?.adapter
+        if (kid) applySliders(kid, poses, kidId === activeChildId)
+      }
+    } finally {
+      _uiReloading = false
+    }
+  }
+
+  /**
+   * Rebuilds a slot from its current `fileSet` after a data edit, keeping playback, skins, overrides,
+   * placeholders, pin and selection. A slot that is not rendered needs nothing: its next load reads the new FileSet.
+   * Throws when the new data cannot be loaded; the top-level and parked paths then leave the old adapter untouched.
+   */
+  async function reloadSlot(slotId: string): Promise<void> {
+    const slot = fileLoaderStore.spineSlots.find(s => s.id === slotId)
+    if (!slot?.fileSet) return
+    if (slot.parentSlotId) return reloadChild(slotId)
+    const active = slotSelectionStore.activeSlot
+    const onStageId = active?.parentSlotId ?? active?.id
+    if (slotId === onStageId && onStage.adapter && !children.activeChildAdapter.value) {
+      return reloadOnStage(slotId, slot.fileSet)
+    }
+    const old = slotId === onStageId && onStage.adapter ? onStage.adapter : mountedAdapters.get(slotId)
+    if (old) await reloadParked(slotId, slot.fileSet, old)
+  }
+
   return {
     start,
+    saveActive,
+    reloadSlot,
+    /** True while the UI adapter is being replaced; the ticker must not drive the stores from another adapter meanwhile. */
+    isUiReloading: () => _uiReloading,
     /** The isPlaying watcher must not replay playlists while a switch sets isPlaying itself. */
     isAnimPlaySuppressed: () => _suppressAnimPlay,
     /** Track times a restore wants applied after the next play; cleared once taken. */

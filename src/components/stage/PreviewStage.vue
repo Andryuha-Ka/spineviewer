@@ -134,6 +134,7 @@ import { makeLoopState, computeNorm, resetLoopState } from '@/core/overlay/overl
 import { queueTrackList, rearmListLoops, playlistPosition, shouldAutoStop } from '@/core/utils/slotState'
 import { fitSequenceScale } from '@/core/utils/exportUtils'
 import { fpsTier } from '@/core/utils/fpsTier'
+import { registerStageCommands, unregisterStageCommands, type CaptureLimit, type StageCommands } from '@/core/api/stageCommands'
 
 const versionStore   = useVersionStore()
 const viewerStore    = useViewerStore()
@@ -254,6 +255,8 @@ const slotSwitch = useSlotSwitch({
   spineError,
   phItems,
   loadSpine,
+  createLoadedAdapter,
+  attachLoaded,
   applySkins,
   applyPlaceholderLabels,
   drainPlaceholderActions,
@@ -386,7 +389,7 @@ onMounted(async () => {
       fps.value = Math.round(pixiApp!.ticker.FPS)
       profilerStore.recordFrame(fps.value, ms)
       rearmOffUiAdapters()
-      if (onStage.adapter) {
+      if (onStage.adapter && !slotSwitch.isUiReloading()) {
         onStage.adapter.tickPlaceholderLabels()
         const uiAd = _uiAdapter()!
         const states = uiAd.getTrackStates()
@@ -640,6 +643,9 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  unregisterStageCommands(commands)
+  // overrides, tracks and times survive viewer → compare → viewer
+  slotSwitch.saveActive()
   for (const stop of stageWatchStops) stop()
   stageWatchStops.length = 0
   containerRef.value?.removeEventListener('wheel', onWheel)
@@ -708,62 +714,7 @@ async function loadSpine(fileSet: FileSet, slotId?: string, resetViewport = true
   loadingText.value = 'Loading Spine…'
 
   try {
-    onStage.adapter = await createSpineAdapter(
-      versionStore.pixiVersion!,
-      versionStore.spineVersion!,
-      fileSet,
-    )
-    await onStage.adapter.load(fileSet)
-
-    const container = containerRef.value!
-    const { width, height } = container.getBoundingClientRect()
-
-    onStage.adapter.mount(pixiApp.stage)
-    profilerStore.restartWarmup()
-    onStage.adapter.setTimeScale(animationStore.isPlaying ? animationStore.speed : 0)
-
-    onStage.obj = pixiApp.getLastStageChild()
-    baseX.value = width / 2
-    baseY.value = height * 0.5
-    spineLoaded.value = true
-    if (resetViewport) viewerStore.resetView()
-
-    if (slotId) {
-      mountedAdapters.set(slotId, onStage.adapter)
-      if (onStage.obj) mountedSpineObjects.set(slotId, onStage.obj as PixiSpriteObject)
-    }
-
-    applyViewport()
-    syncZOrder()
-
-    skeletonStore.populateFrom(onStage.adapter)
-
-    const PH_RE = /placeholder/i
-    const phSlotNames = new Set(onStage.adapter.slots.filter(s => PH_RE.test(s.name)).map(s => s.name))
-    phItems.value = [
-      ...[...phSlotNames].map(name => ({ name, kind: 'slot' as const })),
-      ...onStage.adapter.bones
-        .filter(b => PH_RE.test(b.name) && !phSlotNames.has(b.name))
-        .map(b => ({ name: b.name, kind: 'bone' as const })),
-    ]
-    if (slotId) {
-      fileLoaderStore.setSlotPlaceholders(
-        slotId,
-        phItems.value
-          .filter(p => p.kind !== 'attachment')
-          .map(p => ({ name: p.name, kind: p.kind as 'bone' | 'slot' })),
-      )
-    }
-    if (phItems.value.length > 0 && viewerStore.showPlaceholders) {
-      onStage.adapter.setPlaceholderLabels(phItems.value)
-    }
-
-    onStage.adapter.onEvent(e => eventsStore.push(e))
-
-    if (typeof fileSet.atlas.fileBody === 'string') {
-      atlasStore.load(fileSet.atlas.fileBody, fileSet.images)
-    }
-    complexityStore.analyze(onStage.adapter, fileSet, atlasStore.pages)
+    attachLoaded(await createLoadedAdapter(fileSet), fileSet, slotId, resetViewport)
   } catch (e) {
     spineError.value = e instanceof Error ? e.message : 'Failed to load Spine'
     console.error('[PreviewStage] loadSpine error:', e)
@@ -772,9 +723,74 @@ async function loadSpine(fileSet: FileSet, slotId?: string, resetViewport = true
   }
 }
 
-// ── Export helpers ────────────────────────────────────────────────────────────
+/** Creates and loads an adapter off stage; a failed load destroys it. */
+async function createLoadedAdapter(fileSet: FileSet): Promise<ISpineAdapter> {
+  const adapter = await createSpineAdapter(versionStore.pixiVersion!, versionStore.spineVersion!, fileSet)
+  try {
+    await adapter.load(fileSet)
+  } catch (e) {
+    adapter.destroy()
+    throw e
+  }
+  return adapter
+}
 
-type CaptureLimit = 'gpu' | 'memory' | null
+/** Puts a loaded adapter on stage as the active slot and fills the stores from it, in one task. */
+function attachLoaded(adapter: ISpineAdapter, fileSet: FileSet, slotId?: string, resetViewport = true): void {
+  if (!pixiApp) return
+  onStage.adapter = adapter
+  const container = containerRef.value!
+  const { width, height } = container.getBoundingClientRect()
+
+  adapter.mount(pixiApp.stage)
+  profilerStore.restartWarmup()
+  adapter.setTimeScale(animationStore.isPlaying ? animationStore.speed : 0)
+
+  onStage.obj = pixiApp.getLastStageChild()
+  baseX.value = width / 2
+  baseY.value = height * 0.5
+  spineLoaded.value = true
+  if (resetViewport) viewerStore.resetView()
+
+  if (slotId) {
+    mountedAdapters.set(slotId, adapter)
+    if (onStage.obj) mountedSpineObjects.set(slotId, onStage.obj as PixiSpriteObject)
+  }
+
+  applyViewport()
+  syncZOrder()
+
+  skeletonStore.populateFrom(adapter)
+
+  const PH_RE = /placeholder/i
+  const phSlotNames = new Set(adapter.slots.filter(s => PH_RE.test(s.name)).map(s => s.name))
+  phItems.value = [
+    ...[...phSlotNames].map(name => ({ name, kind: 'slot' as const })),
+    ...adapter.bones
+      .filter(b => PH_RE.test(b.name) && !phSlotNames.has(b.name))
+      .map(b => ({ name: b.name, kind: 'bone' as const })),
+  ]
+  if (slotId) {
+    fileLoaderStore.setSlotPlaceholders(
+      slotId,
+      phItems.value
+        .filter(p => p.kind !== 'attachment')
+        .map(p => ({ name: p.name, kind: p.kind as 'bone' | 'slot' })),
+    )
+  }
+  if (phItems.value.length > 0 && viewerStore.showPlaceholders) {
+    adapter.setPlaceholderLabels(phItems.value)
+  }
+
+  adapter.onEvent(e => eventsStore.push(e))
+
+  if (typeof fileSet.atlas.fileBody === 'string') {
+    atlasStore.load(fileSet.atlas.fileBody, fileSet.images)
+  }
+  complexityStore.analyze(adapter, fileSet, atlasStore.pages)
+}
+
+// ── Export helpers ────────────────────────────────────────────────────────────
 
 // overlay and placeholder labels stay out of exported frames
 async function withViewerOverlaysHidden<T>(fn: () => Promise<T>): Promise<T> {
@@ -857,7 +873,7 @@ function rearmOffUiAdapters(): void {
   }
 }
 
-defineExpose({
+const commands: StageCommands = {
   loadSpine,
   setAnimation: (track: number, name: string, loop: boolean) => {
     animationStore.setTrackEnabled(track, true)
@@ -941,7 +957,12 @@ defineExpose({
   captureCurrentFrame,
   captureAnimFrames,
   getBoneTransformsSnapshot: () => _uiAdapter()?.getBoneTransforms() ?? [],
-})
+  reloadSlot: slotSwitch.reloadSlot,
+  isBusy: () => loading.value,
+  lastError: () => spineError.value,
+}
+defineExpose(commands)
+registerStageCommands(commands)
 </script>
 
 <style scoped>

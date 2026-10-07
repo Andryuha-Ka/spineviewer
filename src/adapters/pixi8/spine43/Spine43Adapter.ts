@@ -10,14 +10,17 @@ import {
   Spine, SpineTexture,
   AtlasAttachmentLoader, SkeletonJson, SkeletonBinary, TextureAtlas, Skin,
   Slider, SliderData, Interpolation, RegionAttachment, VertexAttachment,
-  FromRotate, FromX, FromY, FromScaleX, FromScaleY, FromShearY,
+  FromRotate, FromX, FromY, FromScaleX, FromScaleY, FromShearY, Physics,
   type Bone, type SkeletonData, type TrackEntry, type FromProperty,
 } from 'spine-pixi-v8-43'
+import * as spine43 from 'spine-pixi-v8-43'
 import type {
-  BoneTransform, BoneLocalTransform, AttachmentInfo, SlotBounds,
+  BoneTransform, BoneLocalTransform, BoneLocalState, AttachmentInfo, SlotBounds,
   SliderInfo, SliderProperty, TrackMixOptions, TrackState,
 } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
+import { dialectOf, serializeSkeletonData } from '@/core/spineJson/serializeSkeletonData'
+import { readApplied, readLocal, setupOf, worldShear, type BoneLike } from '@/core/utils/boneTransform'
 import {
   BasePixi8Adapter, classifyAttachment, meshVertexCount,
   type Pixi8LabelPose, type Pixi8TrackEntry,
@@ -54,6 +57,7 @@ const DEFAULT_TRACK_MIX: TrackCurveOptions = { additive: false, mixInterpolation
 
 export default class Spine43Adapter extends BasePixi8Adapter<Spine> {
   readonly detectedVersion = '4.3'
+  protected readonly _physicsPose = Physics.pose
   readonly mixInterpolations = MIX_INTERPOLATIONS
 
   private _trackMix = new Map<number, TrackCurveOptions>()
@@ -98,7 +102,7 @@ export default class Spine43Adapter extends BasePixi8Adapter<Spine> {
     // container drag/zoom must not swing physics bones
     spine.skeletonPhysics.setPositionInheritance(0, 0)
     spine.skeletonPhysics.rotationInheritance = 0
-    spine.beforeUpdateWorldTransforms = () => this._applySliderOverrides()
+    spine.beforeUpdateWorldTransforms = () => this._beforeWorld()
     this._spine = spine
 
     this.animations = skeletonData.animations.map(a => a.name)
@@ -179,8 +183,16 @@ export default class Spine43Adapter extends BasePixi8Adapter<Spine> {
     this._spine.skeleton.setupPoseSlots()
   }
 
-  setToSetupPose(): void { this._spine?.skeleton.setupPose() }
-  setBonesToSetupPose(): void { this._spine?.skeleton.setupPoseBones() }
+  setToSetupPose(): void {
+    this._spine?.skeleton.setupPose()
+    this._poseNow()
+  }
+
+  setBonesToSetupPose(): void {
+    this._spine?.skeleton.setupPoseBones()
+    this._poseNow()
+  }
+
   setSlotsToSetupPose(): void { this._spine?.skeleton.setupPoseSlots() }
 
   // ── Live data ──────────────────────────────────────────────────────────────
@@ -197,8 +209,14 @@ export default class Spine43Adapter extends BasePixi8Adapter<Spine> {
         rotation: -p.getWorldRotationX(),
         scaleX: p.getWorldScaleX(),
         scaleY: p.getWorldScaleY(),
+        shearY: worldShear(p.a, p.b, -p.c, -p.d),
       }
     })
+  }
+
+  getBoneLocalTransforms(): BoneLocalState[] {
+    if (!this._spine) return []
+    return this._spine.skeleton.bones.map(b => ({ name: b.data.name, local: readLocal(b.pose), applied: readApplied(b) }))
   }
 
   getActiveAttachments(): AttachmentInfo[] {
@@ -284,20 +302,15 @@ export default class Spine43Adapter extends BasePixi8Adapter<Spine> {
     return data.bones.filter(b => !keyed.has(b.index)).map(b => b.name)
   }
 
-  setBoneLocalTransform(boneName: string, transform: Partial<BoneLocalTransform>): void {
-    const pose = this._spine?.skeleton.findBone(boneName)?.pose
-    if (!pose) return
-    if (transform.x        !== undefined) pose.x        = transform.x
-    if (transform.y        !== undefined) pose.y        = transform.y
-    if (transform.rotation !== undefined) pose.rotation = transform.rotation
-    if (transform.scaleX   !== undefined) pose.scaleX   = transform.scaleX
-    if (transform.scaleY   !== undefined) pose.scaleY   = transform.scaleY
+  getBoneSetupTransform(boneName: string): BoneLocalTransform | null {
+    const bd = (this._skeletonData as SkeletonData | null)?.findBone(boneName)
+    return bd ? setupOf(bd, true) : null
   }
 
-  getBoneSetupTransform(boneName: string): BoneLocalTransform | null {
-    const sp = (this._skeletonData as SkeletonData | null)?.findBone(boneName)?.setupPose
-    if (!sp) return null
-    return { x: sp.x, y: sp.y, rotation: sp.rotation, scaleX: sp.scaleX, scaleY: sp.scaleY }
+  toSpineJson(): { json: object; warnings: string[] } {
+    const data = this._skeletonData as SkeletonData | null
+    if (!data) throw new Error('No skeleton loaded')
+    return serializeSkeletonData(data, spine43, dialectOf(data.version, '4.3'))
   }
 
   // ── Sliders ────────────────────────────────────────────────────────────────
@@ -334,7 +347,7 @@ export default class Spine43Adapter extends BasePixi8Adapter<Spine> {
       this._detachedSliderBones.set(name, slider.bone)
       slider.bone = null
     }
-    this._applySliderOverrides()
+    this._poseNow()
   }
 
   resetSlider(name: string): void {
@@ -348,10 +361,16 @@ export default class Spine43Adapter extends BasePixi8Adapter<Spine> {
       this._spine?.skeleton.updateCache()
     }
     slider.setupPose()
+    this._poseNow()
   }
 
   private _findSlider(name: string): Slider | null {
     return this._spine?.skeleton.findConstraint(name, Slider) ?? null
+  }
+
+  protected _beforeWorld(): void {
+    this._applySliderOverrides()
+    super._beforeWorld()
   }
 
   private _applySliderOverrides(): void {
@@ -374,6 +393,10 @@ export default class Spine43Adapter extends BasePixi8Adapter<Spine> {
     if (!p) return null
     // appliedPose.rotation is CCW degrees (Spine Y-up); Pixi wants CW radians.
     return { x: p.worldX, y: p.worldY, rotation: -p.rotation * (Math.PI / 180) }
+  }
+
+  protected _poseOf(boneName: string): BoneLike | null {
+    return this._spine?.skeleton.findBone(boneName)?.pose ?? null
   }
 
   protected _slotAlpha(slotName: string): number {

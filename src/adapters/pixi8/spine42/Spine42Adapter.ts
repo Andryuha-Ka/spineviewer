@@ -10,11 +10,14 @@ import {
   Spine, SpineTexture,
   AtlasAttachmentLoader, SkeletonJson, SkeletonBinary,
 } from '@esotericsoftware/spine-pixi-v8'
-import { TextureAtlas, Skin } from '@esotericsoftware/spine-core'
+import { TextureAtlas, Skin, Physics } from '@esotericsoftware/spine-core'
+import * as spineCore from '@esotericsoftware/spine-core'
 import type {
-  BoneTransform, BoneLocalTransform, AttachmentInfo, SlotBounds,
+  BoneTransform, BoneLocalTransform, BoneLocalState, AttachmentInfo, SlotBounds,
 } from '@/core/types/ISpineAdapter'
+import { readApplied, readLocal, setupOf, worldShear, type BoneLike } from '@/core/utils/boneTransform'
 import type { FileSet } from '@/core/types/FileSet'
+import { dialectOf, serializeSkeletonData } from '@/core/spineJson/serializeSkeletonData'
 import {
   BasePixi8Adapter, classifyAttachment, meshVertexCount,
   type Pixi8LabelPose, type Pixi8TrackEntry,
@@ -22,6 +25,7 @@ import {
 
 export default class Spine42Adapter extends BasePixi8Adapter<Spine> {
   readonly detectedVersion = '4.2'
+  protected readonly _physicsPose = Physics.pose
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -62,6 +66,7 @@ export default class Spine42Adapter extends BasePixi8Adapter<Spine> {
     // 4. Create Spine display object
     this._skeletonData = skeletonData
     this._spine = new Spine({ skeletonData })
+    this._spine.beforeUpdateWorldTransforms = () => this._beforeWorld()
 
     // 5. Fill metadata
     this.animations = skeletonData.animations.map((a: { name: string }) => a.name)
@@ -103,8 +108,16 @@ export default class Spine42Adapter extends BasePixi8Adapter<Spine> {
     this._spine.skeleton.setSlotsToSetupPose()
   }
 
-  setToSetupPose(): void { this._spine?.skeleton.setToSetupPose() }
-  setBonesToSetupPose(): void { this._spine?.skeleton.setBonesToSetupPose() }
+  setToSetupPose(): void {
+    this._spine?.skeleton.setToSetupPose()
+    this._poseNow()
+  }
+
+  setBonesToSetupPose(): void {
+    this._spine?.skeleton.setBonesToSetupPose()
+    this._poseNow()
+  }
+
   setSlotsToSetupPose(): void { this._spine?.skeleton.setSlotsToSetupPose() }
 
   // ── Live data ──────────────────────────────────────────────────────────────
@@ -121,7 +134,13 @@ export default class Spine42Adapter extends BasePixi8Adapter<Spine> {
       rotation: -b.getWorldRotationX(),
       scaleX: b.getWorldScaleX(),
       scaleY: b.getWorldScaleY(),
+      shearY: worldShear(b.a, b.b, -b.c, -b.d),
     }))
+  }
+
+  getBoneLocalTransforms(): BoneLocalState[] {
+    if (!this._spine) return []
+    return this._spine.skeleton.bones.map(b => ({ name: b.data.name, local: readLocal(b), applied: readApplied(b) }))
   }
 
   getActiveAttachments(): AttachmentInfo[] {
@@ -234,21 +253,15 @@ export default class Spine42Adapter extends BasePixi8Adapter<Spine> {
     return this.bones.filter(b => !animated.has(b.name)).map(b => b.name)
   }
 
-  setBoneLocalTransform(boneName: string, transform: Partial<BoneLocalTransform>): void {
-    const bone = this._spine?.skeleton.findBone(boneName)
-    if (!bone) return
-    if (transform.x        !== undefined) bone.x        = transform.x
-    if (transform.y        !== undefined) bone.y        = transform.y
-    if (transform.rotation !== undefined) bone.rotation = transform.rotation
-    if (transform.scaleX   !== undefined) bone.scaleX   = transform.scaleX
-    if (transform.scaleY   !== undefined) bone.scaleY   = transform.scaleY
+  getBoneSetupTransform(boneName: string): BoneLocalTransform | null {
+    const bd = this._skeletonData?.findBone(boneName)
+    return bd ? setupOf(bd, false) : null
   }
 
-  getBoneSetupTransform(boneName: string): BoneLocalTransform | null {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bd = (this._skeletonData?.bones as any[])?.find((b: any) => b.name === boneName)
-    if (!bd) return null
-    return { x: bd.x ?? 0, y: bd.y ?? 0, rotation: bd.rotation ?? 0, scaleX: bd.scaleX ?? 1, scaleY: bd.scaleY ?? 1 }
+  toSpineJson(): { json: object; warnings: string[] } {
+    const data = this._skeletonData
+    if (!data) throw new Error('No skeleton loaded')
+    return serializeSkeletonData(data, spineCore, dialectOf(data.version, '4.2'))
   }
 
   // ── Base hooks ─────────────────────────────────────────────────────────────
@@ -264,6 +277,10 @@ export default class Spine42Adapter extends BasePixi8Adapter<Spine> {
     // bone.arotation = CCW-positive degrees (Spine Y-up math).
     // Pixi rotation = CW-positive radians → negate and convert.
     return { x: bone.worldX, y: bone.worldY, rotation: -bone.arotation * (Math.PI / 180) }
+  }
+
+  protected _poseOf(boneName: string): BoneLike | null {
+    return this._spine?.skeleton.findBone(boneName) ?? null
   }
 
   protected _slotAlpha(slotName: string): number {

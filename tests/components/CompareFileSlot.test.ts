@@ -5,6 +5,7 @@ import CompareFileSlot from '@/components/compare/CompareFileSlot.vue'
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useCompareStore } from '@/core/stores/useCompareStore'
 import type { SpineSlot } from '@/core/types/FileSet'
+import { SPINE_ACCEPT_EXTENSIONS } from '@/core/utils/fileLoader'
 
 describe('CompareFileSlot (B4)', () => {
   beforeEach(() => setActivePinia(createPinia()))
@@ -27,6 +28,14 @@ describe('CompareFileSlot (B4)', () => {
 
     await wrapper.find('.slot-btn').trigger('click')
     expect(pick().classes()).toContain('dropdown-item--active')
+    wrapper.unmount()
+  })
+
+  it('file input accepts zips through the shared accept list', () => {
+    const wrapper = mount(CompareFileSlot, { props: { side: 'left' } })
+    const accept = wrapper.find('input[type="file"]').attributes('accept')!.split(',')
+    expect(accept).toEqual(SPINE_ACCEPT_EXTENSIONS)
+    expect(accept).toContain('.zip')
     wrapper.unmount()
   })
 

@@ -3,6 +3,7 @@ import {
   BasePixi8Adapter, classifyAttachment, meshVertexCount,
   type Pixi8SpineLike, type Pixi8TrackEntry, type Pixi8LabelPose,
 } from '@/adapters/pixi8/BasePixi8Adapter'
+import { loadFixtureAdapter, step, local, applied, world } from '../fixtureAdapters'
 
 function entry(name: string, duration: number, next: Pixi8TrackEntry | null = null): Pixi8TrackEntry {
   return { animation: { name, duration }, trackTime: 0, loop: false, timeScale: 1, mixDuration: 0, delay: 0, next }
@@ -12,6 +13,8 @@ const DURATIONS: Record<string, number> = { a: 2, b: 1, c: 0.4 }
 
 class TestAdapter extends BasePixi8Adapter<Pixi8SpineLike> {
   readonly detectedVersion = 'test'
+  protected readonly _physicsPose = 3
+  poses = 0
   tracks: Array<Pixi8TrackEntry | null> = []
   onEntry: Array<[number, Pixi8TrackEntry]> = []
 
@@ -57,12 +60,19 @@ class TestAdapter extends BasePixi8Adapter<Pixi8SpineLike> {
   getAllAttachments() { return [] }
   getSlotBounds() { return null }
   getFreeBones() { return [] }
-  setBoneLocalTransform(): void {}
-  getBoneSetupTransform() { return null }
+  getBoneLocalTransforms() { return [] }
+  toSpineJson() { return { json: {}, warnings: [] } }
+  bone = { x: 0, y: 0, rotation: 5, scaleX: 1, scaleY: 1, shearX: 0, shearY: 0 }
+  getBoneSetupTransform(name: string) {
+    return name === 'c' ? { x: 0, y: 0, rotation: 5, scaleX: 1, scaleY: 1, shearX: 0, shearY: 0 } : null
+  }
 
   protected _trackEntry(track: number): Pixi8TrackEntry | null { return this.tracks[track] ?? null }
   protected _labelPose(): Pixi8LabelPose | null { return null }
   protected _slotAlpha(): number { return 1 }
+  protected _poseOf(name: string) { return name === 'c' ? this.bone : null }
+  beforeWorld() { this._beforeWorld() }
+  protected _poseNow(): void { this.poses++ }
 }
 
 describe('BasePixi8Adapter track operations', () => {
@@ -97,7 +107,9 @@ describe('BasePixi8Adapter track operations', () => {
     a.setTrackTimeScale(0, 2)
     a.seekTo(0, 1.25)
     expect(e).toMatchObject({ loop: true, timeScale: 2, trackTime: 1.25 })
+    expect(a.poses).toBe(1) // a seek poses at once
     expect(() => { a.setTrackLoop(5, true); a.setTrackTimeScale(5, 1); a.seekTo(5, 1) }).not.toThrow()
+    expect(a.poses).toBe(1)
   })
 
   it('removeQueueEntry unlinks the queued entry at index', () => {
@@ -203,5 +215,100 @@ describe('classifyAttachment / meshVertexCount', () => {
     expect(meshVertexCount(new RegionAttachment())).toBeUndefined()
     expect(meshVertexCount(new ClippingAttachment())).toBeUndefined()
     expect(meshVertexCount({ triangles: [] })).toBeUndefined()
+  })
+})
+
+describe('BasePixi8Adapter bone overrides', () => {
+  it('merges, writes at once and in the hook, releases to setup; unknown bones are ignored', () => {
+    const a = new TestAdapter()
+    a.setBoneOverride('c', { rotation: 45 })
+    a.setBoneOverride('c', { x: 3 })
+    a.setBoneOverride('zz', { x: 1 })
+    expect(a.getBoneOverrides()).toEqual({ c: { rotation: 45, x: 3 } })
+    expect(a.bone).toMatchObject({ rotation: 45, x: 3 })
+    expect(a.poses).toBe(2)
+    a.bone.rotation = 12 // state.apply
+    a.beforeWorld()
+    expect(a.bone.rotation).toBe(45)
+    a.setBoneOverride('c', null)
+    expect(a.bone).toMatchObject({ rotation: 5, x: 0 })
+    a.bone.rotation = 12
+    a.beforeWorld()
+    expect(a.bone.rotation).toBe(12)
+    a.setBoneOverride('c', { y: 1 })
+    a.destroy()
+    expect(a.getBoneOverrides()).toEqual({})
+  })
+})
+
+describe('Spine42Adapter on the 4.2 fixture', () => {
+  it('reads local, applied after IK and world shear', async () => {
+    const a = await loadFixtureAdapter('4.2')
+    step(a, 0)
+    expect(local(a, 'c')).toEqual({ x: 40, y: 0, rotation: 5, scaleX: 1.2, scaleY: 1, shearX: 10, shearY: -5 })
+    expect(applied(a, 'c')).toEqual(local(a, 'c'))
+    expect(Math.abs(applied(a, 'a').rotation - local(a, 'a').rotation)).toBeGreaterThan(1)
+    expect(world(a, 'c').shearY).toBeCloseTo(-15, 4)
+    expect(a.getBoneSetupTransform('c')).toEqual(local(a, 'c'))
+  })
+
+  it('override holds over a keyed rotate and is visible after one update(0) while paused', async () => {
+    const a = await loadFixtureAdapter('4.2')
+    a.setAnimation(0, 'anim', true)
+    step(a, 0.6)
+    expect(local(a, 'c').rotation).toBeCloseTo(55, 4)
+    a.setBoneOverride('c', { rotation: 45 })
+    step(a, 0.1)
+    expect(local(a, 'c').rotation).toBe(45)
+
+    a.setTimeScale(0)
+    const before = world(a, 'c').rotation
+    a.setBoneOverride('c', { rotation: 15 })
+    step(a, 0)
+    expect(local(a, 'c').rotation).toBe(15)
+    expect(world(a, 'c').rotation).toBeCloseTo(before - 30, 3)
+
+    a.clearTracks()
+    a.setBoneOverride('c', null)
+    step(a, 0)
+    expect(local(a, 'c').rotation).toBe(5)
+  })
+
+  it('physics still acts on an overridden position', async () => {
+    const a = await loadFixtureAdapter('4.2')
+    for (let i = 0; i < 10; i++) step(a, 1 / 60)
+    expect(world(a, 'tail').x).toBeCloseTo(-40, 3)
+    a.setBoneOverride('tail', { x: 10 })
+    step(a, 1 / 60)
+    expect(local(a, 'tail').x).toBe(10)
+    // inertia: the physics bone lags behind the jump instead of snapping to it
+    expect(Math.abs(world(a, 'tail').x - 10)).toBeGreaterThan(1)
+    for (let i = 0; i < 300; i++) step(a, 1 / 60)
+    expect(world(a, 'tail').x).toBeCloseTo(10, 0)
+  })
+})
+
+describe.each(['4.2', '4.3'] as const)('pixi 8 adapter on the %s fixture', ver => {
+  // a reload mounts and replays a fresh adapter, then the app may render before the Spine ticker runs
+  it('is posed before its first tick: mount, replayed seek and override, then a setup-pose reset', async () => {
+    const a = await loadFixtureAdapter(ver)
+    const pose = () => a.getBoneTransforms().map(b => [b.name, b.x, b.y, b.rotation])
+    a.mount({ addChild() {}, removeChild() {} })
+    expect(world(a, 'c').x).not.toBe(0)
+    a.setAnimation(0, 'anim', true)
+    a.seekTo(0, 0.6)
+    a.setBoneOverride('c', { shearX: 3 })
+    expect(local(a, 'c')).toMatchObject({ rotation: expect.closeTo(55, 4), shearX: 3 })
+    const posed = pose()
+    step(a, 0)
+    expect(pose()).toEqual(posed)
+
+    a.setBoneOverride('c', { rotation: 33 })
+    a.clearTracks()
+    a.setToSetupPose()
+    expect(local(a, 'c')).toMatchObject({ rotation: 33, shearX: 3, x: 40 })
+    const reset = pose()
+    step(a, 0)
+    expect(pose()).toEqual(reset)
   })
 })

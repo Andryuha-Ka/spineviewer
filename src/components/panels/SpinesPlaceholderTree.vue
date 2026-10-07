@@ -127,6 +127,11 @@
               <line x1="2" y1="8.5" x2="22" y2="8.5"/>
             </svg>
             <span class="ph-spine-name">{{ entry.fileName }}</span>
+            <span
+              v-if="editStore.isEdited(entry.childSlotId)"
+              class="ph-spine-edited-mark"
+              :title="editStore.isUnsaved(entry.childSlotId) ? 'Skeleton data edited — export to keep changes' : 'Skeleton data edited'"
+            >★</span>
             <button
               class="ph-image-sync-btn"
               :class="{ 'ph-image-sync-btn--desynced': !entry.syncEnabled }"
@@ -166,6 +171,7 @@ import { useFileLoaderStore, SPINE_SLOTS_LIMIT, PH_PENDING_SENTINEL } from '@/co
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { usePlaceholderImagesStore } from '@/core/stores/usePlaceholderImagesStore'
 import { usePlaceholderActions, SPINE_SLOT_MIME, PH_IMAGE_MIME, PH_SPINE_MIME, IMAGE_LAYER_MIME, type PlaceholderChildRef } from '@/core/composables/usePlaceholderActions'
+import { useSkeletonEditStore } from '@/core/stores/useSkeletonEditStore'
 import type { SpineSlot } from '@/core/types/FileSet'
 
 defineProps<{ spineSlot: SpineSlot }>()
@@ -178,6 +184,7 @@ const fileLoaderStore    = useFileLoaderStore()
 const slotSelectionStore = useSlotSelectionStore()
 const phImagesStore      = usePlaceholderImagesStore()
 const actions            = usePlaceholderActions()
+const editStore          = useSkeletonEditStore()
 
 function readRef(e: DragEvent, mime: string): PlaceholderChildRef | null {
   const data = e.dataTransfer?.getData(mime)
@@ -490,6 +497,12 @@ function onPhSpineDragEnd(): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ph-spine-edited-mark {
+  font-size: 0.6875rem;
+  color: var(--c-warning);
+  flex-shrink: 0;
 }
 
 .ph-spine-entry--active {

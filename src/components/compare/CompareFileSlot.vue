@@ -58,7 +58,7 @@
       type="file"
       multiple
       class="hidden-input"
-      accept=".json,.skel,.atlas,.png,.jpg,.jpeg,.webp,.avif"
+      :accept="SPINE_ACCEPT_EXTENSIONS.join(',')"
       @change="onFileInput"
     />
   </div>
@@ -67,6 +67,7 @@
 <script setup lang="ts">
 import { useCompareStore, type SpineSlotRef } from '@/core/stores/useCompareStore'
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
+import { SPINE_ACCEPT_EXTENSIONS } from '@/core/utils/fileLoader'
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 

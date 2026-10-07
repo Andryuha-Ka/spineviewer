@@ -51,6 +51,7 @@ import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useExportStore } from '@/core/stores/useExportStore'
+import { useSkeletonEditStore } from '@/core/stores/useSkeletonEditStore'
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ const fileLoaderStore = useFileLoaderStore()
 const skeletonStore  = useSkeletonStore()
 const animationStore = useAnimationStore()
 const exportStore    = useExportStore()
+const editStore      = useSkeletonEditStore()
 
 // ── Refs ───────────────────────────────────────────────────────────────────────
 
@@ -141,7 +143,11 @@ function onPanelResizeStart(e: MouseEvent) {
 // ── Back ───────────────────────────────────────────────────────────────────────
 
 function onClickBack() {
-  if (!window.confirm('Reset and return to version picker?')) return
+  const unsaved = editStore.unsavedWorkSummary()
+  const text = unsaved.length > 0
+    ? `Reset and return to version picker? Unsaved work will be lost: ${unsaved.join(', ')}.`
+    : 'Reset and return to version picker?'
+  if (!window.confirm(text)) return
   compareStore.reset()
   skeletonStore.clear()
   animationStore.reset()

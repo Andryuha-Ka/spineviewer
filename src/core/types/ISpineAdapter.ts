@@ -81,6 +81,8 @@ export interface BoneTransform {
   rotation: number
   scaleX: number
   scaleY: number
+  /** World shear in degrees, (−180, 180]; 0 for orthogonal axes */
+  shearY: number
 }
 
 /** Local-space transform without the bone name — used for get/set operations */
@@ -90,7 +92,19 @@ export interface BoneLocalTransform {
   rotation: number
   scaleX: number
   scaleY: number
+  shearX: number
+  shearY: number
 }
+
+export interface BoneLocalState {
+  name: string
+  /** Unconstrained pose: what animations, overrides and setup edits write */
+  local: BoneLocalTransform
+  /** Pose after constraints this frame */
+  applied: BoneLocalTransform
+}
+
+export type BoneOverrides = Record<string, Partial<BoneLocalTransform>>
 
 export interface AttachmentInfo {
   slotName: string
@@ -163,6 +177,7 @@ export interface ISpineAdapter {
   // Live data (called each frame by ticker)
   getTrackStates(): TrackState[]
   getBoneTransforms(): BoneTransform[]
+  getBoneLocalTransforms(): BoneLocalState[]
   getActiveAttachments(): AttachmentInfo[]
   // Returns all attachments across all skins from loaded skeleton data (works for binary .skel too)
   getAllAttachments(): AttachmentInfo[]
@@ -180,8 +195,10 @@ export interface ISpineAdapter {
 
   // Returns names of bones that have no keyframes in any animation (candidates for programmatic control)
   getFreeBones(): string[]
-  // Set local-space transform on a live bone (does not require updateWorldTransform — runtime handles it)
-  setBoneLocalTransform(boneName: string, transform: Partial<BoneLocalTransform>): void
+  // Holds absolute local values over animations every frame, merged per field; null releases all.
+  // Released fields get the setup value once. Unknown bone names are ignored.
+  setBoneOverride(boneName: string, transform: Partial<BoneLocalTransform> | null): void
+  getBoneOverrides(): BoneOverrides
   // Returns the setup pose local transform for a bone (use for reset)
   getBoneSetupTransform(boneName: string): BoneLocalTransform | null
 
@@ -209,6 +226,9 @@ export interface ISpineAdapter {
   getPlaceholderContainer(phName: string): unknown | null
   // Returns the world transform of the placeholder container (for inverse-matrix drag of child spine).
   getPlaceholderContainerWorldTransform(phName: string): { a: number; b: number; c: number; d: number; tx: number; ty: number } | null
+
+  // Skeleton data as loaded, serialized to Spine JSON of the runtime's dialect
+  toSpineJson(): { json: object; warnings: string[] }
 
   // Optional (Spine 4.3 only) — presence is the capability flag
   getSliders?(): SliderInfo[]

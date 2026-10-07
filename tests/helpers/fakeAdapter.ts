@@ -1,5 +1,7 @@
 import { vi } from 'vitest'
-import type { ISpineAdapter, SliderInfo, TrackState } from '@/core/types/ISpineAdapter'
+import type {
+  BoneLocalState, BoneLocalTransform, BoneOverrides, ISpineAdapter, SliderInfo, TrackState,
+} from '@/core/types/ISpineAdapter'
 
 export interface FakeSpineObject {
   x: number
@@ -54,6 +56,16 @@ export function makeFakeAdapter(tracks: TrackState[] = [], animations: string[] 
     removeImageFromPlaceholder: vi.fn(),
     setImageTransform:          vi.fn(),
     setImageZIndex:             vi.fn(),
+    overrides: {} as BoneOverrides,
+    getBoneLocalTransforms: vi.fn((): BoneLocalState[] => []),
+    getBoneSetupTransform:  vi.fn((): BoneLocalTransform | null => null),
+    setBoneOverride: vi.fn((name: string, t: Partial<BoneLocalTransform> | null) => {
+      if (t === null) { delete adapter.overrides[name]; return }
+      adapter.overrides[name] = { ...adapter.overrides[name], ...t }
+    }),
+    getBoneOverrides: vi.fn((): BoneOverrides =>
+      Object.fromEntries(Object.entries(adapter.overrides).map(([k, v]) => [k, { ...v }]))),
+    toSpineJson: vi.fn(() => ({ json: { skeleton: { spine: '4.2.40' } } as object, warnings: [] as string[] })),
     spineObj,
     containers,
   }

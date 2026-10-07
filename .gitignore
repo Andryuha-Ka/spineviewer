@@ -24,3 +24,7 @@ PLAN.md
 COMPARE_PLAN.md
 animation.md
 openspec
+
+# MCP package build output
+mcp/node_modules/
+mcp/dist/

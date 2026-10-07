@@ -35,6 +35,8 @@ import ViewerPage from '@/components/pages/ViewerPage.vue'
 import ComparePage from '@/components/compare/ComparePage.vue'
 import { useSettingsStore } from '@/core/stores/useSettingsStore'
 import { naiveOverrides } from '@/core/utils/themePalette'
+import { installSvpApi, uninstallSvpApi } from '@/core/api/svpApi'
+import { useSkeletonEditStore } from '@/core/stores/useSkeletonEditStore'
 
 const settingsStore = useSettingsStore()
 const page     = ref<'picker' | 'viewer' | 'compare'>('picker')
@@ -46,6 +48,18 @@ function onOpenCompare(payload?: { left?: string; right?: string }) {
   compareInitRight.value = payload?.right
   page.value = 'compare'
 }
+
+installSvpApi({
+  currentPage: () => page.value,
+  openViewer:  () => { page.value = 'viewer' },
+  openPicker:  () => { page.value = 'picker' },
+})
+onUnmounted(uninstallSvpApi)
+
+const editStore = useSkeletonEditStore()
+useEventListener(window, 'beforeunload', (e: BeforeUnloadEvent) => {
+  if (editStore.hasUnsavedEdits) e.preventDefault()
+})
 
 const naiveTheme = computed(() => settingsStore.theme === 'dark' ? darkTheme : null)
 const themeOverrides = computed(() => naiveOverrides(settingsStore.palette, settingsStore.theme))

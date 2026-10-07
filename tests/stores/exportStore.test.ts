@@ -44,4 +44,13 @@ describe('export store settings', () => {
     store.start('png')
     expect(store.notice).toBeNull()
   })
+
+  it('labels the Spine JSON zip progress "Packing zip…"', () => {
+    const store = useExportStore()
+    expect(store.progressLabel).toBe('Exporting…')
+    store.start('skeleton')
+    expect(store.progressLabel).toBe('Packing zip…')
+    store.start('sheet')
+    expect(store.progressLabel).toBe('Capturing frames…')
+  })
 })

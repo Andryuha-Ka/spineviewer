@@ -7,12 +7,8 @@
  */
 
 import { useFileLoaderStore } from '@/core/stores/useFileLoaderStore'
-import { useVersionStore, spineOptionsMap, type PixiVersion, type SpineVersion } from '@/core/stores/useVersionStore'
-import { groupSpineFiles, getFilesFromDataTransfer } from '@/core/utils/fileLoader'
-import { KNOWN_VERSIONS, detectSpineVersion, detectSpineVersionFromSkel, spineVersionProblem, unsupportedVersionHint } from '@/core/utils/versionDetector'
-import { validateSpineFileSet } from '@/core/utils/spineValidator'
+import { getFilesFromDataTransfer } from '@/core/utils/fileLoader'
 import {
-  saveSession,
   isFileSystemAccessSupported,
   pickFilesViaFSAA,
   pickFolderViaFSAA,
@@ -40,7 +36,6 @@ export function formatSize(bytes: number): string {
 
 export function useFilePickerLogic(emit: EmitFn<ShortEmitsToObject<PickerEmits>>,onHistorySaved?: () => void) {
   const fileLoaderStore = useFileLoaderStore()
-  const store           = useVersionStore()
 
   const isDragging     = ref(false)
   const classifyError  = ref<string | null>(null)
@@ -49,68 +44,22 @@ export function useFilePickerLogic(emit: EmitFn<ShortEmitsToObject<PickerEmits>>
   const fileInputRef   = ref<HTMLInputElement | null>(null)
   const folderInputRef = ref<HTMLInputElement | null>(null)
 
-  function autoSelectVersion(version: string): void {
-    const entry = Object.entries(spineOptionsMap).find(([, list]) => list.includes(version as SpineVersion))
-    if (entry) store.selectVersion(Number(entry[0]) as PixiVersion, version as SpineVersion)
-  }
-
   async function handleFiles(
     files: File[],
     handles?: FileSystemFileHandle[],
     skipHistory = false,
   ): Promise<void> {
     if (files.length === 0) return
-    isDragging.value     = false
-    classifyError.value  = null
-    versionUnknown.value = false
+    isDragging.value      = false
+    classifyError.value   = null
+    versionUnknown.value  = false
     unsupportedHint.value = null
 
-    fileLoaderStore.setPendingFiles(files)
-
-    const result = await groupSpineFiles(files)
-
-    if (result.globalError) {
-      classifyError.value = result.globalError
-      return
-    }
-    if (result.slots.length === 0) {
-      classifyError.value = 'No valid Spine files found'
-      return
-    }
-
-    const firstValid = result.slots.find(s => !s.error && s.fileSet)
-    let version: string | null = null
-    if (firstValid?.fileSet) {
-      const { skeleton } = firstValid.fileSet
-      version = skeleton.type === 'skeleton-json'
-        ? detectSpineVersion(skeleton.fileBody as string)
-        : detectSpineVersionFromSkel(skeleton.fileBody as ArrayBuffer)
-    }
-
-    // unknown/unsupported first set: only sets with an unsupported version of their own get marked
-    const runtimeVersion = version && KNOWN_VERSIONS.includes(version as SpineVersion) ? version : 'unknown'
-    for (const slot of result.slots) {
-      if (slot.fileSet) {
-        const errs = validateSpineFileSet(slot.fileSet)
-        const versionProblem = spineVersionProblem(slot.fileSet, runtimeVersion)
-        if (versionProblem) errs.push(versionProblem)
-        if (errs.length > 0) slot.validationErrors = errs
-      }
-    }
-
-    fileLoaderStore.setSlots(result.slots, version)
-
-    if (version && version !== 'unknown') {
-      autoSelectVersion(version)
-    } else {
-      versionUnknown.value = true
-    }
-    unsupportedHint.value = unsupportedVersionHint(version ?? '')
-
-    if (!skipHistory && result.slots.some(s => !s.error && !s.validationErrors?.length)) {
-      await saveSession(files.map(f => f.name), handles)
-      onHistorySaved?.()
-    }
+    const result = await fileLoaderStore.loadFileList(files, { skipHistory, handles })
+    classifyError.value   = result.error
+    versionUnknown.value  = result.versionUnknown
+    unsupportedHint.value = result.unsupportedHint
+    if (result.historySaved) onHistorySaved?.()
   }
 
   async function onDrop(e: DragEvent): Promise<void> {
@@ -197,7 +146,6 @@ export function useFilePickerLogic(emit: EmitFn<ShortEmitsToObject<PickerEmits>>
     fileInputRef,
     folderInputRef,
     handleFiles,
-    autoSelectVersion,
     onDrop,
     onChooseFiles,
     onChooseFolder,

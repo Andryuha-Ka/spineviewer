@@ -6,7 +6,7 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
 
-import type { ISpineAdapter, TrackState, TrackQueueEntry, TrackMixOptions } from '@/core/types/ISpineAdapter'
+import type { BoneOverrides, ISpineAdapter, TrackState, TrackQueueEntry, TrackMixOptions } from '@/core/types/ISpineAdapter'
 import type { PHChildEntry, PHImageEntry, PHSpineEntry, SpineSlot, SpineSlotSavedState } from '@/core/types/FileSet'
 
 /** Plain copies of placeholder entries; `PHSpineEntry.fileSet` stays in loaderStore.spineSlots, never in a snapshot. */
@@ -48,6 +48,7 @@ interface SlotSnapshotInput {
   slot?: Pick<SpineSlot, 'syncEnabled' | 'indPosX' | 'indPosY' | 'indZoom'>
   trackTimes?: Record<number, number>
   placeholderChildren?: Record<string, PHChildEntry[]>
+  boneOverrides?: BoneOverrides
 }
 
 /** Snapshot of the slot that is leaving the stage, built from the live UI state. */
@@ -72,6 +73,7 @@ export function buildSlotSavedState(input: SlotSnapshotInput): SpineSlotSavedSta
   if (input.trackTimes) state.trackTimes = input.trackTimes
   if (Object.keys(playback.trackMix).length > 0) state.trackMix = JSON.parse(JSON.stringify(playback.trackMix))
   if (input.placeholderChildren) state.placeholderChildren = withoutFileSets(input.placeholderChildren)
+  if (input.boneOverrides && Object.keys(input.boneOverrides).length > 0) state.boneOverrides = JSON.parse(JSON.stringify(input.boneOverrides))
   return state
 }
 
@@ -137,12 +139,26 @@ export function applySavedTrackMix(
   }
 }
 
-/** Puts a saved slot back on an adapter that was mounted without it: per-track options, enabled tracks, their queues and times. */
+/** Saved bone overrides onto the adapter; bones this skeleton lacks are skipped. */
+export function applySavedBoneOverrides(
+  adapter: Pick<ISpineAdapter, 'bones' | 'setBoneOverride'>,
+  state: Pick<SpineSlotSavedState, 'boneOverrides'> | undefined,
+): void {
+  const saved = state?.boneOverrides
+  if (!saved) return
+  const known = new Set(adapter.bones.map(b => b.name))
+  for (const [name, t] of Object.entries(saved)) {
+    if (known.has(name)) adapter.setBoneOverride(name, { ...t })
+  }
+}
+
+/** Puts a saved slot back on an adapter that was mounted without it: per-track options, bone overrides, enabled tracks, their queues and times. */
 export function replaySavedTracks(
-  adapter: Pick<ISpineAdapter, 'animations' | 'setAnimation' | 'addAnimation' | 'seekTo' | 'setTrackMixOptions'>,
-  state: Pick<SpineSlotSavedState, 'trackPlaylists' | 'trackEnabled' | 'trackTimes' | 'trackMix'>,
+  adapter: Pick<ISpineAdapter, 'animations' | 'bones' | 'setAnimation' | 'addAnimation' | 'seekTo' | 'setTrackMixOptions' | 'setBoneOverride'>,
+  state: Pick<SpineSlotSavedState, 'trackPlaylists' | 'trackEnabled' | 'trackTimes' | 'trackMix' | 'boneOverrides'>,
 ): void {
   applySavedTrackMix(adapter, state.trackMix)
+  applySavedBoneOverrides(adapter, state)
   for (const [idxStr, playlist] of Object.entries(state.trackPlaylists)) {
     const track = Number(idxStr)
     if (state.trackEnabled[track] === false || !queueTrackList(adapter, track, playlist)) continue

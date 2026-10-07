@@ -6,6 +6,9 @@
  * @built-with Claude Code (https://claude.ai/claude-code)
  */
 
+import type { AsyncZippable } from 'fflate'
+import type { FileSet } from '@/core/types/FileSet'
+
 /** Download a Blob as a file */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
@@ -77,5 +80,51 @@ export function withBackground(canvas: HTMLCanvasElement, color: number | string
   ctx.fillStyle = typeof color === 'number' ? `#${color.toString(16).padStart(6, '0')}` : color
   ctx.fillRect(0, 0, out.width, out.height)
   ctx.drawImage(canvas, 0, 0)
+  return out
+}
+
+/** Replaces characters not allowed in file names with `_`. */
+export function safeFileName(name: string): string {
+  // eslint-disable-next-line no-control-regex
+  return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+}
+
+/**
+ * Flat edited-skeleton zip: `<name>.json`, the source atlas and its page images with their original bytes.
+ * The skeleton body must already be Spine JSON text; aborting `signal` terminates packing.
+ */
+export async function buildSkeletonZip(
+  fileSet: FileSet,
+  skeletonName: string,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const { skeleton, atlas, images } = fileSet
+  if (typeof skeleton.fileBody !== 'string') throw new Error('Skeleton is not Spine JSON')
+  const { zip } = await import('fflate')
+  const text = { level: 6 } as const
+  const files: AsyncZippable = {
+    [`${safeFileName(skeletonName)}.json`]: [bodyBytes(skeleton.fileBody, false), text],
+    [safeFileName(atlas.filename)]:         [bodyBytes(atlas.fileBody, false), text],
+  }
+  for (const img of images) files[safeFileName(img.filename)] = [bodyBytes(img.fileBody, true), { level: 0 }]
+
+  signal?.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const onAbort = () => { terminate(); reject(signal!.reason) }
+    const terminate = zip(files, (err, data) => {
+      signal?.removeEventListener('abort', onAbort)
+      if (err) reject(err)
+      else resolve(new Blob([data], { type: 'application/zip' }))
+    })
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+function bodyBytes(body: string | ArrayBuffer, dataUrl: boolean): Uint8Array {
+  if (body instanceof ArrayBuffer) return new Uint8Array(body)
+  if (!dataUrl) return new TextEncoder().encode(body)
+  const bin = atob(body.slice(body.indexOf(',') + 1))
+  const out = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
   return out
 }

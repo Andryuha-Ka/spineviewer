@@ -3,6 +3,8 @@ import { ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { useExportHandlers } from '@/core/composables/useExportHandlers'
 import { useExportStore } from '@/core/stores/useExportStore'
+import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
+import { SvpError } from '@/core/api/svpErrors'
 import { downloadBlob, canvasToBlob, withBackground } from '@/core/utils/exportUtils'
 
 vi.mock('@/core/utils/exportUtils', () => ({
@@ -12,6 +14,9 @@ vi.mock('@/core/utils/exportUtils', () => ({
   buildSpriteSheet: vi.fn(async (frames: unknown[]) => frames[0]),
   withBackground:   vi.fn((c: unknown) => ({ filled: c })),
 }))
+
+const editMock = { exportSkeleton: vi.fn() }
+vi.mock('@/core/stores/useSkeletonEditStore', () => ({ useSkeletonEditStore: () => editMock }))
 
 vi.mock('gif.js', () => ({
   default: class {
@@ -97,5 +102,48 @@ describe('useExportHandlers', () => {
     await useExportHandlers(stage()).onCaptureGif({ track: 0, fps: 20, quality: 10 })
     expect(withBackground).toHaveBeenCalledWith(frameCanvas, 0x1a1a2e)
     expect(downloadBlob).toHaveBeenCalled()
+  })
+
+  describe('skeleton zip', () => {
+    beforeEach(() => { useSlotSelectionStore().activeSlotId = 'a' })
+
+    it('downloads the zip under its name and ignores Scale / Background', async () => {
+      const exportStore = useExportStore()
+      exportStore.scale = 4
+      exportStore.includeBackground = true
+      const blob = new Blob(['zip'])
+      editMock.exportSkeleton.mockResolvedValue({ blob, name: 'hero.zip', mimeType: 'application/zip', warnings: [] })
+      await useExportHandlers().onExportSkeleton()
+
+      expect(editMock.exportSkeleton).toHaveBeenCalledWith('a', 'zip', expect.any(AbortSignal))
+      expect(downloadBlob).toHaveBeenCalledWith(blob, 'hero.zip')
+      expect(withBackground).not.toHaveBeenCalled()
+      expect(exportStore.exporting).toBe(false)
+      expect(exportStore.error).toBeNull()
+    })
+
+    it('Stop aborts without a download or an error', async () => {
+      const exportStore = useExportStore()
+      editMock.exportSkeleton.mockImplementation((_id: string, _f: string, signal: AbortSignal) =>
+        new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason))))
+      const run = useExportHandlers().onExportSkeleton()
+      expect(exportStore.exportType).toBe('skeleton')
+      exportStore.cancel()
+      await run
+
+      expect(downloadBlob).not.toHaveBeenCalled()
+      expect(exportStore.error).toBeNull()
+      expect(exportStore.exporting).toBe(false)
+    })
+
+    it('a failure shows "Export failed: <reason>" without the error code', async () => {
+      const exportStore = useExportStore()
+      editMock.exportSkeleton.mockRejectedValue(new SvpError('EXPORT_FAILED', 'Skeleton is not Spine JSON'))
+      await useExportHandlers().onExportSkeleton()
+
+      expect(exportStore.error).toBe('Export failed: Skeleton is not Spine JSON')
+      expect(exportStore.exporting).toBe(false)
+      expect(downloadBlob).not.toHaveBeenCalled()
+    })
   })
 })

@@ -23,7 +23,7 @@
       <!-- ── Progress ───────────────────────────────────────── -->
       <div v-if="exportStore.exporting" class="progress-wrap">
         <div class="progress-row">
-          <span class="progress-label">{{ progressLabel }} {{ exportStore.progress }}%</span>
+          <span class="progress-label">{{ exportStore.progressLabel }} {{ exportStore.progress }}%</span>
           <n-button size="tiny" type="error" @click="emit('cancel-export')">Stop</n-button>
         </div>
         <div class="progress-bar">
@@ -193,6 +193,35 @@
         </n-button>
       </section>
 
+      <div class="divider" />
+
+      <!-- ── Skeleton ───────────────────────────────────────── -->
+      <section v-if="skeletonExport" class="section">
+        <label class="label">Skeleton</label>
+        <p class="hint">
+          Spine {{ skeletonExport.version }} JSON + atlas + images
+          <span
+            v-if="skeletonExport.state.edited"
+            class="edited-mark"
+            :title="skeletonExport.state.unsaved ? 'Skeleton data edited — export to keep changes' : 'Skeleton data edited'"
+          >★</span>
+        </p>
+        <p class="hint">Scale and background colour do not apply</p>
+        <n-button
+          size="small"
+          :disabled="exportStore.exporting"
+          @click="onExportSkeleton"
+        >
+          Export Spine JSON (.zip)
+        </n-button>
+        <template v-if="skeletonExport.state.warnings.length">
+          <span class="export-notice-inline">Conversion warnings: {{ skeletonExport.state.warnings.length }}</span>
+          <ul class="warning-list">
+            <li v-for="(w, i) in skeletonExport.state.warnings" :key="i">{{ w }}</li>
+          </ul>
+        </template>
+      </section>
+
     </template>
   </div>
 </template>
@@ -201,6 +230,11 @@
 import { useExportStore } from '@/core/stores/useExportStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
+import { useSkeletonEditStore } from '@/core/stores/useSkeletonEditStore'
+import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
+import { useVersionStore } from '@/core/stores/useVersionStore'
+import { useExportHandlers } from '@/core/composables/useExportHandlers'
+import { runtimeSpineVersion } from '@/core/utils/versionDetector'
 
 const emit = defineEmits<{
   'capture-png':   []
@@ -213,6 +247,22 @@ const emit = defineEmits<{
 const exportStore   = useExportStore()
 const skeletonStore = useSkeletonStore()
 const animationStore = useAnimationStore()
+const editStore      = useSkeletonEditStore()
+const selection      = useSlotSelectionStore()
+const versionStore   = useVersionStore()
+const { onExportSkeleton } = useExportHandlers()
+
+const skeletonExport = computed(() => {
+  const slot = selection.activeSlot
+  const { pixiVersion, spineVersion } = versionStore
+  // re-read on load / export end: a binary's conversion warnings need its live adapter
+  if (!slot?.fileSet || !pixiVersion || !spineVersion || !skeletonStore.isLoaded) return null
+  void exportStore.exporting
+  return {
+    version: runtimeSpineVersion(slot.fileSet, pixiVersion, spineVersion),
+    state:   editStore.getEditState(slot.id),
+  }
+})
 
 // Track options — built from active tracks, auto-selects if only one
 const trackOptions = computed(() =>
@@ -241,13 +291,6 @@ watch(trackOptions, (opts) => {
   }
 }, { immediate: true })
 
-const progressLabel = computed(() => {
-  switch (exportStore.exportType) {
-    case 'sheet': return 'Capturing frames…'
-    case 'gif':   return 'Encoding GIF…'
-    default:      return 'Exporting…'
-  }
-})
 </script>
 
 <style scoped>
@@ -361,6 +404,20 @@ const progressLabel = computed(() => {
   font-size: 0.75rem;
   color: var(--c-warning);
   border-bottom: 1px solid var(--c-border-dim);
+}
+
+.edited-mark {
+  color: var(--c-warning);
+}
+
+.export-notice-inline {
+  color: var(--c-warning);
+}
+
+.warning-list {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--c-text-dim);
 }
 
 /* ── Empty ── */

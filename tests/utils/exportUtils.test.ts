@@ -1,5 +1,55 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { fitScale, fitSequenceScale, withBackground } from '@/core/utils/exportUtils'
+import { unzipSync, strFromU8 } from 'fflate'
+import { buildSkeletonZip, fitScale, fitSequenceScale, safeFileName, withBackground } from '@/core/utils/exportUtils'
+import type { FileSet } from '@/core/types/FileSet'
+
+const PNG1 = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 255, 7])
+const PNG2 = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 9, 8])
+const dataUrl = (b: Uint8Array) => `data:image/png;base64,${btoa(String.fromCharCode(...b))}`
+const ATLAS = 'hero.png\nsize: 4,4\n\nhero2.png\nsize: 4,4\n'
+const JSON_ = '{"skeleton":{"spine":"4.2.40"},"bones":[{"name":"root","x":5}]}'
+
+function heroSet(): FileSet {
+  return {
+    skeleton: { filename: 'hero.json', fileBody: JSON_, type: 'skeleton-json', mimeType: 'application/json' },
+    atlas:    { filename: 'hero.atlas', fileBody: ATLAS, type: 'atlas', mimeType: 'text/plain' },
+    images: [
+      { filename: 'hero.png', fileBody: dataUrl(PNG1), type: 'image', mimeType: 'image/png' },
+      { filename: 'hero2.png', fileBody: dataUrl(PNG2), type: 'image', mimeType: 'image/png' },
+    ],
+  }
+}
+
+describe('buildSkeletonZip', () => {
+  it('holds exactly the JSON, the atlas and the page images with original bytes', async () => {
+    const blob = await buildSkeletonZip(heroSet(), 'hero')
+    expect(blob.type).toBe('application/zip')
+    const entries = unzipSync(new Uint8Array(await blob.arrayBuffer()))
+    expect(Object.keys(entries).sort()).toEqual(['hero.atlas', 'hero.json', 'hero.png', 'hero2.png'])
+    expect(strFromU8(entries['hero.json'])).toBe(JSON_)
+    expect(strFromU8(entries['hero.atlas'])).toBe(ATLAS)
+    expect(entries['hero.png']).toEqual(PNG1)
+    expect(entries['hero2.png']).toEqual(PNG2)
+  })
+
+  it('replaces illegal file-name characters', async () => {
+    const entries = unzipSync(new Uint8Array(await (await buildSkeletonZip(heroSet(), 'a/b:c*')).arrayBuffer()))
+    expect(entries['a_b_c_.json']).toBeDefined()
+    expect(safeFileName('x<y>|"?\\z')).toBe('x_y_____z')
+  })
+
+  it('rejects a binary skeleton body', async () => {
+    const set = heroSet()
+    set.skeleton = { ...set.skeleton, fileBody: new ArrayBuffer(4) }
+    await expect(buildSkeletonZip(set, 'hero')).rejects.toThrow('Skeleton is not Spine JSON')
+  })
+
+  it('rejects when aborted', async () => {
+    const ctrl = new AbortController()
+    ctrl.abort(new DOMException('Stopped', 'AbortError'))
+    await expect(buildSkeletonZip(heroSet(), 'hero', ctrl.signal)).rejects.toThrow('Stopped')
+  })
+})
 
 describe('fitScale', () => {
   it('keeps the requested scale when it fits', () => {

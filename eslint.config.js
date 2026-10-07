@@ -9,7 +9,7 @@ export default defineConfig(
     ignores: [
       'dist/**', 'node_modules/**', 'public/**', 'example/**', 'errors/**',
       'kb/**', '.claude/**', '.ai-work/**', '.docs/**', '.serena/**',
-      'src/**/*.d.ts',
+      'src/**/*.d.ts', 'mcp/**',
     ],
   },
   js.configs.recommended,

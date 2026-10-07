@@ -7,7 +7,7 @@
  */
 
 import { defineStore } from 'pinia'
-import type { BoneInfo, SlotInfo, EventInfo, ISpineAdapter, BoneLocalTransform, SliderInfo } from '@/core/types/ISpineAdapter'
+import type { BoneInfo, SlotInfo, EventInfo, ISpineAdapter, BoneLocalTransform, BoneOverrides, SliderInfo } from '@/core/types/ISpineAdapter'
 
 interface SkeletonPopulateData {
   animations: string[]
@@ -36,6 +36,8 @@ export const useSkeletonStore = defineStore('skeleton', () => {
   const selectedBone    = ref<string | null>(null)
   const selectedSlot    = ref<string | null>(null)
   const syncSelection   = ref(true)
+  /** Held overrides of the attached (UI) adapter; the adapter owns the map, this mirrors it */
+  const boneOverrides   = ref<BoneOverrides>({})
 
   // Non-reactive adapter reference — not stored in a ref to avoid Proxy wrapping class instances
   let _adapter: ISpineAdapter | null = null
@@ -50,12 +52,31 @@ export const useSkeletonStore = defineStore('skeleton', () => {
     selectedSlot.value = selectedSlot.value === name ? null : name
   }
 
-  function attachAdapter(a: ISpineAdapter): void { _adapter = a }
-  function detachAdapter(): void { _adapter = null }
-
-  function setBoneTransform(boneName: string, transform: Partial<BoneLocalTransform>): void {
-    _adapter?.setBoneLocalTransform(boneName, transform)
+  function refreshBoneOverrides(): void {
+    boneOverrides.value = _adapter?.getBoneOverrides() ?? {}
   }
+
+  function attachAdapter(a: ISpineAdapter): void { _adapter = a; refreshBoneOverrides() }
+  function detachAdapter(): void { _adapter = null; refreshBoneOverrides() }
+
+  /** Merges per field into the bone's held override; null releases the bone. */
+  function setBoneOverride(boneName: string, transform: Partial<BoneLocalTransform> | null): void {
+    _adapter?.setBoneOverride(boneName, transform)
+    refreshBoneOverrides()
+  }
+
+  /** Releases the listed fields (all when omitted); released fields return to setup. */
+  function releaseBoneOverride(boneName: string, props?: Array<keyof BoneLocalTransform>): void {
+    const held = _adapter?.getBoneOverrides()[boneName]
+    if (!held) return
+    const kept = props ? Object.fromEntries(Object.entries(held).filter(([k]) => !props.includes(k as keyof BoneLocalTransform))) : {}
+    _adapter!.setBoneOverride(boneName, null)
+    if (Object.keys(kept).length > 0) _adapter!.setBoneOverride(boneName, kept)
+    refreshBoneOverrides()
+  }
+
+  /** The attached UI adapter, read by the window.svp facade */
+  function getAdapter(): ISpineAdapter | null { return _adapter }
 
   function getBoneSetupTransform(boneName: string): BoneLocalTransform | null {
     return _adapter?.getBoneSetupTransform(boneName) ?? null
@@ -82,7 +103,7 @@ export const useSkeletonStore = defineStore('skeleton', () => {
 
   /** Attaches the adapter and fills the store from it; slider overrides left on a parked adapter are dropped so canvas and inputs start from setup. */
   function populateFrom(a: ISpineAdapter): void {
-    _adapter = a
+    attachAdapter(a)
     for (const s of a.getSliders?.() ?? []) a.resetSlider?.(s.name)
     populate({
       animations: a.animations,
@@ -109,6 +130,7 @@ export const useSkeletonStore = defineStore('skeleton', () => {
     composerMode.value = false
     selectedBone.value = null
     selectedSlot.value = null
+    boneOverrides.value = {}
     _adapter = null
   }
 
@@ -116,7 +138,9 @@ export const useSkeletonStore = defineStore('skeleton', () => {
     animations, skins, bones, slots, events, freeBones, sliders, mixInterpolations, isLoaded,
     activeSkins, composerMode,
     selectedBone, selectBone, selectedSlot, selectSlot, syncSelection,
-    attachAdapter, detachAdapter, setBoneTransform, getBoneSetupTransform,
+    boneOverrides,
+    attachAdapter, detachAdapter, refreshBoneOverrides,
+    setBoneOverride, releaseBoneOverride, getBoneSetupTransform, getAdapter,
     setSliderPose, resetSlider,
     populate, populateFrom, clear,
   }

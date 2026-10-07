@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'fs'
 import path from 'path'
 import Spine43Adapter from '@/adapters/pixi8/spine43/Spine43Adapter'
 import type { FileSet } from '@/core/types/FileSet'
+import { loadFixtureAdapter, step, local, applied, world } from '../fixtureAdapters'
 
 const ROOT = path.resolve(__dirname, '../../../example/4.3')
 
@@ -94,14 +95,21 @@ describe.skipIf(!existsSync(ROOT))('Spine43Adapter on example/4.3', () => {
     expect(a.getActiveAttachments().length).toBeGreaterThan(0)
   })
 
-  it('setup pose, bone setup transform and local edits', async () => {
+  it('setup pose, bone setup transform and overrides', async () => {
     const a = await load('spineboy', 'spineboy-pro.skel')
     const setup = a.getBoneSetupTransform('front-thigh')!
     expect(setup).not.toBeNull()
-    a.setBoneLocalTransform('front-thigh', { rotation: setup.rotation + 30 })
+    a.setBoneOverride('front-thigh', { rotation: setup.rotation + 30 })
     expect(spineOf(a).skeleton.findBone('front-thigh').pose.rotation).toBeCloseTo(setup.rotation + 30)
+    // the override survives a setup-pose reset at once, the world transform included
     a.setToSetupPose()
-    expect(spineOf(a).skeleton.findBone('front-thigh').pose.rotation).toBeCloseTo(setup.rotation)
+    const thigh = spineOf(a).skeleton.findBone('front-thigh')
+    expect(thigh.pose.rotation).toBeCloseTo(setup.rotation + 30)
+    const posed = a.getBoneTransforms().find(b => b.name === 'front-thigh')!.rotation
+    spineOf(a).update(0)
+    expect(a.getBoneTransforms().find(b => b.name === 'front-thigh')!.rotation).toBeCloseTo(posed, 4)
+    a.setBoneOverride('front-thigh', null)
+    expect(thigh.pose.rotation).toBeCloseTo(setup.rotation)
     a.setBonesToSetupPose()
     a.setSlotsToSetupPose()
   })
@@ -131,9 +139,15 @@ describe.skipIf(!existsSync(ROOT))('Spine43Adapter on example/4.3', () => {
     spineOf(a).update(0.5)
     expect(a.getSliders()[0]).toMatchObject({ time: expect.closeTo(0.25), mix: expect.closeTo(0.5) })
 
+    // released: the driver bone and the animation pose the slider again, already in the read
     a.resetSlider('rotation')
     expect(slider.bone).toBe(bone)
-    expect(slider.pose.time).toBeCloseTo(s.setupTime)
+    const live = a.getSliders()[0]
+    expect(live.time).not.toBeCloseTo(0.25)
+    spineOf(a).update(0)
+    expect(a.getSliders()[0]).toMatchObject({ time: expect.closeTo(live.time), mix: expect.closeTo(live.mix) })
+    a.clearTracks()
+    a.setToSetupPose()
     expect(slider.pose.mix).toBeCloseTo(s.setupMix)
   })
 
@@ -185,5 +199,41 @@ describe.skipIf(!existsSync(ROOT))('Spine43Adapter on example/4.3', () => {
     a.addAnimation(2, 'run', true)
     a.setTrackMixOptions(2, { mixDuration: 0.1 })
     expect(state.getTrack(2).next).toMatchObject({ additive: true, mixDuration: 0.1 })
+  })
+})
+
+describe('Spine43Adapter on the 4.3 fixture', () => {
+  it('reads local pose, applied pose after IK and world shear', async () => {
+    const a = await loadFixtureAdapter('4.3')
+    adapters.push(a)
+    step(a, 0)
+    expect(local(a, 'c')).toEqual({ x: 40, y: 0, rotation: 5, scaleX: 1.2, scaleY: 1, shearX: 10, shearY: -5 })
+    expect(applied(a, 'c')).toEqual(local(a, 'c'))
+    expect(Math.abs(applied(a, 'a').rotation - local(a, 'a').rotation)).toBeGreaterThan(1)
+    expect(world(a, 'c').shearY).toBeCloseTo(-15, 4)
+    expect(a.getBoneSetupTransform('c')).toEqual(local(a, 'c'))
+  })
+
+  it('a bone override over a keyed bone and a slider override both hold', async () => {
+    const a = await loadFixtureAdapter('4.3')
+    adapters.push(a)
+    a.setAnimation(0, 'anim', true)
+    step(a, 0.6)
+    expect(local(a, 'c').rotation).toBeCloseTo(55, 4)
+
+    a.setBoneOverride('c', { rotation: 45, shearX: 2 })
+    a.setSliderPose('slide', { time: 0.5 })
+    step(a, 0.1)
+    expect(local(a, 'c')).toMatchObject({ rotation: 45, shearX: 2 })
+    // slider-anim keys knob 0 → 90 over 1 s
+    expect(applied(a, 'knob').rotation).toBeCloseTo(45, 3)
+    expect(a.getBoneOverrides()).toEqual({ c: { rotation: 45, shearX: 2 } })
+
+    a.clearTracks()
+    a.setBoneOverride('c', null)
+    expect(local(a, 'c')).toMatchObject({ rotation: 5, shearX: 10 })
+    step(a, 0)
+    expect(local(a, 'c')).toMatchObject({ rotation: 5, shearX: 10 })
+    expect(applied(a, 'knob').rotation).toBeCloseTo(45, 3)
   })
 })
