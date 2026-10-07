@@ -1,6 +1,6 @@
 {
   "name": "spine-viewer-pro-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server for Spine Viewer Pro: drive the viewer's window.svp API in a dedicated Chrome, load and export Spine skeletons from disk, and round-trip them through keyframe.it.",
   "type": "module",
   "bin": {
