@@ -13,8 +13,9 @@ import { dialectOf, serializeSkeletonData, type SpineJsonDialect } from '@/core/
 import {
   applyOverrides, mergeOverride, overridesToRecord, pickLocal, readApplied, readLocal, setupOf, worldShear, writeLocal,
 } from '@/core/utils/boneTransform'
+import { computeBoneEffects, readClassicEffectInput } from '@/core/utils/boneEffect'
 import type {
-  ISpineAdapter, BoneInfo, SlotInfo, EventInfo,
+  ISpineAdapter, BoneInfo, SlotInfo, EventInfo, BoneEffect,
   TrackState, TrackQueueEntry, BoneTransform, BoneLocalTransform, BoneLocalState, BoneOverrides,
   AttachmentInfo, SpineEvent, AnimationEventMarker, SlotBounds, TrackMixOptions,
 } from '@/core/types/ISpineAdapter'
@@ -62,6 +63,7 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
   private _phChildContainers: Map<string, PIXI.Container> = new Map() // phName → Container
   private _mixDurations = new Map<number, number>() // track → crossfade seconds
   private _boneOverrides = new Map<string, Partial<BoneLocalTransform>>()
+  private _animationBones = new WeakMap<object, Int32Array>()
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
@@ -337,6 +339,15 @@ export abstract class BasePixi7Adapter implements ISpineAdapter {
     if (!this._spine) return []
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return this._spine.skeleton.bones.map((b: any) => ({ name: b.data.name, local: readLocal(b), applied: readApplied(b) }))
+  }
+
+  getBoneEffects(): BoneEffect[] {
+    if (!this._spine) return []
+    // user content shows only under a drawn region/mesh/clipping slot container, which already counts as drawn
+    const input = readClassicEffectInput(
+      this._spine.skeleton, this._spine.state.tracks, this._animationBones, classifyAttachment, null,
+    )
+    return computeBoneEffects(this.bones.map(b => b.name), input)
   }
 
   getActiveAttachments(): AttachmentInfo[] {

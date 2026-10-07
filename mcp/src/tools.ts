@@ -84,7 +84,7 @@ export const definitions: ToolDef[] = [
   passthrough('svp_tracks', 'Running tracks with animation, time, duration, loop, mix and queue.', 'getTracks'),
   tool('svp_set_skins', 'Apply one skin, or compose several.', { skins: z.array(str).min(1) }, (r, a) => r.svp('setSkins', a.skins)),
   passthrough('svp_get_skins', 'Available and applied skins.', 'getSkins'),
-  tool('svp_get_bones', 'Bone transforms (local, applied, world, setup) and overrides; all bones when omitted.',
+  tool('svp_get_bones', 'Bone transforms (local, applied, world, setup), overrides and visible-effect status (effect: visible, reason, keyed, constraints); all bones when omitted.',
     { bones: strings.optional() }, (r, a) => a.bones === undefined ? r.svp('getBones') : r.svp('getBones', a.bones)),
   passthrough('svp_apply_pose', 'Hold local bone values over animations (live overrides, all or none).', 'applyPose', { bones }),
   passthrough('svp_release_pose', 'Release overrides: all bones / all properties when omitted.', 'releaseOverride',

@@ -264,13 +264,23 @@ await svp.applyPose({ bones: { head: { rotation: 20 } } })
 const { artifact } = await svp.exportSkeleton({ format: 'zip' })
 ```
 
-**MCP server** — `mcp/` holds `spine-viewer-pro-mcp` (command `svp-mcp`), a stdio MCP server that opens the viewer in its own Chrome and exposes the API as tools: load skeletons from disk, play, pose and key bones, capture frames, export edited skeletons to disk and move skeletons to and from [keyframe.it](https://www.keyframe.it.com/). Setup, client configuration and the tool list: [`mcp/README.md`](mcp/README.md).
+**MCP server** — `spine-viewer-pro-mcp` (source in `mcp/`) is a stdio MCP server that opens the hosted viewer in its own Chrome and exposes the API as tools: load skeletons from disk, play, pose and key bones, capture frames, export edited skeletons to disk and move skeletons to and from [keyframe.it](https://www.keyframe.it.com/). Needs Node.js ≥ 20 and Google Chrome; for example in Claude Code:
+
+```bash
+claude mcp add svp -- npx -y spine-viewer-pro-mcp --headed
+```
+
+Options and the tool list: [`mcp/README.md`](mcp/README.md).
+
+**Guide** — [`docs/api-and-mcp.md`](docs/api-and-mcp.md): [install & connect](docs/api-and-mcp.md#install--connect) for Claude Code, Claude Desktop, Cursor, VS Code / Copilot, Codex CLI, Gemini CLI, Windsurf and other stdio clients, console quick start, editing semantics, every method and tool, recipes (explode a skeleton, bake a pose, key an animation, keyframe.it round trip), troubleshooting, and a "For contributors" part (build from source, local dev server, the PixiJS Devtool Pro route).
+
+**Disclaimer** — Spine is a registered trademark of Esoteric Software; this project is not affiliated with or endorsed by Esoteric Software. keyframe.it is a third-party service. The Spine Runtimes are not bundled in `spine-viewer-pro-mcp`: the package drives the hosted viewer in Chrome.
 
 ---
 
 ## Changelog
 
-### v1.3.21
+### v1.4.0
 
 - **Viewer API** — scripts, the DevTools console and AI agents drive the viewer through `window.svp`: load files, play, pose and key bones, edit, export (`svp.help()` lists every method)
 - **MCP server** — `svp-mcp` (`mcp/`) opens the viewer in its own Chrome and exposes the API as MCP tools, including loading from and exporting to disk and a round trip to keyframe.it

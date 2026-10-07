@@ -45,7 +45,11 @@
             v-for="item in visibleBones"
             :key="item.name"
             class="bone-row"
-            :class="{ 'bone-row--selected': skeletonStore.selectedBone === item.name }"
+            :class="{
+              'bone-row--selected': skeletonStore.selectedBone === item.name,
+              'bone-row--inactive': inspectorStore.boneEffects[item.name]?.visible === false,
+            }"
+            :title="effectTitle(inspectorStore.boneEffects[item.name]) || undefined"
             :style="{ paddingLeft: `${6 + item.depth * 12}px` }"
             @click="onSelectBone(item.name)"
           >
@@ -152,6 +156,7 @@
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useInspectorStore } from '@/core/stores/useInspectorStore'
 import type { BoneLocalTransform, BoneTransform } from '@/core/types/ISpineAdapter'
+import { effectTitle } from '@/core/utils/boneEffect'
 
 const skeletonStore  = useSkeletonStore()
 const inspectorStore = useInspectorStore()
@@ -570,6 +575,14 @@ function fmtS(n: number): string {
 
 .bone-scale {
   color: var(--c-text-ghost);
+}
+
+.bone-row--inactive .bone-name {
+  color: var(--c-text-faint);
+}
+
+.bone-row--inactive.bone-row--selected .bone-name {
+  color: var(--c-text-muted);
 }
 
 /* ── Attachment header ── */

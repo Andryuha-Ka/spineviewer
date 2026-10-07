@@ -9,7 +9,7 @@
 import * as PIXI from 'pixi8'
 import type {
   ISpineAdapter, BoneInfo, SlotInfo, EventInfo,
-  TrackState, TrackQueueEntry, BoneTransform, BoneLocalTransform, BoneLocalState, BoneOverrides,
+  TrackState, TrackQueueEntry, BoneTransform, BoneLocalTransform, BoneLocalState, BoneOverrides, BoneEffect,
   AttachmentInfo, SpineEvent,
   AnimationEventMarker, SlotBounds, TrackMixOptions,
 } from '@/core/types/ISpineAdapter'
@@ -18,6 +18,7 @@ import { applyEntryMixDuration } from '@/core/utils/slotState'
 import {
   applyOverrides, mergeOverride, overridesToRecord, pickLocal, writeLocal, type BoneLike,
 } from '@/core/utils/boneTransform'
+import { MIN_VISIBLE_ALPHA } from '@/core/utils/boneEffect'
 
 /** Track entry fields the base reads and writes; identical on the 4.2 and 4.3 runtimes. */
 export interface Pixi8TrackEntry {
@@ -118,6 +119,7 @@ export abstract class BasePixi8Adapter<TSpine extends Pixi8SpineLike> implements
   abstract getSlotBounds(slotName: string): SlotBounds | null
   abstract getFreeBones(): string[]
   abstract getBoneLocalTransforms(): BoneLocalState[]
+  abstract getBoneEffects(): BoneEffect[]
   abstract toSpineJson(): { json: object; warnings: string[] }
   abstract getBoneSetupTransform(boneName: string): BoneLocalTransform | null
 
@@ -584,6 +586,14 @@ export abstract class BasePixi8Adapter<TSpine extends Pixi8SpineLike> implements
     }
     return childContainer
   }
+
+  /** The slot object (visible only in draw order) carries a user image or child spine and the slot alpha shows it. */
+  protected _userContentShown(slotName: string, slotAlpha: number): boolean {
+    const c = this._phChildContainers.get(slotName)
+    return !!c && c.children.length > 0 && !!this._phSlotContainers.get(slotName)?.visible && slotAlpha >= MIN_VISIBLE_ALPHA
+  }
+
+  protected get _hasUserContent(): boolean { return this._phChildContainers.size > 0 }
 
   getPlaceholderContainerWorldTransform(phName: string): { a: number; b: number; c: number; d: number; tx: number; ty: number } | null {
     const container = this.getPlaceholderContainer(phName) as PIXI.Container | null

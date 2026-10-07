@@ -61,6 +61,7 @@ class TestAdapter extends BasePixi8Adapter<Pixi8SpineLike> {
   getSlotBounds() { return null }
   getFreeBones() { return [] }
   getBoneLocalTransforms() { return [] }
+  getBoneEffects() { return [] }
   toSpineJson() { return { json: {}, warnings: [] } }
   bone = { x: 0, y: 0, rotation: 5, scaleX: 1, scaleY: 1, shearX: 0, shearY: 0 }
   getBoneSetupTransform(name: string) {

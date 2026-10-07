@@ -11,7 +11,7 @@ import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { useVersionStore } from '@/core/stores/useVersionStore'
-import type { BoneInfo, BoneLocalTransform, BoneTransform } from '@/core/types/ISpineAdapter'
+import type { BoneEffect, BoneInfo, BoneLocalTransform, BoneTransform } from '@/core/types/ISpineAdapter'
 import type { FileSet, SpineSlot } from '@/core/types/FileSet'
 import { makeFakeAdapter, withSpine43, track } from '../helpers/fakeAdapter'
 import { loadRuntime } from '../fixtures/spine/fixtures'
@@ -76,6 +76,11 @@ function makeAdapter() {
       const local = T(b.name === 'arm' ? { rotation: 10, ...held } : held)
       return { name: b.name, local, applied: b.name === 'arm' ? { ...local, rotation: 25 } : local }
     })),
+    getBoneEffects: vi.fn((): BoneEffect[] => [
+      { name: 'root', visible: true, reason: null, keyed: false, constraints: [] },
+      { name: 'arm', visible: true, reason: null, keyed: true, constraints: ['arm-ik'] },
+      { name: 'head', visible: false, reason: 'no-attachments', keyed: true, constraints: [] },
+    ]),
     clearTrack: vi.fn(), clearTracks: vi.fn(), setTrackLoop: vi.fn(), setToSetupPose: vi.fn(),
   })
 }
@@ -150,9 +155,9 @@ describe('SvpError', () => {
 })
 
 describe('svp object, info and help', () => {
-  it('has a frozen 1.0.0 version and help lists every method exactly once', async () => {
+  it('has a frozen 1.1.0 version and help lists every method exactly once', async () => {
     setup()
-    expect(svp.version).toBe('1.0.0')
+    expect(svp.version).toBe('1.1.0')
     expect(Object.isFrozen(svp)).toBe(true)
     const help = await svp.help() as Array<{ name: string; args: string; returns: string; description: string }>
     const names = help.map(h => h.name)
@@ -164,7 +169,7 @@ describe('svp object, info and help', () => {
   it('info on the picker and in the viewer', async () => {
     setup()
     expect(await svp.info()).toEqual({
-      apiVersion: '1.0.0', appVersion: __APP_VERSION__, page: 'picker', runtime: null, slotCount: 0, activeSlotId: null,
+      apiVersion: '1.1.0', appVersion: __APP_VERSION__, page: 'picker', runtime: null, slotCount: 0, activeSlotId: null,
     })
     viewer()
     expect(await svp.info()).toMatchObject({ page: 'viewer', runtime: { pixi: 8, spine: '4.2' }, slotCount: 2, activeSlotId: 'hero' })
@@ -453,8 +458,20 @@ describe('bones and overrides', () => {
       local: T({ rotation: 10 }), applied: T({ rotation: 25 }),
       world: { x: 5, y: 0, rotation: 40, scaleX: 1, scaleY: 1, shearX: 0, shearY: 12 },
       setup: T(), override: null,
+      effect: { visible: true, reason: null, keyed: true, constraints: ['arm-ik'] },
     })
     expect((await svp.getBones() as unknown[]).length).toBe(3)
+  })
+
+  it('"Bone without a visible effect": effect is JSON, one getBoneEffects call per read', async () => {
+    const { adapter } = viewer()
+    adapter.getBoneEffects.mockClear()
+    const records = await svp.getBones() as Array<{ name: string; effect: unknown }>
+    expect(adapter.getBoneEffects).toHaveBeenCalledTimes(1)
+    expect(records.find(r => r.name === 'head')!.effect).toEqual({ visible: false, reason: 'no-attachments', keyed: true, constraints: [] })
+    expect(JSON.parse(JSON.stringify(records))).toEqual(records)
+    const help = await svp.help() as Array<{ name: string; returns: string }>
+    expect(help.find(h => h.name === 'getBones')!.returns).toContain('effect: { visible, reason, keyed, constraints }')
   })
 
   it('non-finite or unknown properties set nothing', async () => {
@@ -515,8 +532,9 @@ describe('setup pose, undo, revert and export (5.11)', () => {
 
   it('"Explicit setup value": one reload, bone records back, slot edited and unsaved', async () => {
     const { stage } = viewer()
-    const res = await svp.setSetupPose({ bones: { arm: { rotation: 20 } } }) as Array<{ name: string }>
+    const res = await svp.setSetupPose({ bones: { arm: { rotation: 20 } } }) as Array<{ name: string; effect: { constraints: string[] } }>
     expect(res.map(r => r.name)).toEqual(['arm'])
+    expect(res[0].effect.constraints).toEqual(['arm-ik'])
     expect(heroBone('arm').rotation).toBe(20)
     expect(stage.reloadSlot).toHaveBeenCalledTimes(1)
     expect(await slotRec('hero')).toMatchObject({ edited: true, unsaved: true })

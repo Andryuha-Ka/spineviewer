@@ -9,16 +9,20 @@
 import {
   Spine, SpineTexture,
   AtlasAttachmentLoader, SkeletonJson, SkeletonBinary, TextureAtlas, Skin,
-  Slider, SliderData, Interpolation, RegionAttachment, VertexAttachment,
+  Slider, SliderData, Interpolation, RegionAttachment, VertexAttachment, MeshAttachment, PathAttachment,
+  IkConstraint, TransformConstraint, PathConstraint,
   FromRotate, FromX, FromY, FromScaleX, FromScaleY, FromShearY, Physics,
   type Bone, type SkeletonData, type TrackEntry, type FromProperty,
 } from 'spine-pixi-v8-43'
 import * as spine43 from 'spine-pixi-v8-43'
 import type {
-  BoneTransform, BoneLocalTransform, BoneLocalState, AttachmentInfo, SlotBounds,
+  BoneTransform, BoneLocalTransform, BoneLocalState, BoneEffect, AttachmentInfo, SlotBounds,
   SliderInfo, SliderProperty, TrackMixOptions, TrackState,
 } from '@/core/types/ISpineAdapter'
 import type { FileSet } from '@/core/types/FileSet'
+import {
+  computeBoneEffects, isZeroScale, keyedBones, slotKind, weightBones, type EffectLink, type EffectSlot,
+} from '@/core/utils/boneEffect'
 import { dialectOf, serializeSkeletonData } from '@/core/spineJson/serializeSkeletonData'
 import { readApplied, readLocal, setupOf, worldShear, type BoneLike } from '@/core/utils/boneTransform'
 import {
@@ -217,6 +221,64 @@ export default class Spine43Adapter extends BasePixi8Adapter<Spine> {
   getBoneLocalTransforms(): BoneLocalState[] {
     if (!this._spine) return []
     return this._spine.skeleton.bones.map(b => ({ name: b.data.name, local: readLocal(b.pose), applied: readApplied(b) }))
+  }
+
+  getBoneEffects(): BoneEffect[] {
+    if (!this._spine) return []
+    const skeleton = this._spine.skeleton
+    const bones = skeleton.bones
+    const n = bones.length
+    const parent = new Int32Array(n)
+    const active = new Uint8Array(n)
+    const zeroScale = new Uint8Array(n)
+    for (let i = 0; i < n; i++) {
+      const b = bones[i], p = b.appliedPose
+      parent[i] = b.parent ? b.parent.data.index : -1
+      active[i] = b.active ? 1 : 0
+      zeroScale[i] = isZeroScale(p.a, p.b, p.c, p.d)
+    }
+
+    const userContent = this._hasUserContent
+    const slots: EffectSlot[] = skeleton.slots.map(s => {
+      const pose = s.appliedPose, att = pose.attachment
+      const kind = slotKind(att ? classifyAttachment(att) : null)
+      const tinted = att instanceof RegionAttachment || att instanceof MeshAttachment ? att : null
+      return {
+        bone: s.bone.data.index,
+        kind,
+        alpha: pose.color.a * (tinted ? tinted.color.a : 1),
+        weights: att instanceof MeshAttachment ? att.bones : null,
+        userContent: userContent && this._userContentShown(s.data.name, pose.color.a),
+      }
+    })
+
+    const links: EffectLink[] = []
+    const idx = (list: ReadonlyArray<{ index: number }>) => list.map(b => b.index)
+    for (const c of skeleton.constraints) {
+      if (!c.active) continue
+      if (c instanceof IkConstraint) {
+        if (c.appliedPose.mix !== 0) links.push({ name: c.data.name, driven: idx(c.data.bones), drivers: [c.target.data.index] })
+      } else if (c instanceof TransformConstraint) {
+        const p = c.appliedPose
+        if (p.mixRotate || p.mixX || p.mixY || p.mixScaleX || p.mixScaleY || p.mixShearY) {
+          links.push({ name: c.data.name, driven: idx(c.data.bones), drivers: [c.source.data.index] })
+        }
+      } else if (c instanceof PathConstraint) {
+        const p = c.appliedPose
+        if (!(p.mixRotate || p.mixX || p.mixY)) continue
+        const drivers = [c.slot.bone.data.index]
+        const path = c.slot.appliedPose.attachment
+        if (path instanceof PathAttachment) weightBones(path.bones, drivers)
+        links.push({ name: c.data.name, driven: idx(c.data.bones), drivers })
+      } else if (c instanceof Slider) {
+        if (c.appliedPose.mix !== 0) {
+          links.push({ name: c.data.name, driven: c.data.animation.bones, drivers: c.bone ? [c.bone.data.index] : [] })
+        }
+      }
+    }
+
+    const keyed = keyedBones(n, this._spine.state.tracks, a => a.bones)
+    return computeBoneEffects(this.bones.map(b => b.name), { parent, active, zeroScale, keyed, slots, links })
   }
 
   getActiveAttachments(): AttachmentInfo[] {

@@ -106,6 +106,20 @@ export interface BoneLocalState {
 
 export type BoneOverrides = Record<string, Partial<BoneLocalTransform>>
 
+export type BoneEffectReason = 'inactive' | 'hidden' | 'no-attachments'
+
+/** Whether a bone changes what is drawn at the current frame */
+export interface BoneEffect {
+  name: string
+  visible: boolean
+  /** null when visible */
+  reason: BoneEffectReason | null
+  /** A current track entry (or the entry it mixes from) has a bone timeline for it */
+  keyed: boolean
+  /** Active IK / transform / path constraints and 4.3 sliders with mix > 0 that constrain this bone, skeleton order */
+  constraints: string[]
+}
+
 export interface AttachmentInfo {
   slotName: string
   attachmentName: string
@@ -178,6 +192,8 @@ export interface ISpineAdapter {
   getTrackStates(): TrackState[]
   getBoneTransforms(): BoneTransform[]
   getBoneLocalTransforms(): BoneLocalState[]
+  /** Visible-effect status of every bone, skeleton order */
+  getBoneEffects(): BoneEffect[]
   getActiveAttachments(): AttachmentInfo[]
   // Returns all attachments across all skins from loaded skeleton data (works for binary .skel too)
   getAllAttachments(): AttachmentInfo[]

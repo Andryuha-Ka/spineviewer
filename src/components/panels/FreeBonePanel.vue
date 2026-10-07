@@ -25,10 +25,17 @@
         clearable
         placeholder="Select a bone"
         class="bone-picker"
+        :render-label="renderBoneLabel"
         @update:value="onPickBone"
+        @update:show="menuOpen = $event"
       />
       <div v-if="!skeletonStore.selectedBone" class="editor-hint">Select a bone</div>
       <template v-else>
+        <div class="effect-line" :title="[status.reason, status.constraints].filter(Boolean).join('\n') || undefined">
+          <span v-if="status.reason" data-effect="reason">{{ status.reason }}</span>
+          <template v-if="status.reason && status.constraints"> · </template>
+          <span v-if="status.constraints" data-effect="constraints">{{ status.constraints }}</span>
+        </div>
         <div class="editor-grid">
           <template v-for="f in FIELDS" :key="f.prop">
             <label class="editor-label" :class="{ 'editor-label--held': isHeld(f.prop) }">
@@ -40,10 +47,7 @@
               :data-prop="f.prop"
               type="number"
               :step="f.step"
-              :value="shown(f.prop)"
-              @focus="focused = true"
-              @blur="focused = false"
-              @change="onBoneField(f.prop, $event)"
+              v-bind="draftInput(`b:${f.prop}`, shown(f.prop), e => onBoneField(f.prop, e))"
             />
           </template>
         </div>
@@ -88,24 +92,21 @@
             class="ctrl-input"
             type="number"
             step="1"
-            :value="getVal(name).x"
-            @change="onField(name, 'x', $event)"
+            v-bind="draftInput(`f:${name}:x`, getVal(name).x, e => onField(name, 'x', e))"
           />
           <label class="ctrl-label">Y</label>
           <input
             class="ctrl-input"
             type="number"
             step="1"
-            :value="getVal(name).y"
-            @change="onField(name, 'y', $event)"
+            v-bind="draftInput(`f:${name}:y`, getVal(name).y, e => onField(name, 'y', e))"
           />
           <label class="ctrl-label">R</label>
           <input
             class="ctrl-input ctrl-input--rot"
             type="number"
             step="0.5"
-            :value="getVal(name).rotation"
-            @change="onField(name, 'rotation', $event)"
+            v-bind="draftInput(`f:${name}:rotation`, getVal(name).rotation, e => onField(name, 'rotation', e))"
           />
           <button class="reset-btn" title="Reset to setup pose" @click="onReset(name)">↺</button>
         </div>
@@ -133,8 +134,7 @@
             type="number"
             step="0.01"
             min="0"
-            :value="getSlider(s).time"
-            @change="onSliderField(s, 'time', $event)"
+            v-bind="draftInput(`s:${s.name}:time`, getSlider(s).time, e => onSliderField(s, 'time', e))"
           />
           <label class="ctrl-label">Mix</label>
           <input
@@ -143,8 +143,7 @@
             step="0.01"
             min="0"
             max="1"
-            :value="getSlider(s).mix"
-            @change="onSliderField(s, 'mix', $event)"
+            v-bind="draftInput(`s:${s.name}:mix`, getSlider(s).mix, e => onSliderField(s, 'mix', e))"
           />
           <button class="reset-btn" title="Reset to setup values" @click="onSliderReset(s)">↺</button>
         </div>
@@ -159,7 +158,10 @@ import { useSkeletonStore } from '@/core/stores/useSkeletonStore'
 import { useSkeletonEditStore } from '@/core/stores/useSkeletonEditStore'
 import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
+import { useInspectorStore } from '@/core/stores/useInspectorStore'
 import type { BoneLocalTransform, SliderInfo } from '@/core/types/ISpineAdapter'
+import { EFFECT_REASON_TEXT, constraintText, effectTitle } from '@/core/utils/boneEffect'
+import type { SelectOption } from 'naive-ui'
 
 const emit = defineEmits<{ 'set-animation': [track: number, name: string, loop: boolean] }>()
 
@@ -167,6 +169,7 @@ const skeletonStore      = useSkeletonStore()
 const editStore          = useSkeletonEditStore()
 const slotSelectionStore = useSlotSelectionStore()
 const animationStore     = useAnimationStore()
+const inspectorStore     = useInspectorStore()
 
 type Prop = keyof BoneLocalTransform
 const FIELDS: Array<{ prop: Prop; label: string; step: number }> = [
@@ -180,7 +183,56 @@ const FIELDS: Array<{ prop: Prop; label: string; step: number }> = [
 ]
 const NO_ANIM_TIP = 'Set an animation on the current track to key it'
 
-const boneOptions = computed(() => skeletonStore.bones.map(b => ({ label: b.name, value: b.name })))
+// name, dimmed flag and title per bone: options are rebuilt only when what they show changes
+const optionsSignature = computed(() => JSON.stringify(skeletonStore.bones.map(b => {
+  const e = inspectorStore.boneEffects[b.name]
+  return [b.name, e?.visible === false, effectTitle(e)]
+})))
+const boneOptions = shallowRef<SelectOption[]>([])
+const menuOpen = ref(false)
+// NSelect resets the hovered option whenever options change, so they stay frozen while the menu is open
+watch([optionsSignature, menuOpen], ([sig, open]) => {
+  if (open) return
+  boneOptions.value = (JSON.parse(sig) as Array<[string, boolean, string]>).map(([name, dim, title]) => ({
+    label: name,
+    value: name,
+    title: title || undefined,
+    // Teleported menu: scoped classes do not reach it
+    style: dim ? { color: 'var(--c-text-faint)' } : undefined,
+  }))
+}, { immediate: true })
+const renderBoneLabel = (o: SelectOption) => h('span', { title: o.title }, String(o.label))
+const selectedEffect = computed(() => skeletonStore.selectedBone ? inspectorStore.boneEffects[skeletonStore.selectedBone] : undefined)
+
+// A shown status holds this long so effects toggling during playback do not blink
+const STATUS_HOLD_MS = 400
+const liveStatus = computed(() => {
+  const e = selectedEffect.value
+  return {
+    reason: e && !e.visible && e.reason ? `This bone draws nothing right now: ${EFFECT_REASON_TEXT[e.reason]}` : '',
+    constraints: e?.constraints.length ? constraintText(e.constraints) : '',
+  }
+})
+const status = ref(liveStatus.value)
+let statusShownAt = 0
+let holdTimer: ReturnType<typeof setTimeout> | undefined
+
+function showLiveStatus(): void {
+  clearTimeout(holdTimer)
+  holdTimer = undefined
+  status.value = liveStatus.value
+  statusShownAt = Date.now()
+}
+
+watch(liveStatus, next => {
+  clearTimeout(holdTimer)
+  if (next.reason === status.value.reason && next.constraints === status.value.constraints) return
+  const wait = statusShownAt + STATUS_HOLD_MS - Date.now()
+  if (wait <= 0) showLiveStatus()
+  else holdTimer = setTimeout(showLiveStatus, wait)
+})
+watch(() => skeletonStore.selectedBone, showLiveStatus)
+onBeforeUnmount(() => clearTimeout(holdTimer))
 
 const editState = computed(() => {
   const id = slotSelectionStore.activeSlotId
@@ -204,6 +256,24 @@ function refreshLive(): void {
 }
 useIntervalFn(refreshLive, 100)
 watch(() => [skeletonStore.selectedBone, skeletonStore.boneOverrides], refreshLive, { immediate: true })
+
+// Vue re-patches `value` on every render, so typed text lives in a draft until change / blur / Escape
+const drafts = ref<Record<string, string>>({})
+
+function draftInput(key: string, value: number, commit: (e: Event) => void) {
+  return {
+    value: drafts.value[key] ?? value,
+    onInput: (e: Event) => { drafts.value[key] = (e.target as HTMLInputElement).value },
+    onKeydown: (e: KeyboardEvent) => { if (e.key === 'Escape') delete drafts.value[key] },
+    onFocus: () => { focused.value = true },
+    onBlur: () => { focused.value = false; delete drafts.value[key] },
+    onChange: (e: Event) => {
+      if (!(key in drafts.value)) return
+      delete drafts.value[key]
+      commit(e)
+    },
+  }
+}
 
 function shown(prop: Prop): number {
   const v = held.value?.[prop] ?? live.value?.[prop] ?? 0
@@ -423,6 +493,16 @@ watch(() => skeletonStore.sliders, () => { sliderVals.value.clear() })
   font-size: 0.6875rem;
   color: var(--c-warning);
   cursor: help;
+}
+
+.effect-line {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  height: 1rem;
+  color: var(--c-warning);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .editor-error {

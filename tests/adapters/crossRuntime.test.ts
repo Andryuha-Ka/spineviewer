@@ -70,3 +70,20 @@ describe('the same pose agrees on all five runtimes', () => {
     expectSame(snaps)
   })
 })
+
+describe('bone effects agree on all five runtimes', () => {
+  it.each([
+    ['setup pose', (a: ISpineAdapter) => step(a, 0)],
+    ['animation playing', (a: ISpineAdapter) => { a.setAnimation(0, 'anim', true); step(a, 0.6) }],
+  ])('%s', async (_label, pose) => {
+    const all: Array<[string, unknown]> = []
+    for (const ver of FIXTURE_VERSIONS) {
+      const a = await loadFixtureAdapter(ver)
+      pose(a)
+      // only the 4.3 fixture has the slider "slide"
+      all.push([ver, a.getBoneEffects().map(e => ({ ...e, constraints: e.constraints.filter(c => c !== 'slide') }))])
+      a.destroy()
+    }
+    for (const [ver, effects] of all.slice(1)) expect(effects, `${ver} vs ${all[0][0]}`).toEqual(all[0][1])
+  })
+})

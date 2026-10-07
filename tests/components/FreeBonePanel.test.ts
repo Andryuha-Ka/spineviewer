@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { nextTick, type VNode } from 'vue'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import FreeBonePanel from '@/components/panels/FreeBonePanel.vue'
@@ -10,7 +10,8 @@ import { useSlotSelectionStore } from '@/core/stores/useSlotSelectionStore'
 import { useAnimationStore } from '@/core/stores/useAnimationStore'
 import { SvpError } from '@/core/api/svpErrors'
 import type { FileSet } from '@/core/types/FileSet'
-import type { BoneLocalTransform, SliderInfo, TrackState } from '@/core/types/ISpineAdapter'
+import { useInspectorStore } from '@/core/stores/useInspectorStore'
+import type { BoneEffect, BoneLocalTransform, SliderInfo, TrackState } from '@/core/types/ISpineAdapter'
 import { makeFakeAdapter, track } from '../helpers/fakeAdapter'
 
 const BLINK: SliderInfo = {
@@ -325,5 +326,155 @@ describe('FreeBonePanel Bone section', () => {
     const text = wrapper.text()
     expect(text.indexOf('Bone')).toBeLessThan(text.indexOf('not keyframed'))
     expect(text.indexOf('not keyframed')).toBeLessThan(text.indexOf('Sliders'))
+  })
+
+  const effect = (name: string, over: Partial<BoneEffect> = {}): BoneEffect =>
+    ({ name, visible: true, reason: null, keyed: false, constraints: [], ...over })
+
+  it('Warning for a hidden bone: reason line above the inputs, Rotation 45 still sets the override', async () => {
+    const { adapter } = mountEditor()
+    expect(wrapper.find('.effect-line').text()).toBe('')
+    useInspectorStore().update([], [], [], [effect('arm', { visible: false, reason: 'hidden' })])
+    await nextTick()
+    const line = wrapper.find('.effect-line [data-effect="reason"]')
+    expect(line.text()).toBe('This bone draws nothing right now: Attachments hidden in the current frame')
+    expect(wrapper.find('[data-effect="constraints"]').exists()).toBe(false)
+    expect(wrapper.html().indexOf('data-effect="reason"')).toBeLessThan(wrapper.html().indexOf('data-prop="x"'))
+    await field('rotation').setValue('45')
+    expect(adapter.setBoneOverride).toHaveBeenCalledWith('arm', { rotation: 45 })
+    expect(btn('apply').attributes('disabled')).toBeUndefined()
+    useInspectorStore().update([], [], [], [effect('arm')])
+    await wait(450)
+    expect(wrapper.find('.effect-line').text()).toBe('')
+  })
+
+  it('Constrained bone warning: constraint text only; both texts share one row with the full text as title', async () => {
+    mountEditor()
+    useInspectorStore().update([], [], [], [effect('arm', { constraints: ['arm-ik'] })])
+    await nextTick()
+    const IK = 'Driven by arm-ik — constrained properties ignore local edits'
+    expect(wrapper.findAll('.effect-line').map(l => l.text())).toEqual([IK])
+    useInspectorStore().update([], [], [], [effect('arm', { visible: false, reason: 'hidden', constraints: ['arm-ik'] })])
+    await wait(450)
+    const row = wrapper.findAll('.effect-line')
+    expect(row).toHaveLength(1)
+    expect(row[0].attributes('title')).toBe(`This bone draws nothing right now: Attachments hidden in the current frame\n${IK}`)
+  })
+
+  it('status row is always present and holds a shown status for 400 ms', async () => {
+    vi.useFakeTimers()
+    try {
+      mountEditor()
+      const inspector = useInspectorStore()
+      expect(wrapper.findAll('.effect-line')).toHaveLength(1)
+      inspector.update([], [], [], [effect('arm', { visible: false, reason: 'hidden' })])
+      await nextTick()
+      const shown = wrapper.find('.effect-line').text()
+      expect(shown).toContain('draws nothing')
+      const height = getComputedStyle(wrapper.find('.effect-line').element).height
+      // off and back on within the hold: never blinks
+      inspector.update([], [], [], [effect('arm')])
+      await nextTick()
+      vi.advanceTimersByTime(200)
+      await nextTick()
+      expect(wrapper.find('.effect-line').text()).toBe(shown)
+      inspector.update([], [], [], [effect('arm', { visible: false, reason: 'hidden' })])
+      await nextTick()
+      vi.advanceTimersByTime(300)
+      await nextTick()
+      expect(wrapper.find('.effect-line').text()).toBe(shown)
+      // a change inside the hold applies when it ends
+      inspector.update([], [], [], [effect('arm', { constraints: ['ik'] })])
+      await nextTick()
+      expect(wrapper.find('.effect-line').text()).toBe('Driven by ik — constrained properties ignore local edits')
+      inspector.update([], [], [], [effect('arm')])
+      await nextTick()
+      vi.advanceTimersByTime(399)
+      await nextTick()
+      expect(wrapper.find('.effect-line').text()).toContain('Driven by ik')
+      vi.advanceTimersByTime(1)
+      await nextTick()
+      expect(wrapper.find('.effect-line').text()).toBe('')
+      expect(getComputedStyle(wrapper.find('.effect-line').element).height).toBe(height)
+      expect(wrapper.findAll('.effect-line')).toHaveLength(1)
+      expect(wrapper.find('.effect-line').text()).toBe('')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('Dimmed picker option: faint style and the reason as tooltip, still pickable', async () => {
+    const { store } = mountEditor({ selected: null })
+    useInspectorStore().update([], [], [], [effect('root'), effect('arm', { visible: false, reason: 'no-attachments' })])
+    await nextTick()
+    const select = wrapper.findComponent({ name: 'Select' })
+    const [root, arm] = select.props('options') as Array<Record<string, unknown>>
+    expect(root.style).toBeUndefined()
+    expect(root.title).toBeUndefined()
+    expect(arm.style).toEqual({ color: 'var(--c-text-faint)' })
+    expect(arm.title).toBe('No drawn attachments on this bone or its children')
+    const label = mount({ render: () => (select.props('renderLabel') as (o: unknown, s: boolean) => VNode)(arm, false) })
+    expect(label.find('span').attributes('title')).toBe('No drawn attachments on this bone or its children')
+    expect(label.text()).toBe('arm')
+    label.unmount()
+    select.vm.$emit('update:value', 'arm')
+    await nextTick()
+    expect(store.selectedBone).toBe('arm')
+  })
+
+  it('typed text survives re-renders until change commits it; Escape restores the shown value', async () => {
+    const { adapter } = mountEditor()
+    const input = field('rotation').element as HTMLInputElement
+    input.value = '45'
+    await field('rotation').trigger('input')
+    useInspectorStore().update([], [], [], [effect('arm', { visible: false, reason: 'hidden' })])
+    adapter.getBoneLocalTransforms.mockImplementation(() => [{ name: 'arm', local: { ...LOCAL, rotation: 11 }, applied: LOCAL }])
+    await wait(150)
+    expect(input.value).toBe('45')
+    expect(adapter.setBoneOverride).not.toHaveBeenCalled()
+    await field('rotation').trigger('change')
+    expect(adapter.setBoneOverride).toHaveBeenCalledWith('arm', { rotation: 45 })
+    await nextTick()
+    expect(input.value).toBe('45')
+
+    const x = field('x').element as HTMLInputElement
+    x.value = '7'
+    await field('x').trigger('input')
+    await field('x').trigger('keydown', { key: 'Escape' })
+    expect(x.value).toBe('5')
+    await field('x').trigger('change')
+    expect(adapter.setBoneOverride).toHaveBeenCalledTimes(1)
+  })
+
+  it('picker options keep their identity across refreshes that change nothing shown', async () => {
+    mountEditor({ selected: null })
+    const inspector = useInspectorStore()
+    inspector.update([], [], [], [effect('root'), effect('arm', { visible: false, reason: 'hidden' })])
+    await nextTick()
+    const select = wrapper.findComponent({ name: 'Select' })
+    const before = select.props('options')
+    inspector.update([], [], [], [effect('root'), effect('arm', { visible: false, reason: 'hidden' })])
+    inspector.update([], [], [], [effect('root', { keyed: true }), effect('arm', { visible: false, reason: 'hidden' })])
+    await nextTick()
+    expect(select.props('options')).toBe(before)
+  })
+
+  it('picker options stay frozen while the menu is open; picking works; changes apply on close', async () => {
+    const { store } = mountEditor({ selected: null })
+    const inspector = useInspectorStore()
+    const select = wrapper.findComponent({ name: 'Select' })
+    select.vm.$emit('update:show', true)
+    await nextTick()
+    const before = select.props('options')
+    inspector.update([], [], [], [effect('root'), effect('arm', { visible: false, reason: 'hidden' })])
+    await nextTick()
+    expect(select.props('options')).toBe(before)
+    select.vm.$emit('update:value', 'arm')
+    await nextTick()
+    expect(store.selectedBone).toBe('arm')
+    select.vm.$emit('update:show', false)
+    await nextTick()
+    const arm = (select.props('options') as Array<Record<string, unknown>>)[1]
+    expect(arm.style).toEqual({ color: 'var(--c-text-faint)' })
   })
 })

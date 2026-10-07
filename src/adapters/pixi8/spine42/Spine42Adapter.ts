@@ -13,9 +13,10 @@ import {
 import { TextureAtlas, Skin, Physics } from '@esotericsoftware/spine-core'
 import * as spineCore from '@esotericsoftware/spine-core'
 import type {
-  BoneTransform, BoneLocalTransform, BoneLocalState, AttachmentInfo, SlotBounds,
+  BoneTransform, BoneLocalTransform, BoneLocalState, BoneEffect, AttachmentInfo, SlotBounds,
 } from '@/core/types/ISpineAdapter'
 import { readApplied, readLocal, setupOf, worldShear, type BoneLike } from '@/core/utils/boneTransform'
+import { computeBoneEffects, readClassicEffectInput } from '@/core/utils/boneEffect'
 import type { FileSet } from '@/core/types/FileSet'
 import { dialectOf, serializeSkeletonData } from '@/core/spineJson/serializeSkeletonData'
 import {
@@ -26,6 +27,7 @@ import {
 export default class Spine42Adapter extends BasePixi8Adapter<Spine> {
   readonly detectedVersion = '4.2'
   protected readonly _physicsPose = Physics.pose
+  private _animationBones = new WeakMap<object, Int32Array>()
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -141,6 +143,17 @@ export default class Spine42Adapter extends BasePixi8Adapter<Spine> {
   getBoneLocalTransforms(): BoneLocalState[] {
     if (!this._spine) return []
     return this._spine.skeleton.bones.map(b => ({ name: b.data.name, local: readLocal(b), applied: readApplied(b) }))
+  }
+
+  getBoneEffects(): BoneEffect[] {
+    if (!this._spine) return []
+    const userContent = this._hasUserContent
+      ? (slot: { data: { name: string }; color: { a: number } }) => this._userContentShown(slot.data.name, slot.color.a)
+      : null
+    const input = readClassicEffectInput(
+      this._spine.skeleton, this._spine.state.tracks, this._animationBones, classifyAttachment, userContent,
+    )
+    return computeBoneEffects(this.bones.map(b => b.name), input)
   }
 
   getActiveAttachments(): AttachmentInfo[] {

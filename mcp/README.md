@@ -1,52 +1,61 @@
 # spine-viewer-pro-mcp
 
 MCP server (stdio) for [Spine Viewer Pro](https://andryuha-ka.github.io/spineviewer/). It launches the installed
-Google Chrome with its own profile, opens the viewer and drives its `window.svp` API: load skeletons from disk,
-play animations, pose and key bones, export edited skeletons to disk, and move skeletons to and from the
+Google Chrome with its own profile, opens the hosted viewer and drives its `window.svp` API: load skeletons from
+disk, play animations, pose and key bones, export edited skeletons to disk, and move skeletons to and from the
 [keyframe.it](https://www.keyframe.it.com/) editor as files.
 
 It never attaches to your own browser or tabs. The browser starts on the first tool call that needs a page
 and is closed when the server exits.
 
-## Install and build
+Full guide (console API, all client configs, recipes, troubleshooting):
+[API and MCP guide](https://github.com/Andryuha-Ka/spineviewer/blob/master/docs/api-and-mcp.md).
 
-Requires Node.js 20+ and Google Chrome.
+## Quick start
+
+Requires Node.js ≥ 20 and Google Chrome. Your MCP client runs:
 
 ```bash
-cd mcp
-npm install
-npm run build      # tsc → dist/
-npm test           # node --test, fake browser objects; no Chrome needed
+npx -y spine-viewer-pro-mcp --headed
 ```
 
-The package is not part of the viewer: the root lint, tests, build and CI ignore `mcp/`.
+`--headed` shows the Chrome window; `-y` skips npx's install prompt, which a stdio client cannot answer. The first
+run downloads the package.
 
 ## Client configuration
 
-From a checkout (path relative to the repository root, or absolute):
+Claude Code:
+
+```bash
+claude mcp add svp -- npx -y spine-viewer-pro-mcp --headed
+```
+
+Claude Desktop, Cursor, Gemini CLI, Windsurf and most other clients (`mcpServers` JSON):
 
 ```json
 {
   "mcpServers": {
-    "spine-viewer-pro": { "command": "node", "args": ["mcp/dist/server.js"] }
+    "svp": {
+      "command": "npx",
+      "args": ["-y", "spine-viewer-pro-mcp", "--headed"]
+    }
   }
 }
 ```
 
-Claude Code: `claude mcp add spine-viewer-pro -- node D:/tools/spine_viewer_pro/mcp/dist/server.js`
+VS Code / GitHub Copilot uses `"servers"` with `"type": "stdio"`; Codex CLI uses `[mcp_servers.svp]` in
+`~/.codex/config.toml`. File locations and every client's snippet:
+[guide → Install & connect](https://github.com/Andryuha-Ka/spineviewer/blob/master/docs/api-and-mcp.md#install--connect).
 
-After publishing to npm (an owner action): `{ "command": "npx", "args": ["-y", "spine-viewer-pro-mcp"] }`, or
-`npx svp-mcp` once installed.
-
-Against the local dev server: `"args": ["mcp/dist/server.js", "--url", "http://localhost:5173/spineviewer/", "--headed"]`.
+Then ask the agent to call `svp_session`: Chrome opens on the viewer and the client lists the `svp_*` tools.
 
 ## Options
 
-The command-line option wins over the environment variable.
+Add them after `--headed`. The command-line option wins over the environment variable.
 
 | Option | Environment | Default | Meaning |
 |--------|-------------|---------|---------|
-| `--url <url>` | `SVP_URL` | `https://andryuha-ka.github.io/spineviewer/` | Viewer address |
+| `--url <url>` | `SVP_URL` | `https://andryuha-ka.github.io/spineviewer/` | Point it at another viewer address |
 | `--headed` | `SVP_HEADED=1` | headless | Show the browser window |
 | `--profile <dir>` | `SVP_PROFILE_DIR` | `~/.svp-mcp/profile` | Chrome profile folder |
 | `--export-dir <dir>` | `SVP_EXPORT_DIR` | `~/.svp-mcp/exports` | Where exports are written |
@@ -97,7 +106,69 @@ overwrite: an existing name gets `-1`, `-2`, …. A rejected API call is a tool 
 `{ ok: false, code, error }`. When the viewer page was closed or crashed, the next call reopens it and its result
 notes that the previous session and its edits were lost.
 
-## Large-file transport (design D11)
+## keyframe.it round trip
+
+- keyframe.it → viewer: `svp_keyframe_to_viewer` calls keyframe.it's `exportArtifact({ format: "spine", version, binary })`,
+  writes the zip into the export folder and loads it. keyframe.it bakes motion into linear keys at the project fps.
+  A 3.8 export loads on Pixi 7 / Spine 3.8 when the session is new or on Pixi 7; over a Pixi 8 (4.2) session pass
+  `mode: "replace"`, otherwise it is listed as a version-mismatch error row.
+- Viewer → keyframe.it: `svp_viewer_to_keyframe` writes `<name>.zip` plus the unpacked `<name>/` folder, then clicks
+  "Import Spine…" and answers its file chooser; when that menu item cannot be driven it sets the files on
+  keyframe.it's hidden Spine import input. Success is detected from keyframe.it's `sessionInfo()` or its import
+  message; on failure the result has `imported: false`, the reason and a manual step. keyframe.it imports Spine
+  3.8 / 4.x JSON with atlas and pages, not binary `.skel`.
+- Spine 4.3 import result (live QA 2026-10-07): an edited 4.3 skeleton imports (`imported: true`); keyframe.it
+  reports that bounding boxes are skipped and animated IK softness is unsupported.
+
+Step-by-step round trip with `svp_keyframe_call` examples: [guide](https://github.com/Andryuha-Ka/spineviewer/blob/master/docs/api-and-mcp.md#round-trip-with-keyframeit-mcp).
+
+Only keyframe.it's public `window.keyframe` API and its page UI are used. When keyframe.it cannot be reached,
+keyframe tools fail with "keyframe.it is not available: …" and viewer tools keep working.
+
+## Disclaimer
+
+Spine is a registered trademark of Esoteric Software. This project is not affiliated with or endorsed by Esoteric
+Software. keyframe.it is a third-party service. The Spine Runtimes are not bundled in `spine-viewer-pro-mcp`: the
+package drives the hosted viewer in Chrome.
+
+## Licence
+
+MIT, see `LICENSE` (includes the MIT notice of keyframe-mcp, whose structure this package follows).
+
+## For contributors
+
+### Build from source
+
+```bash
+cd mcp
+npm install
+npm run build      # tsc → dist/
+npm test           # node --test, fake browser objects; no Chrome needed
+```
+
+The package is not part of the viewer: the root lint, tests, build and CI ignore `mcp/`.
+
+Against the local dev server (`npm run dev` in the repository root), with `<repo>` the absolute path of the clone:
+
+```bash
+claude mcp add svp -- node <repo>/mcp/dist/server.js --url http://localhost:5173/spineviewer/ --headed
+```
+
+```json
+{
+  "mcpServers": {
+    "svp": {
+      "command": "node",
+      "args": ["<repo>/mcp/dist/server.js", "--url", "http://localhost:5173/spineviewer/", "--headed"]
+    }
+  }
+}
+```
+
+Driving your own browser tab through the PixiJS Devtool Pro extension instead:
+[guide → For contributors](https://github.com/Andryuha-Ka/spineviewer/blob/master/docs/api-and-mcp.md#advanced-pixijs-devtool-pro).
+
+### Large-file transport (design D11)
 
 `svp_load` and `svp_keyframe_to_viewer` hand files on disk to `window.svp.load` through variant **B**: the server adds a
 hidden `<input type=file data-svp-api>` to the viewer page itself, sets the disk paths on it with Playwright
@@ -123,24 +194,3 @@ Measured (task 8.9, local dev server, headless Chrome):
 | 80 MB | page crashes ("Target page, context or browser has been closed") | 10.6 s |
 
 A fails at ≈ 80 MB, so B is the only transport.
-
-## keyframe.it round trip
-
-- keyframe.it → viewer: `svp_keyframe_to_viewer` calls keyframe.it's `exportArtifact({ format: "spine", version, binary })`,
-  writes the zip into the export folder and loads it. keyframe.it bakes motion into linear keys at the project fps.
-  A 3.8 export loads on Pixi 7 / Spine 3.8 when the session is new or on Pixi 7; over a Pixi 8 (4.2) session pass
-  `mode: "replace"`, otherwise it is listed as a version-mismatch error row.
-- Viewer → keyframe.it: `svp_viewer_to_keyframe` writes `<name>.zip` plus the unpacked `<name>/` folder, then clicks
-  "Import Spine…" and answers its file chooser; when that menu item cannot be driven it sets the files on
-  keyframe.it's hidden Spine import input. Success is detected from keyframe.it's `sessionInfo()` or its import
-  message; on failure the result has `imported: false`, the reason and a manual step. keyframe.it imports Spine
-  3.8 / 4.x JSON with atlas and pages, not binary `.skel`.
-- Spine 4.3 import result (live QA 2026-10-07): an edited 4.3 skeleton imports (`imported: true`); keyframe.it
-  reports that bounding boxes are skipped and animated IK softness is unsupported.
-
-Only keyframe.it's public `window.keyframe` API and its page UI are used. When keyframe.it cannot be reached,
-keyframe tools fail with "keyframe.it is not available: …" and viewer tools keep working.
-
-## Licence
-
-See `LICENSE` (includes the MIT notice of keyframe-mcp, whose structure this package follows).

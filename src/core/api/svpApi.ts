@@ -28,7 +28,7 @@ import { withBackground } from '@/core/utils/exportUtils'
 import type { SpineSlot } from '@/core/types/FileSet'
 import type { BoneLocalTransform, ISpineAdapter } from '@/core/types/ISpineAdapter'
 
-export const SVP_API_VERSION = '1.0.0'
+export const SVP_API_VERSION = '1.1.0'
 
 export type SvpPage = 'picker' | 'viewer' | 'compare'
 
@@ -309,10 +309,12 @@ export function createSvpApi(deps: SvpApiDeps): SvpApi {
     const world = new Map(a.getBoneTransforms().map(b => [b.name, b]))
     const held = a.getBoneOverrides()
     const parents = new Map(a.bones.map(b => [b.name, b.parent]))
+    const effects = new Map(a.getBoneEffects().map(e => [e.name, e]))
     return wanted.map(name => {
       const setup = a.getBoneSetupTransform(name)
       const l = local.get(name)
       const w = world.get(name)
+      const e = effects.get(name)
       return {
         name,
         parent: parents.get(name) ?? null,
@@ -323,6 +325,7 @@ export function createSvpApi(deps: SvpApiDeps): SvpApi {
           : null,
         setup,
         override: held[name] ?? null,
+        effect: e ? { visible: e.visible, reason: e.reason, keyed: e.keyed, constraints: [...e.constraints] } : null,
       }
     })
   }
@@ -586,8 +589,8 @@ export function createSvpApi(deps: SvpApiDeps): SvpApi {
     },
     {
       name: 'getBones', where: 'viewer', skeleton: true, args: 'names?: string[]',
-      returns: '[{ name, parent, local, applied, world, setup, override }]',
-      description: 'Bone transforms (local, after constraints, world, setup) and overrides',
+      returns: '[{ name, parent, local, applied, world, setup, override, effect: { visible, reason, keyed, constraints } }]',
+      description: 'Bone transforms (local, after constraints, world, setup), overrides and visible-effect status (reason: inactive | hidden | no-attachments)',
       run: getBones,
     },
     {

@@ -91,3 +91,45 @@ describe('SkeletonPanel selected bone details', () => {
     w.unmount()
   })
 })
+
+describe('SkeletonPanel bone visible-effect status', () => {
+  function setup() {
+    setActivePinia(createPinia())
+    useSkeletonStore().populate({ animations: ['idle'], skins: [], bones: [{ name: 'root', parent: null }, { name: 'glow', parent: null }, { name: 'arm', parent: null }], slots: [], events: [] })
+    useInspectorStore().update([], [], [], [
+      { name: 'root', visible: true, reason: null, keyed: false, constraints: [] },
+      { name: 'glow', visible: false, reason: 'no-attachments', keyed: true, constraints: [] },
+      { name: 'arm', visible: true, reason: null, keyed: false, constraints: ['arm-ik'] },
+    ])
+    const w = mount(SkeletonPanel)
+    const rowOf = (name: string) => w.findAll('.bone-row').find(r => r.find('.bone-name').text() === name)!
+    return { w, rowOf }
+  }
+
+  it('dims a bone without a visible effect and gives the reason as tooltip', () => {
+    const { w, rowOf } = setup()
+    expect(rowOf('glow').classes()).toContain('bone-row--inactive')
+    expect(rowOf('glow').attributes('title')).toBe('No drawn attachments on this bone or its children')
+    w.unmount()
+  })
+
+  it('a visible unconstrained bone has neither dimming nor tooltip; a constrained one gets the constraint line', () => {
+    const { w, rowOf } = setup()
+    expect(rowOf('root').classes()).not.toContain('bone-row--inactive')
+    expect(rowOf('root').attributes('title')).toBeUndefined()
+    expect(rowOf('arm').classes()).not.toContain('bone-row--inactive')
+    expect(rowOf('arm').attributes('title')).toBe('Driven by arm-ik — constrained properties ignore local edits')
+    w.unmount()
+  })
+
+  it('stays dimmed while selected and undims with the next refresh', async () => {
+    const { w, rowOf } = setup()
+    useSkeletonStore().selectedBone = 'glow'
+    await nextTick()
+    expect(rowOf('glow').classes()).toEqual(expect.arrayContaining(['bone-row--selected', 'bone-row--inactive']))
+    useInspectorStore().update([], [], [], [{ name: 'glow', visible: true, reason: null, keyed: true, constraints: [] }])
+    await nextTick()
+    expect(rowOf('glow').classes()).not.toContain('bone-row--inactive')
+    w.unmount()
+  })
+})

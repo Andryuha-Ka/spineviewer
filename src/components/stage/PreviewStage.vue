@@ -30,6 +30,7 @@
     <div
       v-if="selectedBonePos"
       class="bone-cross"
+      :class="{ 'bone-cross--inactive': inspectorStore.boneEffects[skeletonStore.selectedBone ?? '']?.visible === false }"
       :style="{ left: selectedBonePos.x + 'px', top: selectedBonePos.y + 'px' }"
     />
 
@@ -476,7 +477,7 @@ onMounted(async () => {
         if (now - lastInspectorTs >= 100) {
           lastInspectorTs = now
           const attachments = uiAd.getActiveAttachments()
-          inspectorStore.update(uiAd.getBoneTransforms(), attachments, uiAd.getSliders?.() ?? [])
+          inspectorStore.update(uiAd.getBoneTransforms(), attachments, uiAd.getSliders?.() ?? [], uiAd.getBoneEffects())
           atlasStore.markSeen(
             attachments
               .filter(a => a.type === 'region' || a.type === 'mesh')
@@ -1151,6 +1152,11 @@ registerStageCommands(commands)
   position: absolute;
   background: rgba(74, 222, 128, 0.9);
   border-radius: 1px;
+}
+
+.bone-cross--inactive::before,
+.bone-cross--inactive::after {
+  background: rgba(200, 204, 210, 0.6);
 }
 
 /* horizontal bar */
